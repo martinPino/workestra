@@ -14,6 +14,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import { Undo2, Redo2, LayoutGrid, StickyNote, Play, Save, Boxes, Loader2, UploadCloud, PanelRightClose, PanelRightOpen, Menu, X } from 'lucide-react';
 import { cn } from '../lib/cn';
+import { useMediaQuery } from '../lib/useMediaQuery';
 import type { ExecutionEvent } from '@core/contracts';
 import { reduceExecution, type NodeRunStatus } from '@core/domain';
 import { api } from '../lib/api';
@@ -69,7 +70,8 @@ export function Editor() {
   const rf = useRef<ReactFlowInstance | null>(null);
   const dragStart = useRef<Record<string, { x: number; y: number }>>({});
   const [publishedVersion, setPublishedVersion] = useState<number | null>(null);
-  const [inspectorOpen, setInspectorOpen] = useState(true);
+  const isDesktop = useMediaQuery('(min-width: 768px)');
+  const [inspectorOpen, setInspectorOpen] = useState(isDesktop); // en móvil arranca cerrado (ver canvas)
   const nodeTypes = useMemo(() => ({ af: AfNode, comment: CommentNode }), []);
   const base = useMemo(() => docToReactFlow(doc, nodeStatus), [doc, nodeStatus]);
   // Selección CONTROLADA por el store: en modo controlado React Flow ignora los cambios de
