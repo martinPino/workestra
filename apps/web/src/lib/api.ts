@@ -1,7 +1,8 @@
 import type { WorkflowGraph, ExecutionEvent } from '@core/contracts';
 import { currentToken, ensureDevSession, type Role } from './auth';
 
-const API = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
+// Normaliza: quita barra(s) final(es) para no generar `//ruta` (que en Nest da 404).
+const API = (import.meta.env.VITE_API_URL ?? 'http://localhost:3001').replace(/\/+$/, '');
 
 export interface WorkflowDto {
   id: string;
