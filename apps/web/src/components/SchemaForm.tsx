@@ -6,6 +6,23 @@ const inputBase =
   'rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-txt-primary outline-none transition-colors focus:border-primary/60 focus:ring-2 focus:ring-primary/20 placeholder:text-txt-disabled';
 
 /**
+ * Valida que `s` sea JSON válido, tolerando los `{{placeholders}}` de interpolación: cada uno se
+ * sustituye por `1` (token válido tanto entre comillas `"{{x}}"` como como valor suelto `{{x}}`)
+ * antes de parsear. Devuelve `null` si es válido o está vacío; si no, el mensaje del parser.
+ */
+function validateJsonTemplate(s: string): string | null {
+  const t = s.trim();
+  if (t === '') return null; // el cuerpo es opcional
+  const probe = s.replace(/\{\{[^}]+\}\}/g, '1');
+  try {
+    JSON.parse(probe);
+    return null;
+  } catch (e) {
+    return e instanceof Error ? e.message.replace(/^JSON\.parse:\s*/, '') : 'JSON inválido';
+  }
+}
+
+/**
  * Selector de "acción" (plantilla) según el proveedor del conector elegido. Al elegir una acción
  * rellena method + path + body del nodo; luego el usuario los puede ajustar. Depende de `connectorId`
  * ya seleccionado en el mismo config (para saber el proveedor).
@@ -122,8 +139,25 @@ function Field({ field, value, onChange }: { field: FieldSchema; value: unknown;
     );
   }
   if (field.multiline) {
+    const text = String(value ?? '');
+    const jsonError = field.format === 'json' ? validateJsonTemplate(text) : null;
     return (
-      <textarea value={String(value ?? '')} placeholder={field.placeholder} onChange={(e) => onChange(e.target.value)} rows={3} className={`${base} resize-none`} />
+      <>
+        <textarea
+          value={text}
+          placeholder={field.placeholder}
+          onChange={(e) => onChange(e.target.value)}
+          rows={3}
+          spellCheck={field.format === 'json' ? false : undefined}
+          className={`${base} resize-none ${jsonError ? 'border-danger/70 focus:border-danger/70 focus:ring-danger/20' : ''}`}
+        />
+        {field.format === 'json' && jsonError && (
+          <span className="text-[11px] text-danger">JSON inválido: {jsonError}</span>
+        )}
+        {field.format === 'json' && !jsonError && text.trim() !== '' && (
+          <span className="text-[11px] text-txt-disabled">JSON válido · {'{{variables}}'} permitidas</span>
+        )}
+      </>
     );
   }
   return <input type="text" value={String(value ?? '')} placeholder={field.placeholder} onChange={(e) => onChange(e.target.value)} className={base} />;

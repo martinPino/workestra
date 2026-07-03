@@ -10,6 +10,8 @@ export interface FieldSchema {
   placeholder?: string;
   options?: string[]; // para type: 'enum'
   multiline?: boolean;
+  // `json`: valida en vivo que el texto sea JSON válido (tolerando {{placeholders}}); solo advisory.
+  format?: 'json';
 }
 
 export interface NodeConfigSchema {
@@ -220,6 +222,7 @@ registerNodeType({
         label: 'Cuerpo (JSON, opcional · admite {{variables}})',
         placeholder: '{"channel":"#general","text":"{{agent:LLM.output}}"}',
         multiline: true,
+        format: 'json',
       },
     },
   },
