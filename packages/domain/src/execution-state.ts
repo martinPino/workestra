@@ -76,6 +76,9 @@ export function reduceExecutionEvent(state: ExecutionState, e: ExecutionEvent): 
     case 'node.failed':
       nodes[e.nodeKey] = { ...nodes[e.nodeKey], status: 'failed', stepKey: e.stepKey, error: e.error };
       break;
+    case 'node.skipped':
+      nodes[e.nodeKey] = { ...nodes[e.nodeKey], status: 'skipped' };
+      break;
     case 'execution.succeeded':
       status = 'SUCCEEDED';
       break;

@@ -1,6 +1,6 @@
-import type { WorkflowGraph, ExecutionContext, ExecutionEvent, NodeControl, WorkflowNode } from '@core/contracts';
+import type { WorkflowGraph, ExecutionContext, ExecutionEvent, NodeControl, WorkflowNode, OutgoingEdge } from '@core/contracts';
 import { EXECUTION_EVENT_SCHEMA_VERSION } from '@core/contracts';
-import { validateDag, createScheduler, mergeContexts, type ContextContribution } from '@core/domain';
+import { validateDag, createScheduler, mergeContexts, shouldRunNode, type ContextContribution } from '@core/domain';
 import type {
   IExecutionRepository,
   IContextStore,
@@ -120,6 +120,7 @@ export class WorkflowRunner {
     executionId: string,
     node: WorkflowNode,
     baseCtx: ExecutionContext,
+    outgoing: readonly OutgoingEdge[],
     controller: AbortController,
   ): Promise<NodeOutcome> {
     const key = node.key;
@@ -144,7 +145,7 @@ export class WorkflowRunner {
 
       try {
         const result = await this.withTimeout(
-          executor.execute({ executionId, workspaceId: this.workspaceId, nodeKey: key, config: node.config, context: baseCtx, signal: controller.signal, emit }),
+          executor.execute({ executionId, workspaceId: this.workspaceId, nodeKey: key, config: node.config, context: baseCtx, signal: controller.signal, outgoing, emit }),
           policy.timeoutMs,
         );
         await emitChain;
@@ -207,18 +208,42 @@ export class WorkflowRunner {
 
     const scheduler = createScheduler(input.graph);
     const nodeByKey = new Map(input.graph.nodes.map((n) => [n.key, n]));
+    // Aristas salientes por nodo (para que el Router inspeccione sus destinos en runtime, M14).
+    const outgoingByKey = new Map<string, OutgoingEdge[]>();
+    for (const n of input.graph.nodes) outgoingByKey.set(n.key, []);
+    for (const e of input.graph.edges) {
+      const t = nodeByKey.get(e.target);
+      if (t && outgoingByKey.has(e.source) && e.source !== e.target) {
+        outgoingByKey.get(e.source)!.push({ target: e.target, targetType: t.type, targetConfig: t.config, sourceHandle: e.sourceHandle ?? null });
+      }
+    }
     // Resume-safe: los nodos ya completados se saltan; el contexto parte del último checkpoint.
     const completed = new Set<string>(input.resumeCompleted ?? []);
+    const skipped = new Set<string>(); // nodos podados por una rama/router aguas arriba (M14)
+    const resolved = () => new Set<string>([...completed, ...skipped]); // terminales: desbloquean sucesores
     const controller = new AbortController();
     let ctx = resuming ? await this.deps.context.load(executionId) : input.initialContext;
 
     try {
-      while (!scheduler.isComplete(completed)) {
-        const ready = scheduler.ready(completed);
+      while (!scheduler.isComplete(resolved())) {
+        const ready = scheduler.ready(resolved());
         if (ready.length === 0) break;
 
+        // Partición (M14): un nodo listo se EJECUTA si tiene ≥1 arista entrante viva; si todas están
+        // muertas (rama/router aguas arriba no lo eligió, o predecesor saltado) → se SALTA.
+        const toRun: string[] = [];
+        const toSkip: string[] = [];
+        for (const key of ready) (shouldRunNode(key, input.graph.edges, completed, ctx) ? toRun : toSkip).push(key);
+
+        // El skip es terminal y propaga aguas abajo (sus aristas quedan muertas en la sig. iteración).
+        for (const key of toSkip) {
+          await this.emit(executionId, { type: 'node.skipped', nodeKey: key });
+          skipped.add(key);
+        }
+        if (toRun.length === 0) continue; // nivel sólo de skips: sigue con los recién desbloqueados
+
         const baseCtx = ctx; // copy-on-write: cada nodo del nivel parte de la misma base
-        const outcomes = await Promise.all(ready.map((key) => this.runNode(executionId, nodeByKey.get(key)!, baseCtx, controller)));
+        const outcomes = await Promise.all(toRun.map((key) => this.runNode(executionId, nodeByKey.get(key)!, baseCtx, outgoingByKey.get(key) ?? [], controller)));
 
         const failed = outcomes.find((o) => !o.ok);
         if (failed) throw failed.error;

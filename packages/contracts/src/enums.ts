@@ -13,6 +13,7 @@ export const NodeType = z.enum([
   'memory',
   'human',
   'connector',
+  'router',
   'end',
 ]);
 export type NodeType = z.infer<typeof NodeType>;

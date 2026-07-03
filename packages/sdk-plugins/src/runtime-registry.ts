@@ -11,6 +11,7 @@ import { Orchestrator } from './orchestrator';
 import { AgentNodeExecutor } from './agent-node';
 import { HumanNodeExecutor } from './human-node';
 import { ConnectorNodeExecutor } from './connector-node';
+import { RouterNodeExecutor } from './router-node';
 
 export interface RuntimeRegistryDeps {
   agents: IAgentRepository;
@@ -53,6 +54,8 @@ export function createRuntimeRegistry(deps: RuntimeRegistryDeps): NodeExecutorRe
   });
   registry.register(new AgentNodeExecutor(runtime, deps.agents, 'agent', orchestrator));
   registry.register(new AgentNodeExecutor(runtime, deps.agents, 'llm'));
+  // Router (M14): el coordinador enruta a los nodos de agente conectados (usa el LLM para elegir).
+  registry.register(new RouterNodeExecutor(deps.agents, deps.llmRouter));
   if (deps.pendingReviews) registry.register(new HumanNodeExecutor(deps.pendingReviews));
   if (deps.connectors && deps.secrets) {
     registry.register(new ConnectorNodeExecutor(deps.connectors, deps.secrets, deps.selfBase));

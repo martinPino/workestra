@@ -34,6 +34,9 @@ export const ExecutionEventSchema = z.discriminatedUnion('type', [
     stepKey: z.string(),
     error: z.string(),
   }),
+  // El nodo no se ejecuta porque ninguna de sus aristas entrantes quedó ACTIVA (una rama/router
+  // aguas arriba no lo eligió, o un predecesor fue saltado). Terminal, propaga skip a sus sucesores.
+  base.extend({ type: z.literal('node.skipped'), nodeKey: z.string() }),
   base.extend({ type: z.literal('execution.succeeded') }),
   base.extend({ type: z.literal('execution.failed'), error: z.string() }),
 

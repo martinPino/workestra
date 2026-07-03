@@ -19,6 +19,9 @@ export type { Plan, Subtask, PlanEdge, PlanValidationError, PlanValidationResult
 export { mergeContexts } from './merge';
 export type { ContextContribution } from './merge';
 
+export { flowDecisionOf, edgeIsLive, shouldRunNode } from './flow';
+export type { FlowDecision } from './flow';
+
 export type {
   PlanExecutor,
   PlanExecutorConfig,

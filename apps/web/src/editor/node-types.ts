@@ -1,5 +1,5 @@
 import type { NodeType } from '@core/contracts';
-import { Zap, Wrench, GitBranch, Globe, BrainCircuit, Sparkles, Timer, UserCheck, Plug, Flag, type LucideIcon } from 'lucide-react';
+import { Zap, Wrench, GitBranch, Globe, BrainCircuit, Sparkles, Timer, UserCheck, Plug, Flag, Split, type LucideIcon } from 'lucide-react';
 
 /** Subconjunto de JSON Schema que entiende el NodePropertiesPanel. */
 export interface FieldSchema {
@@ -206,6 +206,28 @@ registerNodeType({
         default: 'Aprobación humana requerida',
       },
       ttlMs: { type: 'number', label: 'Caducidad (ms · 0 = sin límite)', default: 0 },
+    },
+  },
+});
+
+registerNodeType({
+  kind: 'router',
+  label: 'Router (coordinador)',
+  icon: Split,
+  color: 'text-teal-400',
+  category: 'control',
+  configSchema: {
+    title: 'Router — el coordinador elige el agente',
+    fields: {
+      // El coordinador cuyo modelo decide a qué agente(s) conectados enrutar. Conecta este nodo a
+      // varios nodos Agente: al ejecutar, solo corren los que el coordinador elija.
+      agentId: { type: 'agent', label: 'Coordinador (decide)' },
+      input: {
+        type: 'string',
+        label: 'Tarea a repartir (opcional · admite {{variables}})',
+        placeholder: 'Investiga X y redacta un resumen',
+        multiline: true,
+      },
     },
   },
 });

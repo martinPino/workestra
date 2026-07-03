@@ -7,6 +7,16 @@ import type { Agent } from './entities';
  * implementan para añadir tipos de nodo, herramientas y conectores SIN tocar el núcleo.
  */
 
+/** Arista saliente del nodo hacia un sucesor: permite a un nodo (p. ej. el Router) inspeccionar sus
+ *  destinos en runtime para decidir a cuál(es) enrutar. `targetType`/`targetConfig` describen el nodo
+ *  destino (p. ej. un nodo `agent` con su `agentId`). */
+export interface OutgoingEdge {
+  readonly target: string;
+  readonly targetType: string;
+  readonly targetConfig: Record<string, unknown>;
+  readonly sourceHandle: string | null;
+}
+
 export interface NodeExecutionContext {
   readonly executionId: string;
   /** Workspace (tenant) DE LA EJECUCIÓN. Los nodos lo usan para acotar recursos por tenant (M8). */
@@ -15,6 +25,8 @@ export interface NodeExecutionContext {
   readonly config: Record<string, unknown>;
   readonly context: ExecutionContext;
   readonly signal: AbortSignal;
+  /** Aristas salientes del nodo (destinos). Presente en el runner real; opcional para tests simples. */
+  readonly outgoing?: readonly OutgoingEdge[];
   /** Emite un evento de dominio (observabilidad). */
   emit(event: unknown): void;
 }

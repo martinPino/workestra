@@ -84,7 +84,13 @@ class ScriptedExecutor implements INodeExecutor {
   readonly type: NodeType = 'tool';
   private attempts = new Map<string, number>();
   async execute(ctx: NodeExecutionContext): Promise<NodeResult> {
-    const c = ctx.config as { sleep?: number; failTimes?: number; set?: { key: string; value: unknown } };
+    const c = ctx.config as {
+      sleep?: number;
+      failTimes?: number;
+      set?: { key: string; value: unknown };
+      route?: string[]; // M14: activa SOLO estas aristas destino (poda el resto)
+      branch?: string[]; // M14: activa SOLO estos handles de salida
+    };
     if (c.sleep) await new Promise((r) => setTimeout(r, c.sleep));
     if (c.failTimes) {
       const n = (this.attempts.get(ctx.nodeKey) ?? 0) + 1;
@@ -93,6 +99,8 @@ class ScriptedExecutor implements INodeExecutor {
     }
     const variables = { ...ctx.context.variables };
     if (c.set) variables[c.set.key] = c.set.value;
+    if (c.route) variables[`flow:${ctx.nodeKey}`] = { targets: c.route };
+    if (c.branch) variables[`flow:${ctx.nodeKey}`] = { handles: c.branch };
     return { context: { ...ctx.context, variables }, control: { kind: 'continue' } };
   }
 }
@@ -174,5 +182,53 @@ describe('WorkflowRunner — política de despacho paralela (M4)', () => {
     const seqs = events.map((e) => e.seq);
     expect(Math.min(...seqs)).toBe(10); // arranca donde le dijeron
     expect(seqs).toEqual([...seqs].sort((x, y) => x - y)); // monótono creciente
+  });
+});
+
+describe('WorkflowRunner — enrutado/poda + skip (M14)', () => {
+  it('router: solo corren los destinos elegidos; el resto se SALTA; fin converge', async () => {
+    const graph: WorkflowGraph = {
+      nodes: [node('r', { route: ['b'] }), node('b'), node('c'), node('fin')],
+      edges: [
+        { source: 'r', target: 'b' },
+        { source: 'r', target: 'c' },
+        { source: 'b', target: 'fin' },
+        { source: 'c', target: 'fin' },
+      ],
+    };
+    const { run, events } = harness();
+    await run(graph);
+    expect(events.some((e) => e.type === 'execution.succeeded')).toBe(true);
+    expect(new Set(nodeKeysOf(events, 'node.succeeded'))).toEqual(new Set(['r', 'b', 'fin']));
+    expect(nodeKeysOf(events, 'node.skipped')).toEqual(['c']); // c no elegido → saltado
+  });
+
+  it('skip PROPAGA: un nodo que solo depende del saltado también se salta', async () => {
+    const graph: WorkflowGraph = {
+      nodes: [node('r', { route: ['b'] }), node('b'), node('c'), node('d')],
+      edges: [
+        { source: 'r', target: 'b' },
+        { source: 'r', target: 'c' },
+        { source: 'c', target: 'd' }, // d solo cuelga de c (saltado) → d se salta
+      ],
+    };
+    const { run, events } = harness();
+    await run(graph);
+    expect(new Set(nodeKeysOf(events, 'node.succeeded'))).toEqual(new Set(['r', 'b']));
+    expect(new Set(nodeKeysOf(events, 'node.skipped'))).toEqual(new Set(['c', 'd']));
+  });
+
+  it('condición: solo la rama del handle elegido corre; la otra se salta', async () => {
+    const graph: WorkflowGraph = {
+      nodes: [node('cond', { branch: ['true'] }), node('x'), node('y')],
+      edges: [
+        { source: 'cond', target: 'x', sourceHandle: 'true' },
+        { source: 'cond', target: 'y', sourceHandle: 'false' },
+      ],
+    };
+    const { run, events } = harness();
+    await run(graph);
+    expect(new Set(nodeKeysOf(events, 'node.succeeded'))).toEqual(new Set(['cond', 'x']));
+    expect(nodeKeysOf(events, 'node.skipped')).toEqual(['y']);
   });
 });

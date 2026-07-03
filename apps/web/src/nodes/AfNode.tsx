@@ -26,7 +26,7 @@ export function AfNode({ data, selected }: NodeProps<AfNodeData>) {
   // en la galería de Agentes. Corona si es coordinador. Se resuelve del registro del workspace.
   const { data: agents } = useAgents();
   const agent =
-    data.kind === 'agent' && data.config?.agentId
+    (data.kind === 'agent' || data.kind === 'router') && data.config?.agentId
       ? agents?.find((a) => a.id === String(data.config?.agentId))
       : undefined;
 

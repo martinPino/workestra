@@ -11,6 +11,7 @@ export * from './orchestrator';
 export * from './agent-node';
 export * from './human-node';
 export * from './connector-node';
+export * from './router-node';
 export * from './connector-providers';
 export * from './interpolate';
 export * from './handoff';
