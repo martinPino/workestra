@@ -8,9 +8,16 @@ import { getModelInfo } from './pricing';
 export class ModelRouter {
   private readonly providers = new Map<string, ILlmProvider>();
   private readonly overrides = new Map<string, string>(); // model -> providerId
+  private defaultProviderId?: string;
 
   registerProvider(provider: ILlmProvider): this {
     this.providers.set(provider.id, provider);
+    return this;
+  }
+
+  /** Proveedor por defecto para modelos sin override ni entrada en el registro (p. ej. Groq/Ollama). */
+  setDefault(providerId: string): this {
+    this.defaultProviderId = providerId;
     return this;
   }
 
@@ -23,10 +30,12 @@ export class ModelRouter {
   providerFor(model: string): ILlmProvider {
     const providerId = this.overrides.get(model) ?? getModelInfo(model)?.provider;
     const provider = providerId ? this.providers.get(providerId) : undefined;
-    if (!provider) {
-      throw new Error(`No hay proveedor LLM registrado para el modelo "${model}" (proveedor ${providerId ?? 'desconocido'}).`);
-    }
-    return provider;
+    if (provider) return provider;
+    // Fallback: si el proveedor resuelto no está registrado (p. ej. anthropic sin clave) o el modelo
+    // es desconocido, usa el proveedor por defecto (openai-compatible o mock).
+    const fallback = this.defaultProviderId ? this.providers.get(this.defaultProviderId) : undefined;
+    if (fallback) return fallback;
+    throw new Error(`No hay proveedor LLM registrado para el modelo "${model}" (proveedor ${providerId ?? 'desconocido'}).`);
   }
 
   chat(req: LlmRequest): Promise<LlmResponse> {

@@ -2,6 +2,7 @@ import type { INodeExecutor, NodeExecutionContext, NodeResult, NodeType, Agent }
 import type { IAgentRepository } from '@core/engine';
 import { AgentRuntime } from './agent-runtime';
 import { Orchestrator } from './orchestrator';
+import { interpolate } from './interpolate';
 
 function inlineAgent(ctx: NodeExecutionContext): Agent {
   const c = ctx.config;
@@ -42,11 +43,17 @@ export class AgentNodeExecutor implements INodeExecutor {
     // si no (o no hay id), se usa un agente efímero inline — nunca un agente de otro tenant.
     const agent: Agent = (agentId ? await this.agents.getInWorkspace(agentId, ctx.workspaceId) : null) ?? inlineAgent(ctx);
 
+    // Entrada del agente (M12): si el nodo define `input`, se interpola contra el contexto y se pasa
+    // como tarea (variables.task, que el runtime lee). Permite "responde a esto: {{connector:c.body}}".
+    let context = ctx.context;
+    const input = ctx.config.input != null ? interpolate(String(ctx.config.input), ctx.context) : '';
+    if (input) context = { ...ctx.context, variables: { ...ctx.context.variables, task: input } };
+
     // El Orchestrator es "un agente cuyo output es un Plan": mismo nodo, comportamiento por flag.
     const result =
       agent.isOrchestrator && this.orchestrator
-        ? await this.orchestrator.run(agent, ctx.context, ctx.emit, ctx.workspaceId)
-        : await this.runtime.invoke(agent, ctx.context);
+        ? await this.orchestrator.run(agent, context, ctx.emit, ctx.workspaceId)
+        : await this.runtime.invoke(agent, context);
 
     return {
       context: result.context,

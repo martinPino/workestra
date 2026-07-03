@@ -12,5 +12,6 @@ export * from './agent-node';
 export * from './human-node';
 export * from './connector-node';
 export * from './connector-providers';
+export * from './interpolate';
 export * from './handoff';
 export * from './runtime-registry';

@@ -17,6 +17,11 @@ export const MODEL_REGISTRY: Record<string, ModelPricing> = {
   'claude-haiku-4-5': { model: 'claude-haiku-4-5', provider: 'anthropic', inputPer1M: 0.8, outputPer1M: 4, contextWindow: 200_000 },
   'gpt-5': { model: 'gpt-5', provider: 'openai', inputPer1M: 10, outputPer1M: 30, contextWindow: 128_000 },
   'mock-1': { model: 'mock-1', provider: 'mock', inputPer1M: 0.5, outputPer1M: 1.5, contextWindow: 8_192 },
+  // Modelos compatibles OpenAI (gratis/baratos). El proveedor pasa el nombre tal cual al endpoint;
+  // sirven de atajo en el dropdown, pero cualquier otro nombre también funciona vía LLM_MODEL.
+  'llama-3.3-70b-versatile': { model: 'llama-3.3-70b-versatile', provider: 'openai-compatible', inputPer1M: 0, outputPer1M: 0, contextWindow: 128_000 }, // Groq (free tier)
+  'llama-3.1-8b-instant': { model: 'llama-3.1-8b-instant', provider: 'openai-compatible', inputPer1M: 0, outputPer1M: 0, contextWindow: 128_000 }, // Groq (free tier)
+  'llama3.2': { model: 'llama3.2', provider: 'openai-compatible', inputPer1M: 0, outputPer1M: 0, contextWindow: 128_000 }, // Ollama local
 };
 
 export function getModelInfo(model: string): ModelPricing | undefined {

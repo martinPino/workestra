@@ -3,4 +3,5 @@ export * from './cost';
 export * from './router';
 export * from './mock-provider';
 export * from './anthropic-provider';
+export * from './openai-compatible-provider';
 export * from './factory';

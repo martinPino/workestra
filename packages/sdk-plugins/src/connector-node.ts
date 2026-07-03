@@ -1,6 +1,7 @@
 import type { INodeExecutor, NodeExecutionContext, NodeResult, NodeType } from '@core/contracts';
 import type { IConnectorRepository, ISecretStore } from '@core/engine';
 import { getConnectorProvider } from './connector-providers';
+import { interpolate } from './interpolate';
 
 /**
  * Nodo de CONECTOR (M11): dispatch saliente AUTENTICADO. Resuelve el conector del propio tenant,
@@ -21,7 +22,9 @@ export class ConnectorNodeExecutor implements INodeExecutor {
   async execute(ctx: NodeExecutionContext): Promise<NodeResult> {
     const connectorId = String(ctx.config.connectorId ?? '');
     const method = String(ctx.config.method ?? 'GET').toUpperCase();
-    const path = String(ctx.config.path ?? '/');
+    // Interpolación (M12): ruta y cuerpo pueden usar la salida de nodos previos, p. ej.
+    // `{"text":"{{agent:LLM.output}}"}`. `jsonSafe` en el cuerpo escapa strings para no romper el JSON.
+    const path = interpolate(String(ctx.config.path ?? '/'), ctx.context);
     const rawBody = ctx.config.body;
 
     const store = (result: Record<string, unknown>): NodeResult => ({
@@ -49,7 +52,8 @@ export class ConnectorNodeExecutor implements INodeExecutor {
     let body: string | undefined;
     if (method !== 'GET' && method !== 'HEAD' && rawBody != null) {
       headers['content-type'] = 'application/json';
-      body = typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody);
+      const bodyStr = typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody);
+      body = interpolate(bodyStr, ctx.context, true); // jsonSafe: escapa strings incrustados
     }
 
     const signal = AbortSignal.any([ctx.signal, AbortSignal.timeout(this.timeoutMs)]);

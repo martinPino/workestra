@@ -145,10 +145,26 @@ registerNodeType({
       model: {
         type: 'enum',
         label: 'Modelo',
-        options: ['mock-1', 'claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5', 'gpt-5'],
+        // Gratis/baratos vía proveedor compatible OpenAI (LLM_BASE_URL): Groq / Ollama.
+        options: [
+          'mock-1',
+          'llama-3.3-70b-versatile',
+          'llama-3.1-8b-instant',
+          'llama3.2',
+          'claude-opus-4-8',
+          'claude-sonnet-5',
+          'claude-haiku-4-5',
+          'gpt-5',
+        ],
         default: 'mock-1',
       },
-      prompt: { type: 'string', label: 'Prompt del sistema', placeholder: 'Eres un asistente útil.', multiline: true },
+      prompt: { type: 'string', label: 'Prompt del sistema', placeholder: 'Eres un asistente útil y conciso.', multiline: true },
+      input: {
+        type: 'string',
+        label: 'Tarea / entrada',
+        placeholder: 'Responde a este mensaje: {{connector:leer.bodyPreview}}',
+        multiline: true,
+      },
     },
   },
 });
@@ -198,7 +214,13 @@ registerNodeType({
       connectorId: { type: 'connector', label: 'Conector' },
       method: { type: 'enum', label: 'Método', options: ['GET', 'POST', 'PUT', 'DELETE'], default: 'GET' },
       path: { type: 'string', label: 'Ruta', placeholder: '/chat.postMessage' },
-      body: { type: 'string', label: 'Cuerpo (JSON, opcional)', placeholder: '{"channel":"#general","text":"hola"}', multiline: true },
+      // El cuerpo admite {{...}} para usar la salida de otros nodos (p. ej. la respuesta del agente).
+      body: {
+        type: 'string',
+        label: 'Cuerpo (JSON, opcional · admite {{variables}})',
+        placeholder: '{"channel":"#general","text":"{{agent:LLM.output}}"}',
+        multiline: true,
+      },
     },
   },
 });
