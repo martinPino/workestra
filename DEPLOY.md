@@ -82,6 +82,17 @@ Pégala en tu app de Slack (**OAuth & Permissions → Redirect URLs**) / Jira (C
 `*_CLIENT_ID/SECRET` en el servicio `api`, y **activa Public Distribution** en Slack para que
 funcione en cualquier workspace. El proveedor `dev` no está disponible en producción.
 
+## Troubleshooting (gotchas reales de Railway)
+- **`SERVICE` obligatorio por servicio** (`api`/`worker`/`web`). Sin él, el entrypoint arranca la API
+  por defecto en el servicio equivocado (p. ej. el web intenta migrar y falla).
+- **Puerto del web (502 "Application failed to respond")**: al generar el dominio del web, Railway a
+  veces auto-detecta el `targetPort` como **5173** (puerto de Vite), pero el contenedor sirve en
+  `PORT` (8080 por defecto de Railway) → desajuste → 502. Fija **`PORT=5173`** en el servicio web
+  (para que coincida con el `targetPort`), o cambia el `targetPort` del dominio a 8080. Comprueba con:
+  `railway domain list --service @app/web --json` (mira `targetPort`).
+- **No pegues `.env.example` entero** en cada servicio: mete `REDIS_URL=redis://localhost:6379` y
+  otros valores de dev que no aplican. Usa referencias `${{Redis.REDIS_URL}}` / `${{Postgres.DATABASE_URL}}`.
+
 ## Notas importantes
 - **Auth de desarrollo**: este despliegue usa el endpoint `/auth/token` (dev) para la sesión, porque
   aún no hay OIDC. Por eso **NO** pongas `NODE_ENV=production` (deshabilitaría ese login y la app
