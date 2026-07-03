@@ -5,6 +5,7 @@ import { Search, CornerDownLeft, Sun, Moon, Plus } from 'lucide-react';
 import { NAV } from './nav';
 import { useUI } from './ui-store';
 import { cn } from '../lib/cn';
+import { useT } from '../i18n';
 
 interface Action {
   id: string;
@@ -19,6 +20,7 @@ export function CommandPalette() {
   const setCmdOpen = useUI((s) => s.setCmdOpen);
   const toggleTheme = useUI((s) => s.toggleTheme);
   const theme = useUI((s) => s.theme);
+  const t = useT();
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
@@ -48,23 +50,23 @@ export function CommandPalette() {
   const actions: Action[] = useMemo(() => {
     const nav: Action[] = NAV.map((n) => ({
       id: `nav-${n.to}`,
-      label: `Ir a ${n.label}`,
-      hint: 'Navegación',
+      label: `${t('Ir a')} ${n.label}`,
+      hint: t('Navegación'),
       icon: <n.icon size={16} />,
       run: () => navigate(n.to),
     }));
     return [
-      { id: 'new-wf', label: 'Nuevo workflow', hint: 'Acción', icon: <Plus size={16} />, run: () => navigate('/workflows?new=1') },
+      { id: 'new-wf', label: t('Nuevo workflow'), hint: t('Acción'), icon: <Plus size={16} />, run: () => navigate('/workflows?new=1') },
       {
         id: 'theme',
-        label: `Cambiar a tema ${theme === 'dark' ? 'claro' : 'oscuro'}`,
-        hint: 'Acción',
+        label: `${t('Cambiar a tema')} ${theme === 'dark' ? t('claro') : t('oscuro')}`,
+        hint: t('Acción'),
         icon: theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />,
         run: toggleTheme,
       },
       ...nav,
     ];
-  }, [navigate, theme, toggleTheme]);
+  }, [navigate, theme, toggleTheme, t]);
 
   const filtered = useMemo(
     () => actions.filter((a) => a.label.toLowerCase().includes(query.toLowerCase())),
@@ -115,7 +117,7 @@ export function CommandPalette() {
                   setQuery(e.target.value);
                   setCursor(0);
                 }}
-                placeholder="Escribe un comando o busca…"
+                placeholder={t('Escribe un comando o busca…')}
                 className="h-12 w-full bg-transparent text-sm text-txt-primary placeholder:text-txt-disabled outline-none"
               />
               <span className="rounded border border-border bg-elevated px-1.5 py-0.5 font-mono text-[10px] text-txt-secondary">
@@ -124,7 +126,7 @@ export function CommandPalette() {
             </div>
             <div className="max-h-80 overflow-y-auto p-2">
               {filtered.length === 0 && (
-                <div className="px-3 py-8 text-center text-sm text-txt-secondary">Sin resultados</div>
+                <div className="px-3 py-8 text-center text-sm text-txt-secondary">{t('Sin resultados')}</div>
               )}
               {filtered.map((a, i) => (
                 <button

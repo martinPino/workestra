@@ -3,9 +3,11 @@ import type { NodeProps } from 'reactflow';
 import { X } from 'lucide-react';
 import type { CommentNodeData } from '../graph';
 import { useEditorStore } from '../editor/store';
+import { useT } from '../i18n';
 
 /** Comentario/anotación tipo sticky note. Se edita en el nodo y se confirma al perder foco. */
 export function CommentNode({ data, selected }: NodeProps<CommentNodeData>) {
+  const t = useT();
   const [text, setText] = useState(data.text);
   const updateCommentText = useEditorStore((s) => s.updateCommentText);
   const removeCommentById = useEditorStore((s) => s.removeCommentById);
@@ -17,7 +19,7 @@ export function CommentNode({ data, selected }: NodeProps<CommentNodeData>) {
       className={`min-h-[64px] w-[184px] rounded-xl border border-warning/40 bg-warning/[0.07] p-2.5 text-xs text-txt-primary ${selected ? 'ring-2 ring-warning' : ''}`}
     >
       <div className="mb-1 flex items-center justify-between text-[10px] text-warning">
-        <span>Comentario</span>
+        <span>{t('Comentario')}</span>
         <button onClick={() => removeCommentById(data.id)} className="opacity-70 hover:opacity-100">
           <X size={12} />
         </button>

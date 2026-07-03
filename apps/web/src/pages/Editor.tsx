@@ -26,6 +26,7 @@ import { docToReactFlow, docToWorkflowGraph, workflowGraphToDoc, STARTER_DOC } f
 import { listNodeTypes } from '../editor/node-types';
 import { useEditorStore } from '../editor/store';
 import { Button, IconButton, Badge, Dot } from '../ui';
+import { useT } from '../i18n';
 
 function SelectionSync() {
   useOnSelectionChange({
@@ -62,6 +63,7 @@ export function Editor() {
   const canRedo = useEditorStore((s) => s.canRedo);
   const lastError = useEditorStore((s) => s.lastError);
   const s = useEditorStore.getState;
+  const t = useT();
 
   const rf = useRef<ReactFlowInstance | null>(null);
   const dragStart = useRef<Record<string, { x: number; y: number }>>({});
@@ -86,8 +88,8 @@ export function Editor() {
           s().loadDoc(wf.graph.nodes.length ? workflowGraphToDoc(wf.graph) : STARTER_DOC, { id: wf.id, name: wf.name });
         }
       } catch {
-        s().setError('No se pudo conectar con la API');
-        s().loadDoc(STARTER_DOC, { id: 'local', name: 'local (sin API)' });
+        s().setError(t('No se pudo conectar con la API'));
+        s().loadDoc(STARTER_DOC, { id: 'local', name: t('local (sin API)') });
       }
     })();
   }, [id]);
@@ -146,9 +148,9 @@ export function Editor() {
     if (!workflowId || workflowId === 'local') return;
     try {
       await api.saveGraph(workflowId, docToWorkflowGraph(s().history.doc));
-      s().setError('Guardado ✓');
+      s().setError(t('Guardado ✓'));
     } catch {
-      s().setError('Error al guardar (¿ciclo?)');
+      s().setError(t('Error al guardar (¿ciclo?)'));
     }
   };
 
@@ -158,9 +160,9 @@ export function Editor() {
       await api.saveGraph(workflowId, docToWorkflowGraph(s().history.doc));
       const v = await api.publish(workflowId);
       setPublishedVersion(v.version);
-      s().setError(`Publicada v${v.version} ✓ — las ejecuciones se anclan a esta versión`);
+      s().setError(`${t('Publicada')} v${v.version} ${t('✓ — las ejecuciones se anclan a esta versión')}`);
     } catch {
-      s().setError('Error al publicar');
+      s().setError(t('Error al publicar'));
     }
   };
 
@@ -181,7 +183,7 @@ export function Editor() {
         if (state.status === 'SUCCEEDED' || state.status === 'FAILED') setTimeout(unsub, 400);
       });
     } catch {
-      s().setError('Error al ejecutar');
+      s().setError(t('Error al ejecutar'));
     }
   };
 
@@ -202,28 +204,28 @@ export function Editor() {
           </Badge>
         </div>
         <div className="flex items-center gap-1.5">
-          <IconButton disabled={!canUndo} onClick={() => s().undo()} aria-label="Deshacer">
+          <IconButton disabled={!canUndo} onClick={() => s().undo()} aria-label={t('Deshacer')}>
             <Undo2 size={16} />
           </IconButton>
-          <IconButton disabled={!canRedo} onClick={() => s().redo()} aria-label="Rehacer">
+          <IconButton disabled={!canRedo} onClick={() => s().redo()} aria-label={t('Rehacer')}>
             <Redo2 size={16} />
           </IconButton>
           <div className="mx-1 h-4 w-px bg-border" />
           <Button size="sm" variant="subtle" onClick={autoLayout}>
-            <LayoutGrid size={14} /> Layout
+            <LayoutGrid size={14} /> {t('Layout')}
           </Button>
           <Button size="sm" variant="subtle" onClick={() => s().addCommentAt({ x: 260, y: 120 })}>
-            <StickyNote size={14} /> Nota
+            <StickyNote size={14} /> {t('Nota')}
           </Button>
           <div className="mx-1 h-4 w-px bg-border" />
           <Button size="sm" variant="secondary" onClick={handleSave}>
-            <Save size={14} /> Guardar
+            <Save size={14} /> {t('Guardar')}
           </Button>
           <Button size="sm" variant="secondary" onClick={handlePublish}>
-            <UploadCloud size={14} /> Publicar
+            <UploadCloud size={14} /> {t('Publicar')}
           </Button>
           <Button size="sm" variant="primary" onClick={handleRun}>
-            <Play size={14} /> Ejecutar
+            <Play size={14} /> {t('Ejecutar')}
           </Button>
         </div>
       </div>
@@ -231,7 +233,7 @@ export function Editor() {
       <div className="flex min-h-0 flex-1">
         {/* Paleta */}
         <aside className="w-44 shrink-0 border-r border-border bg-surface p-3">
-          <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-txt-disabled">Nodos</div>
+          <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-txt-disabled">{t('Nodos')}</div>
           <div className="flex flex-col gap-1.5">
             {listNodeTypes().map((t) => {
               const Icon = t.icon;
@@ -250,7 +252,7 @@ export function Editor() {
             })}
           </div>
           <p className="mt-4 text-[10px] leading-relaxed text-txt-disabled">
-            La paleta se genera desde el registro. Atajos: ⌘Z, ⌘C/⌘V, Supr.
+            {t('La paleta se genera desde el registro. Atajos: ⌘Z, ⌘C/⌘V, Supr.')}
           </p>
         </aside>
 
@@ -293,8 +295,8 @@ export function Editor() {
         {inspectorOpen ? (
           <aside className="flex w-80 shrink-0 flex-col border-l border-border bg-surface">
             <div className="flex items-center justify-between border-b border-border px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-txt-disabled">
-              <span>Inspector</span>
-              <IconButton aria-label="Ocultar inspector" onClick={() => setInspectorOpen(false)}>
+              <span>{t('Inspector')}</span>
+              <IconButton aria-label={t('Ocultar inspector')} onClick={() => setInspectorOpen(false)}>
                 <PanelRightClose size={15} />
               </IconButton>
             </div>
@@ -305,7 +307,7 @@ export function Editor() {
           </aside>
         ) : (
           <aside className="flex w-11 shrink-0 flex-col items-center border-l border-border bg-surface py-2">
-            <IconButton aria-label="Mostrar inspector" onClick={() => setInspectorOpen(true)}>
+            <IconButton aria-label={t('Mostrar inspector')} onClick={() => setInspectorOpen(true)}>
               <PanelRightOpen size={16} />
             </IconButton>
           </aside>

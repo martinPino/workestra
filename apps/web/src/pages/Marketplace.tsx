@@ -4,6 +4,7 @@ import { Search, Star, Download, Bot, Workflow, Wrench, Plug } from 'lucide-reac
 import { Page } from '../app/AppShell';
 import { Card, Badge, PageHeader, Input } from '../ui';
 import { cn } from '../lib/cn';
+import { useT } from '../i18n';
 
 type Cat = 'all' | 'agents' | 'workflows' | 'tools' | 'connectors';
 
@@ -37,6 +38,7 @@ const CATS: { key: Cat; label: string; icon: React.ReactNode }[] = [
 ];
 
 export function Marketplace() {
+  const t = useT();
   const [cat, setCat] = useState<Cat>('all');
   const [q, setQ] = useState('');
 
@@ -47,12 +49,12 @@ export function Marketplace() {
 
   return (
     <Page className="space-y-6">
-      <PageHeader title="Marketplace" subtitle="Descubre y reutiliza agentes, workflows, herramientas y conectores." />
+      <PageHeader title="Marketplace" subtitle={t("Descubre y reutiliza agentes, workflows, herramientas y conectores.")} />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative w-full max-w-sm">
           <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-txt-disabled" />
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar en el marketplace…" className="pl-9" />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Buscar en el marketplace…")} className="pl-9" />
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           {CATS.map((c) => (
@@ -64,7 +66,7 @@ export function Marketplace() {
                 cat === c.key ? 'border-primary/30 bg-primary/12 text-primary' : 'border-border bg-card text-txt-secondary hover:text-txt-primary',
               )}
             >
-              {c.icon} {c.label}
+              {c.icon} {t(c.label)}
             </button>
           ))}
         </div>
@@ -81,9 +83,9 @@ export function Marketplace() {
                 <span className="text-sm font-semibold text-txt-primary">{it.name}</span>
                 <Badge tone="default">{it.cat}</Badge>
               </div>
-              <p className="mt-1 flex-1 text-xs text-txt-secondary">{it.desc}</p>
+              <p className="mt-1 flex-1 text-xs text-txt-secondary">{t(it.desc)}</p>
               <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-xs text-txt-secondary">
-                <span>por {it.author}</span>
+                <span>{t("por")} {it.author}</span>
                 <div className="flex items-center gap-3">
                   <span className="flex items-center gap-1">
                     <Star size={12} className="fill-warning text-warning" /> {it.rating}

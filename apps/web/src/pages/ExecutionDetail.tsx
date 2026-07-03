@@ -26,6 +26,7 @@ import { CommentNode } from '../nodes/CommentNode';
 import { Badge, IconButton, EmptyState } from '../ui';
 import { ReviewActions } from './Executions';
 import { cn } from '../lib/cn';
+import { useT } from '../i18n';
 
 type Tone = 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'accent';
 
@@ -74,6 +75,7 @@ const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString('es-ES', { hou
  * reproduce el estado EXACTO tras los primeros N eventos (replay determinista, sin re-ejecutar).
  */
 export function ExecutionDetail() {
+  const t = useT();
   const { id } = useParams<{ id: string }>();
   const [cursor, setCursor] = useState<number | null>(null); // null = en vivo (todos los eventos)
   const [playing, setPlaying] = useState(false);
@@ -170,7 +172,7 @@ export function ExecutionDetail() {
   if (error || !data?.execution) {
     return (
       <div className="p-8">
-        <EmptyState icon={<CircleX size={20} />} title="Ejecución no encontrada" description="Comprueba el identificador o vuelve al listado." />
+        <EmptyState icon={<CircleX size={20} />} title={t('Ejecución no encontrada')} description={t('Comprueba el identificador o vuelve al listado.')} />
       </div>
     );
   }
@@ -185,7 +187,7 @@ export function ExecutionDetail() {
       <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-border bg-surface px-4">
         <div className="flex min-w-0 items-center gap-3">
           <Link to="/executions" className="flex items-center gap-1 text-xs text-txt-secondary hover:text-txt-primary">
-            <ArrowLeft size={14} /> Ejecuciones
+            <ArrowLeft size={14} /> {t('Ejecuciones')}
           </Link>
           <span className="font-mono text-[11px] text-txt-disabled">{data.executionId}</span>
           <Badge tone={STATUS_TONE[shownStatus] ?? 'default'}>{shownStatus}</Badge>
@@ -224,25 +226,25 @@ export function ExecutionDetail() {
               <Background variant={BackgroundVariant.Dots} gap={22} size={1.5} color="rgb(var(--border))" />
             </ReactFlow>
           ) : (
-            <div className="flex h-full items-center justify-center text-xs text-txt-secondary">Grafo no disponible.</div>
+            <div className="flex h-full items-center justify-center text-xs text-txt-secondary">{t('Grafo no disponible.')}</div>
           )}
 
           {/* Controles de replay (solo cuando hay stream) */}
           {events.length > 0 && (
           <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-border glass px-3 py-2 shadow-pop">
-            <IconButton aria-label="Al inicio" onClick={() => { setPlaying(false); setCursor(0); }}>
+            <IconButton aria-label={t('Al inicio')} onClick={() => { setPlaying(false); setCursor(0); }}>
               <SkipBack size={15} />
             </IconButton>
-            <IconButton aria-label="Un evento atrás" onClick={() => { setPlaying(false); setCursor(Math.max(0, position - 1)); }}>
+            <IconButton aria-label={t('Un evento atrás')} onClick={() => { setPlaying(false); setCursor(Math.max(0, position - 1)); }}>
               <ChevronLeft size={15} />
             </IconButton>
-            <IconButton aria-label={playing ? 'Pausar' : 'Reproducir'} onClick={() => setPlaying((p) => !p)}>
+            <IconButton aria-label={playing ? t('Pausar') : t('Reproducir')} onClick={() => setPlaying((p) => !p)}>
               {playing ? <Pause size={15} /> : <Play size={15} />}
             </IconButton>
-            <IconButton aria-label="Un evento adelante" onClick={() => { setPlaying(false); const n = position + 1; setCursor(n >= events.length ? null : n); }}>
+            <IconButton aria-label={t('Un evento adelante')} onClick={() => { setPlaying(false); const n = position + 1; setCursor(n >= events.length ? null : n); }}>
               <ChevronRight size={15} />
             </IconButton>
-            <IconButton aria-label="Al final" onClick={() => { setPlaying(false); setCursor(null); }}>
+            <IconButton aria-label={t('Al final')} onClick={() => { setPlaying(false); setCursor(null); }}>
               <SkipForward size={15} />
             </IconButton>
             <input
@@ -264,7 +266,7 @@ export function ExecutionDetail() {
                 live ? 'bg-success/15 text-success' : 'text-txt-secondary hover:text-txt-primary',
               )}
             >
-              <Radio size={12} className={live ? 'animate-pulse' : ''} /> En vivo
+              <Radio size={12} className={live ? 'animate-pulse' : ''} /> {t('En vivo')}
             </button>
           </div>
           )}
@@ -274,14 +276,14 @@ export function ExecutionDetail() {
         <aside className="flex w-96 shrink-0 flex-col border-l border-border bg-surface">
           {liveStatus === 'WAITING_HUMAN' && (
             <div className="border-b border-border p-3">
-              <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-warning">Revisión pendiente</div>
+              <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-warning">{t('Revisión pendiente')}</div>
               <ReviewActions executionId={data.executionId} />
             </div>
           )}
 
           {state.plan && (
             <div className="border-b border-border p-3">
-              <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-txt-disabled">Plan del Orchestrator</div>
+              <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-txt-disabled">{t('Plan del Orchestrator')}</div>
               <div className="space-y-1.5">
                 {state.plan.order.map((sid) => {
                   const st = state.plan!.subtasks[sid];
@@ -299,12 +301,12 @@ export function ExecutionDetail() {
           )}
 
           <div className="flex items-center justify-between border-b border-border px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-txt-disabled">
-            <span>Timeline · {events.length} eventos</span>
+            <span>Timeline · {events.length} {t('eventos')}</span>
             {state.error && <span className="normal-case text-danger">{state.error.slice(0, 40)}</span>}
           </div>
           <div ref={timelineRef} className="min-h-0 flex-1 overflow-y-auto">
             {events.length === 0 ? (
-              <div className="p-4 text-xs text-txt-secondary">Sin eventos todavía.</div>
+              <div className="p-4 text-xs text-txt-secondary">{t('Sin eventos todavía.')}</div>
             ) : (
               <ol>
                 {events.map((e, i) => {

@@ -1,6 +1,7 @@
 import { Brain } from 'lucide-react';
 import { useEditorStore } from '../editor/store';
 import { Badge } from '../ui';
+import { useT } from '../i18n';
 
 const DOT: Record<string, string> = {
   pending: 'bg-muted',
@@ -12,6 +13,7 @@ const DOT: Record<string, string> = {
 
 /** Árbol de subtareas del Orchestrator, proyectado en vivo desde el ExecutionStateReducer. */
 export function SubtaskTree() {
+  const t = useT();
   const plan = useEditorStore((s) => s.plan);
   if (!plan) return null;
 
@@ -23,13 +25,13 @@ export function SubtaskTree() {
         <div className="flex h-6 w-6 items-center justify-center rounded-md bg-accent/12 text-accent">
           <Brain size={13} />
         </div>
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-txt-secondary">Plan del Orchestrator</span>
-        {plan.merged && <Badge tone="success">fusionado ✓</Badge>}
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-txt-secondary">{t('Plan del Orchestrator')}</span>
+        {plan.merged && <Badge tone="success">{t('fusionado ✓')}</Badge>}
       </div>
 
       {plan.validationErrors?.length ? (
         <div className="mb-2 rounded-lg border border-danger/20 bg-danger/10 p-2 text-[11px] text-danger">
-          Plan rechazado: {plan.validationErrors.join('; ')}
+          {t('Plan rechazado:')} {plan.validationErrors.join('; ')}
         </div>
       ) : null}
 

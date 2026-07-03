@@ -8,6 +8,7 @@ import { Card, Badge, Dot, PageHeader, Tabs, Button, Input, EmptyState } from '.
 import { useExecutions, useReviews } from '../lib/hooks';
 import { api, type ExecutionRow, type ReviewDto } from '../lib/api';
 import { useAuth, canApprove } from '../lib/auth';
+import { useT } from '../i18n';
 
 type Tone = 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'accent';
 
@@ -25,6 +26,7 @@ const fmtCost = (c: number) => (c === 0 ? '—' : `$${c.toFixed(c < 0.01 ? 4 : 3
 
 /** Tarjeta de revisión: aprobar/rechazar una pausa humana. El scope lo valida el servidor (403). */
 export function ReviewActions({ executionId }: { executionId: string }) {
+  const t = useT();
   const { data: reviews } = useReviews(executionId);
   const { token, role } = useAuth();
   const qc = useQueryClient();
@@ -42,7 +44,7 @@ export function ReviewActions({ executionId }: { executionId: string }) {
       for (const r of pending) await api.resolveReview(executionId, { approved, decision: decision || undefined, reviewId: r.id });
       await Promise.all([qc.invalidateQueries({ queryKey: ['executions'] }), qc.invalidateQueries({ queryKey: ['reviews', executionId] })]);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Error al resolver');
+      setErr(e instanceof Error ? e.message : t('Error al resolver'));
     } finally {
       setBusy(false);
     }
@@ -57,23 +59,23 @@ export function ReviewActions({ executionId }: { executionId: string }) {
       ))}
       {!token ? (
         <div className="flex items-center gap-2 rounded-lg border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
-          <ShieldAlert size={14} /> Necesitas una sesión para aprobar.{' '}
+          <ShieldAlert size={14} /> {t('Necesitas una sesión para aprobar.')}{' '}
           <Link to="/settings" className="underline">
-            Generar token
+            {t('Generar token')}
           </Link>
         </div>
       ) : (
         <>
           <div className="flex items-center gap-2">
-            <Input value={decision} onChange={(e) => setDecision(e.target.value)} placeholder="Comentario de decisión (opcional)" className="h-8 text-xs" />
+            <Input value={decision} onChange={(e) => setDecision(e.target.value)} placeholder={t('Comentario de decisión (opcional)')} className="h-8 text-xs" />
             <Button size="sm" variant="primary" disabled={busy || !canApprove(role)} onClick={() => resolve(true)}>
-              <Check size={14} /> Aprobar
+              <Check size={14} /> {t('Aprobar')}
             </Button>
             <Button size="sm" variant="danger" disabled={busy || !canApprove(role)} onClick={() => resolve(false)}>
-              <X size={14} /> Rechazar
+              <X size={14} /> {t('Rechazar')}
             </Button>
           </div>
-          {!canApprove(role) && <p className="text-[11px] text-warning">El rol {role} no puede aprobar (se requiere execution:approve).</p>}
+          {!canApprove(role) && <p className="text-[11px] text-warning">{t('El rol')} {role} {t('no puede aprobar (se requiere execution:approve).')}</p>}
         </>
       )}
       {err && <p className="text-[11px] text-danger">{err}</p>}
@@ -108,6 +110,7 @@ function ExecRow({ e, i }: { e: ExecutionRow; i: number }) {
 }
 
 export function Executions() {
+  const t = useT();
   const [tab, setTab] = useState('all');
   const statusFilter = tab === 'reviews' ? 'WAITING_HUMAN' : undefined;
   const { data, isLoading, error } = useExecutions(statusFilter);
@@ -121,32 +124,32 @@ export function Executions() {
   return (
     <Page className="space-y-6">
       <PageHeader
-        title="Ejecuciones"
-        subtitle="Historial, monitorización en vivo y bandeja de revisiones humanas."
+        title={t('Ejecuciones')}
+        subtitle={t('Historial, monitorización en vivo y bandeja de revisiones humanas.')}
         actions={
           <Tabs
             active={tab}
             onChange={setTab}
             tabs={[
-              { key: 'all', label: 'Todas' },
-              { key: 'reviews', label: waitingCount ? `Revisiones · ${waitingCount}` : 'Revisiones' },
-              { key: 'ok', label: 'Correctas' },
-              { key: 'err', label: 'Con incidencias' },
+              { key: 'all', label: t('Todas') },
+              { key: 'reviews', label: waitingCount ? `${t('Revisiones')} · ${waitingCount}` : t('Revisiones') },
+              { key: 'ok', label: t('Correctas') },
+              { key: 'err', label: t('Con incidencias') },
             ]}
           />
         }
       />
 
       {error ? (
-        <EmptyState icon={<CircleX size={20} />} title="No se pudo conectar con la API" description="Arranca la API para ver las ejecuciones reales." />
+        <EmptyState icon={<CircleX size={20} />} title={t('No se pudo conectar con la API')} description={t('Arranca la API para ver las ejecuciones reales.')} />
       ) : (
         <Card>
           <div className="grid grid-cols-[1.6fr_0.9fr_0.6fr_0.6fr_0.7fr] gap-4 border-b border-border px-5 py-2.5 text-[11px] font-medium uppercase tracking-wide text-txt-disabled">
-            <span>Ejecución</span>
-            <span>Estado</span>
-            <span>Tokens</span>
-            <span>Coste</span>
-            <span className="text-right">Versión</span>
+            <span>{t('Ejecución')}</span>
+            <span>{t('Estado')}</span>
+            <span>{t('Tokens')}</span>
+            <span>{t('Coste')}</span>
+            <span className="text-right">{t('Versión')}</span>
           </div>
           {isLoading ? (
             <div className="px-5 py-10 text-center text-txt-secondary">
@@ -156,11 +159,11 @@ export function Executions() {
             <div className="px-5 py-12">
               <EmptyState
                 icon={<Inbox size={20} />}
-                title={tab === 'reviews' ? 'Sin revisiones pendientes' : 'Sin ejecuciones todavía'}
+                title={tab === 'reviews' ? t('Sin revisiones pendientes') : t('Sin ejecuciones todavía')}
                 description={
                   tab === 'reviews'
-                    ? 'Cuando un workflow con nodo Humano se pause, aparecerá aquí para aprobar o rechazar.'
-                    : 'Ejecuta un workflow desde el editor para verlo aquí.'
+                    ? t('Cuando un workflow con nodo Humano se pause, aparecerá aquí para aprobar o rechazar.')
+                    : t('Ejecuta un workflow desde el editor para verlo aquí.')
                 }
               />
             </div>
@@ -175,7 +178,7 @@ export function Executions() {
       )}
       <p className="flex items-center gap-1.5 text-xs text-txt-disabled">
         <Dot tone={waitingCount ? 'warning' : 'success'} pulse={!!waitingCount} />
-        {waitingCount ? `${waitingCount} ejecución(es) esperando aprobación humana.` : 'Datos en vivo desde la API · refresco cada 3s.'}
+        {waitingCount ? `${waitingCount} ${t('ejecución(es) esperando aprobación humana.')}` : t('Datos en vivo desde la API · refresco cada 3s.')}
       </p>
     </Page>
   );

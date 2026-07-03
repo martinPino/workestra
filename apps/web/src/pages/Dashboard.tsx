@@ -4,6 +4,7 @@ import { Workflow, Bot, Activity, DollarSign, Cpu, CircleCheck, TriangleAlert, A
 import { Page } from '../app/AppShell';
 import { Card, Stat, Badge, Dot, Button, PageHeader, Skeleton } from '../ui';
 import { useAgents, useWorkflows, useHealth } from '../lib/hooks';
+import { useT } from '../i18n';
 
 const MODEL_USAGE = [
   { model: 'claude-opus-4-8', pct: 46, tone: 'bg-primary' },
@@ -23,6 +24,7 @@ const ACTIVITY = [
 const SPARK = [8, 12, 9, 16, 14, 22, 18, 26, 21, 30, 24, 34];
 
 export function Dashboard() {
+  const t = useT();
   const navigate = useNavigate();
   const agents = useAgents();
   const workflows = useWorkflows();
@@ -34,10 +36,10 @@ export function Dashboard() {
     <Page className="space-y-6">
       <PageHeader
         title="Dashboard"
-        subtitle="Estado del sistema, agentes y ejecuciones en tiempo real."
+        subtitle={t("Estado del sistema, agentes y ejecuciones en tiempo real.")}
         actions={
           <Button variant="primary" onClick={() => navigate('/workflows?new=1')}>
-            <Plus size={15} /> Nuevo workflow
+            <Plus size={15} /> {t("Nuevo workflow")}
           </Button>
         }
       />
@@ -47,19 +49,19 @@ export function Dashboard() {
         <Stat
           label="Workflows"
           value={workflows.isLoading ? <Skeleton className="h-7 w-10" /> : (workflows.data?.length ?? 0)}
-          delta="+2 esta semana"
+          delta={t("+2 esta semana")}
           icon={<Workflow size={18} />}
           tone="primary"
         />
         <Stat
-          label="Agentes"
+          label={t("Agentes")}
           value={agents.isLoading ? <Skeleton className="h-7 w-10" /> : (agents.data?.length ?? 0)}
-          delta="1 orchestrator activo"
+          delta={t("1 orchestrator activo")}
           icon={<Bot size={18} />}
           tone="accent"
         />
-        <Stat label="Ejecuciones (24h)" value="128" delta="+18% vs. ayer" icon={<Activity size={18} />} tone="success" />
-        <Stat label="Coste estimado (mes)" value="$42.10" delta="1.2M tokens" icon={<DollarSign size={18} />} tone="warning" />
+        <Stat label={t("Ejecuciones (24h)")} value="128" delta={t("+18% vs. ayer")} icon={<Activity size={18} />} tone="success" />
+        <Stat label={t("Coste estimado (mes)")} value="$42.10" delta="1.2M tokens" icon={<DollarSign size={18} />} tone="warning" />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -67,13 +69,13 @@ export function Dashboard() {
         <Card className="lg:col-span-2">
           <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold text-txt-primary">Actividad en tiempo real</h2>
+              <h2 className="text-sm font-semibold text-txt-primary">{t("Actividad en tiempo real")}</h2>
               <Badge tone="success">
-                <Dot tone="success" pulse /> en vivo
+                <Dot tone="success" pulse /> {t("en vivo")}
               </Badge>
             </div>
             <button className="flex items-center gap-1 text-xs text-txt-secondary hover:text-txt-primary" onClick={() => navigate('/executions')}>
-              Ver todo <ArrowUpRight size={13} />
+              {t("Ver todo")} <ArrowUpRight size={13} />
             </button>
           </div>
           <div className="divide-y divide-border">
@@ -86,8 +88,8 @@ export function Dashboard() {
                 className="flex items-center gap-3 px-5 py-3"
               >
                 <Dot tone={a.tone} />
-                <span className="flex-1 text-sm text-txt-primary">{a.text}</span>
-                <span className="text-xs text-txt-disabled">{a.t}</span>
+                <span className="flex-1 text-sm text-txt-primary">{t(a.text)}</span>
+                <span className="text-xs text-txt-disabled">{t(a.t)}</span>
               </motion.div>
             ))}
           </div>
@@ -96,18 +98,18 @@ export function Dashboard() {
         {/* Estado del sistema */}
         <Card>
           <div className="border-b border-border px-5 py-3.5">
-            <h2 className="text-sm font-semibold text-txt-primary">Estado del sistema</h2>
+            <h2 className="text-sm font-semibold text-txt-primary">{t("Estado del sistema")}</h2>
           </div>
           <div className="space-y-3 p-5">
-            <SystemRow label="API" ok={online} value={online ? 'operativa' : 'offline'} />
-            <SystemRow label="Motor de ejecución" ok value="inline" />
-            <SystemRow label="Cola (BullMQ)" ok value="0 pendientes" />
-            <SystemRow label="Errores (24h)" ok={false} warn value="3" />
+            <SystemRow label="API" ok={online} value={online ? t('operativa') : 'offline'} />
+            <SystemRow label={t("Motor de ejecución")} ok value="inline" />
+            <SystemRow label={t("Cola (BullMQ)")} ok value={t("0 pendientes")} />
+            <SystemRow label={t("Errores (24h)")} ok={false} warn value="3" />
           </div>
           <div className="border-t border-border px-5 py-4">
             <div className="mb-2 flex items-center justify-between text-xs">
               <span className="text-txt-secondary">Throughput</span>
-              <span className="font-medium text-txt-primary">34 ejec/h</span>
+              <span className="font-medium text-txt-primary">{t("34 ejec/h")}</span>
             </div>
             <div className="flex h-12 items-end gap-1">
               {SPARK.map((v, i) => (
@@ -123,7 +125,7 @@ export function Dashboard() {
         <Card className="lg:col-span-2">
           <div className="flex items-center gap-2 border-b border-border px-5 py-3.5">
             <Cpu size={16} className="text-txt-secondary" />
-            <h2 className="text-sm font-semibold text-txt-primary">Uso de modelos</h2>
+            <h2 className="text-sm font-semibold text-txt-primary">{t("Uso de modelos")}</h2>
           </div>
           <div className="space-y-4 p-5">
             {MODEL_USAGE.map((m) => (
@@ -147,13 +149,13 @@ export function Dashboard() {
 
         <Card className="flex flex-col">
           <div className="border-b border-border px-5 py-3.5">
-            <h2 className="text-sm font-semibold text-txt-primary">Salud</h2>
+            <h2 className="text-sm font-semibold text-txt-primary">{t("Salud")}</h2>
           </div>
           <div className="grid flex-1 grid-cols-2 gap-px overflow-hidden bg-border">
-            <HealthTile icon={<CircleCheck size={18} className="text-success" />} label="Éxito" value="97.6%" />
-            <HealthTile icon={<TriangleAlert size={18} className="text-warning" />} label="Fallos" value="2.4%" />
-            <HealthTile icon={<Activity size={18} className="text-primary" />} label="Latencia p50" value="640ms" />
-            <HealthTile icon={<Cpu size={18} className="text-accent" />} label="Tokens/ejec" value="1.4k" />
+            <HealthTile icon={<CircleCheck size={18} className="text-success" />} label={t("Éxito")} value="97.6%" />
+            <HealthTile icon={<TriangleAlert size={18} className="text-warning" />} label={t("Fallos")} value="2.4%" />
+            <HealthTile icon={<Activity size={18} className="text-primary" />} label={t("Latencia p50")} value="640ms" />
+            <HealthTile icon={<Cpu size={18} className="text-accent" />} label={t("Tokens/ejec")} value="1.4k" />
           </div>
         </Card>
       </div>

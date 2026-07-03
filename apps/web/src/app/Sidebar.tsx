@@ -4,8 +4,10 @@ import { PanelLeftClose, PanelLeft, Command } from 'lucide-react';
 import { NAV } from './nav';
 import { useUI } from './ui-store';
 import { cn } from '../lib/cn';
+import { useT } from '../i18n';
 
 export function Sidebar() {
+  const t = useT();
   const collapsed = useUI((s) => s.collapsed);
   const toggleCollapsed = useUI((s) => s.toggleCollapsed);
   const setCmdOpen = useUI((s) => s.setCmdOpen);
@@ -41,7 +43,7 @@ export function Sidebar() {
           <Command size={14} />
           {!collapsed && (
             <>
-              <span className="flex-1 text-left">Buscar…</span>
+              <span className="flex-1 text-left">{t('Buscar…')}</span>
               <span className="rounded border border-border bg-elevated px-1 font-mono text-[10px]">⌘K</span>
             </>
           )}
@@ -90,7 +92,7 @@ export function Sidebar() {
           )}
         >
           {collapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
-          {!collapsed && <span>Colapsar</span>}
+          {!collapsed && <span>{t('Colapsar')}</span>}
         </button>
       </div>
     </motion.aside>

@@ -6,6 +6,7 @@ import { useUI } from '../app/ui-store';
 import { cn } from '../lib/cn';
 import { api } from '../lib/api';
 import { useAuth, canApprove, type Role } from '../lib/auth';
+import { useT } from '../i18n';
 
 const ROLES: Role[] = ['OWNER', 'ADMIN', 'EDITOR', 'VIEWER'];
 
@@ -19,6 +20,7 @@ function jwtSub(token: string): string {
 }
 
 function SessionCard() {
+  const t = useT();
   const { token, role, setSession, clear } = useAuth();
   const [picked, setPicked] = useState<Role>(role ?? 'EDITOR');
   const [busy, setBusy] = useState(false);
@@ -31,7 +33,7 @@ function SessionCard() {
       const { accessToken } = await api.devToken(picked);
       setSession({ token: accessToken, role: picked, sub: jwtSub(accessToken) });
     } catch {
-      setErr('No se pudo emitir el token (¿API arriba?)');
+      setErr(t('No se pudo emitir el token (¿API arriba?)'));
     } finally {
       setBusy(false);
     }
@@ -40,8 +42,8 @@ function SessionCard() {
   return (
     <Section
       icon={<ShieldCheck size={16} />}
-      title="Sesión (dev) · Escalado humano"
-      description="Emite un JWT de desarrollo para aprobar/rechazar revisiones. Aprobar exige el scope execution:approve (OWNER/ADMIN/EDITOR)."
+      title={t('Sesión (dev) · Escalado humano')}
+      description={t('Emite un JWT de desarrollo para aprobar/rechazar revisiones. Aprobar exige el scope execution:approve (OWNER/ADMIN/EDITOR).')}
     >
       <div className="flex flex-wrap items-center gap-2">
         {ROLES.map((r) => (
@@ -57,7 +59,7 @@ function SessionCard() {
           </button>
         ))}
         <Button size="sm" variant="primary" onClick={generate} disabled={busy}>
-          {busy ? 'Emitiendo…' : 'Generar token'}
+          {busy ? t('Emitiendo…') : t('Generar token')}
         </Button>
       </div>
       <div className="flex items-center justify-between rounded-lg border border-border bg-surface px-3 py-2.5">
@@ -65,16 +67,16 @@ function SessionCard() {
           {token ? (
             <>
               <Badge tone={canApprove(role) ? 'success' : 'warning'}>{role}</Badge>
-              <span className="text-txt-secondary">sesión activa</span>
+              <span className="text-txt-secondary">{t('sesión activa')}</span>
               <span className="font-mono text-[11px] text-txt-disabled">…{token.slice(-10)}</span>
             </>
           ) : (
-            <span className="text-txt-secondary">Sin sesión — genera un token para poder aprobar revisiones.</span>
+            <span className="text-txt-secondary">{t('Sin sesión — genera un token para poder aprobar revisiones.')}</span>
           )}
         </div>
         {token && (
           <button onClick={clear} className="flex items-center gap-1 text-xs text-txt-secondary hover:text-danger">
-            <LogOut size={13} /> Salir
+            <LogOut size={13} /> {t('Salir')}
           </button>
         )}
       </div>
@@ -84,21 +86,22 @@ function SessionCard() {
 }
 
 export function SettingsPage() {
+  const t = useT();
   const theme = useUI((s) => s.theme);
   const setTheme = useUI((s) => s.setTheme);
 
   return (
     <Page className="max-w-3xl space-y-6">
-      <PageHeader title="Configuración" subtitle="Apariencia, notificaciones y preferencias de la cuenta." />
+      <PageHeader title={t('Configuración')} subtitle={t('Apariencia, notificaciones y preferencias de la cuenta.')} />
 
       <SessionCard />
 
-      <Section icon={<Monitor size={16} />} title="Apariencia" description="Personaliza cómo se ve AgentFlow.">
+      <Section icon={<Monitor size={16} />} title={t('Apariencia')} description={t('Personaliza cómo se ve AgentFlow.')}>
         <div className="flex gap-2">
           {(
             [
-              { key: 'dark', label: 'Oscuro', icon: <Moon size={15} /> },
-              { key: 'light', label: 'Claro', icon: <Sun size={15} /> },
+              { key: 'dark', label: t('Oscuro'), icon: <Moon size={15} /> },
+              { key: 'light', label: t('Claro'), icon: <Sun size={15} /> },
             ] as const
           ).map((opt) => (
             <button
@@ -115,23 +118,23 @@ export function SettingsPage() {
         </div>
       </Section>
 
-      <Section icon={<Bell size={16} />} title="Notificaciones" description="Cuándo quieres recibir avisos.">
-        <Row label="Ejecución completada" desc="Notificar al finalizar un workflow" defaultOn />
-        <Row label="Ejecución fallida" desc="Avisar ante errores o timeouts" defaultOn />
-        <Row label="Escalado humano" desc="Cuando un agente pide aprobación" />
+      <Section icon={<Bell size={16} />} title={t('Notificaciones')} description={t('Cuándo quieres recibir avisos.')}>
+        <Row label={t('Ejecución completada')} desc={t('Notificar al finalizar un workflow')} defaultOn />
+        <Row label={t('Ejecución fallida')} desc={t('Avisar ante errores o timeouts')} defaultOn />
+        <Row label={t('Escalado humano')} desc={t('Cuando un agente pide aprobación')} />
       </Section>
 
-      <Section icon={<Building2 size={16} />} title="Workspace" description="Identidad de tu espacio de trabajo.">
+      <Section icon={<Building2 size={16} />} title={t('Workspace')} description={t('Identidad de tu espacio de trabajo.')}>
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-txt-secondary">Nombre del workspace</span>
+          <span className="mb-1 block text-xs font-medium text-txt-secondary">{t('Nombre del workspace')}</span>
           <Input defaultValue="Default" />
         </label>
       </Section>
 
-      <Section icon={<KeyRound size={16} />} title="Proveedores LLM" description="Claves de API (cifradas por el Secret Manager).">
+      <Section icon={<KeyRound size={16} />} title={t('Proveedores LLM')} description={t('Claves de API (cifradas por el Secret Manager).')}>
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-txt-secondary">Anthropic API Key</span>
-          <Input type="password" placeholder="sk-ant-… (usa el Mock si está vacía)" />
+          <Input type="password" placeholder={t('sk-ant-… (usa el Mock si está vacía)')} />
         </label>
       </Section>
     </Page>

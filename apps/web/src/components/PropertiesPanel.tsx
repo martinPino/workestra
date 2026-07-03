@@ -1,17 +1,19 @@
 import { useEditorStore } from '../editor/store';
 import { getNodeType } from '../editor/node-types';
 import { SchemaForm } from './SchemaForm';
+import { useT } from '../i18n';
 
 /** Panel de propiedades: se genera desde el config schema del tipo del nodo seleccionado. */
 export function PropertiesPanel() {
   const selection = useEditorStore((s) => s.selection);
   const doc = useEditorStore((s) => s.history.doc);
   const updateConfig = useEditorStore((s) => s.updateConfig);
+  const t = useT();
 
   if (selection.length !== 1) {
     return (
       <div className="p-4 text-xs text-txt-secondary">
-        {selection.length === 0 ? 'Selecciona un nodo para editar sus propiedades.' : `${selection.length} nodos seleccionados.`}
+        {selection.length === 0 ? t('Selecciona un nodo para editar sus propiedades.') : `${selection.length} ${t('nodos seleccionados.')}`}
       </div>
     );
   }
@@ -20,7 +22,7 @@ export function PropertiesPanel() {
   if (!node) return <div className="p-4 text-xs text-txt-secondary">—</div>;
 
   const def = getNodeType(node.kind);
-  if (!def) return <div className="p-4 text-xs text-txt-secondary">Tipo desconocido: {node.kind}</div>;
+  if (!def) return <div className="p-4 text-xs text-txt-secondary">{t('Tipo desconocido:')} {node.kind}</div>;
 
   const Icon = def.icon;
   return (

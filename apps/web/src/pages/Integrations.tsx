@@ -10,6 +10,7 @@ import { Card, Badge, Dot, PageHeader, Button } from '../ui';
 import { useWorkflows, useWorkflow, useWebhooks, useSchedules, useConnectors, useConnectorProviders } from '../lib/hooks';
 import { api } from '../lib/api';
 import { useAuth, canApprove } from '../lib/auth';
+import { useT } from '../i18n';
 
 type TriggerEvent = 'manual' | 'webhook' | 'cron';
 
@@ -22,19 +23,21 @@ function triggerEventOf(graph?: WorkflowGraph): TriggerEvent {
 
 /** Aviso cuando el Trigger del workflow no coincide con la integración; enlaza al editor. */
 function TriggerMismatch({ event, need, wfId }: { event: TriggerEvent; need: TriggerEvent; wfId: string }) {
+  const t = useT();
   return (
     <div className="mt-3 flex flex-wrap items-center gap-1.5 rounded-lg border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
       <Zap size={13} />
-      El Trigger de este workflow es «{event}», no «{need}».
+      {t('El Trigger de este workflow es')} «{event}», {t('no')} «{need}».
       <Link to={`/workflows/${wfId}`} className="font-medium underline">
-        Cámbialo en el editor
+        {t('Cámbialo en el editor')}
       </Link>
-      para {need === 'webhook' ? 'crear webhooks' : 'programar disparos'}.
+      {t('para')} {need === 'webhook' ? t('crear webhooks') : t('programar disparos')}.
     </div>
   );
 }
 
 function CopyButton({ value }: { value: string }) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
   return (
     <button
@@ -44,7 +47,7 @@ function CopyButton({ value }: { value: string }) {
         setTimeout(() => setCopied(false), 1200);
       }}
       className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-txt-secondary transition-colors hover:bg-elevated hover:text-txt-primary"
-      aria-label="Copiar"
+      aria-label={t('Copiar')}
     >
       {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
     </button>
@@ -62,6 +65,7 @@ function WebhookManager() {
   const triggerEvent = triggerEventOf(wf?.graph);
   const allowed = triggerEvent === 'webhook'; // el nodo Trigger debe ser de tipo webhook
   const { token, role } = useAuth();
+  const t = useT();
   const qc = useQueryClient();
   const [creating, setCreating] = useState(false);
   const [justCreated, setJustCreated] = useState<{ url: string; signingSecret: string } | null>(null);
@@ -76,7 +80,7 @@ function WebhookManager() {
       setJustCreated({ url: w.url, signingSecret: w.signingSecret });
       await qc.invalidateQueries({ queryKey: ['webhooks', wfId] });
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Error al crear el webhook');
+      setErr(e instanceof Error ? e.message : t('Error al crear el webhook'));
     } finally {
       setCreating(false);
     }
@@ -95,15 +99,15 @@ function WebhookManager() {
         </div>
         <div className="flex-1">
           <div className="text-sm font-semibold text-txt-primary">Webhook triggers</div>
-          <div className="text-xs text-txt-secondary">Arranca un workflow desde un evento externo. Cada endpoint se firma con HMAC-SHA256.</div>
+          <div className="text-xs text-txt-secondary">{t('Arranca un workflow desde un evento externo. Cada endpoint se firma con HMAC-SHA256.')}</div>
         </div>
       </div>
 
       {!token ? (
         <div className="flex items-center gap-2 rounded-lg border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
-          <ShieldAlert size={14} /> Necesitas una sesión (rol EDITOR o superior) para gestionar webhooks.{' '}
+          <ShieldAlert size={14} /> {t('Necesitas una sesión (rol EDITOR o superior) para gestionar webhooks.')}{' '}
           <Link to="/settings" className="underline">
-            Generar token
+            {t('Generar token')}
           </Link>
         </div>
       ) : (
@@ -127,21 +131,21 @@ function WebhookManager() {
               <Zap size={11} /> trigger: {triggerEvent}
             </Badge>
             <Button size="sm" variant="primary" onClick={create} disabled={creating || !wfId || !allowed || !canApprove(role)}>
-              <Plus size={14} /> {creating ? 'Creando…' : 'Nuevo webhook'}
+              <Plus size={14} /> {creating ? t('Creando…') : t('Nuevo webhook')}
             </Button>
-            {!canApprove(role) && <span className="text-[11px] text-warning">El rol {role} no puede crear (requiere workflow:write).</span>}
+            {!canApprove(role) && <span className="text-[11px] text-warning">{t('El rol')} {role} {t('no puede crear (requiere workflow:write).')}</span>}
           </div>
           {wfId && !allowed && <TriggerMismatch event={triggerEvent} need="webhook" wfId={wfId} />}
 
           {justCreated && (
             <div className="mt-3 space-y-2 rounded-lg border border-primary/25 bg-primary/[0.06] p-3">
               <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
-                <KeyRound size={12} /> Guarda el secreto ahora — no se volverá a mostrar
+                <KeyRound size={12} /> {t('Guarda el secreto ahora — no se volverá a mostrar')}
               </div>
-              <FieldRow label="URL (POST)" value={`${API_BASE}${justCreated.url}`} mono />
-              <FieldRow label="Signing secret" value={justCreated.signingSecret} mono />
+              <FieldRow label={t('URL (POST)')} value={`${API_BASE}${justCreated.url}`} mono />
+              <FieldRow label={t('Signing secret')} value={justCreated.signingSecret} mono />
               <p className="text-[11px] text-txt-secondary">
-                Firma el cuerpo: <span className="font-mono">x-agentflow-signature = HMAC_SHA256(body, secret)</span> en hex.
+                {t('Firma el cuerpo:')} <span className="font-mono">x-agentflow-signature = HMAC_SHA256(body, secret)</span> {t('en hex.')}
               </p>
             </div>
           )}
@@ -149,14 +153,14 @@ function WebhookManager() {
 
           <div className="mt-4 space-y-1.5">
             {(webhooks ?? []).length === 0 ? (
-              <p className="text-xs text-txt-disabled">Este workflow aún no tiene webhooks.</p>
+              <p className="text-xs text-txt-disabled">{t('Este workflow aún no tiene webhooks.')}</p>
             ) : (
               (webhooks ?? []).map((w) => (
                 <div key={w.id} className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs">
                   <Badge tone={w.active ? 'success' : 'default'}>{w.event}</Badge>
                   <span className="min-w-0 flex-1 truncate font-mono text-txt-secondary">{API_BASE}{w.url}</span>
                   <CopyButton value={`${API_BASE}${w.url}`} />
-                  <button onClick={() => remove(w.id)} className="flex h-7 w-7 items-center justify-center rounded-md text-txt-secondary hover:bg-danger/15 hover:text-danger" aria-label="Eliminar">
+                  <button onClick={() => remove(w.id)} className="flex h-7 w-7 items-center justify-center rounded-md text-txt-secondary hover:bg-danger/15 hover:text-danger" aria-label={t('Eliminar')}>
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -185,6 +189,7 @@ function ScheduleManager() {
   const triggerEvent = triggerEventOf(wf?.graph);
   const allowed = triggerEvent === 'cron'; // el nodo Trigger debe ser de tipo cron
   const { token, role } = useAuth();
+  const t = useT();
   const qc = useQueryClient();
   const [mode, setMode] = useState<'interval' | 'cron'>('interval');
   const [seconds, setSeconds] = useState('60');
@@ -199,7 +204,7 @@ function ScheduleManager() {
       await api.createSchedule(wfId, spec);
       await qc.invalidateQueries({ queryKey: ['schedules', wfId] });
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Error al programar');
+      setErr(e instanceof Error ? e.message : t('Error al programar'));
     }
   };
   const remove = async (id: string) => {
@@ -214,16 +219,16 @@ function ScheduleManager() {
           <Clock size={17} />
         </div>
         <div className="flex-1">
-          <div className="text-sm font-semibold text-txt-primary">Triggers programados</div>
-          <div className="text-xs text-txt-secondary">Dispara un workflow por intervalo o patrón cron (BullMQ · requiere el worker durable).</div>
+          <div className="text-sm font-semibold text-txt-primary">{t('Triggers programados')}</div>
+          <div className="text-xs text-txt-secondary">{t('Dispara un workflow por intervalo o patrón cron (BullMQ · requiere el worker durable).')}</div>
         </div>
       </div>
 
       {!token ? (
         <div className="flex items-center gap-2 rounded-lg border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
-          <ShieldAlert size={14} /> Necesitas una sesión (rol EDITOR o superior) para programar triggers.{' '}
+          <ShieldAlert size={14} /> {t('Necesitas una sesión (rol EDITOR o superior) para programar triggers.')}{' '}
           <Link to="/settings" className="underline">
-            Generar token
+            {t('Generar token')}
           </Link>
         </div>
       ) : (
@@ -250,13 +255,13 @@ function ScheduleManager() {
                   onClick={() => setMode(m)}
                   className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${mode === m ? 'bg-elevated text-txt-primary' : 'text-txt-secondary hover:text-txt-primary'}`}
                 >
-                  {m === 'interval' ? 'Intervalo' : 'Cron'}
+                  {m === 'interval' ? t('Intervalo') : t('Cron')}
                 </button>
               ))}
             </div>
             {mode === 'interval' ? (
               <div className="flex items-center gap-1.5 text-xs text-txt-secondary">
-                cada
+                {t('cada')}
                 <input
                   value={seconds}
                   onChange={(e) => setSeconds(e.target.value.replace(/[^\d]/g, ''))}
@@ -273,24 +278,24 @@ function ScheduleManager() {
               />
             )}
             <Button size="sm" variant="primary" onClick={create} disabled={!wfId || !allowed || !canApprove(role)}>
-              <Plus size={14} /> Programar
+              <Plus size={14} /> {t('Programar')}
             </Button>
           </div>
           {wfId && !allowed && <TriggerMismatch event={triggerEvent} need="cron" wfId={wfId} />}
-          {!canApprove(role) && <p className="mt-1 text-[11px] text-warning">El rol {role} no puede programar (requiere workflow:write).</p>}
+          {!canApprove(role) && <p className="mt-1 text-[11px] text-warning">{t('El rol')} {role} {t('no puede programar (requiere workflow:write).')}</p>}
           {err && <p className="mt-2 text-xs text-danger">{err}</p>}
 
           <div className="mt-4 space-y-1.5">
             {(schedules ?? []).length === 0 ? (
-              <p className="text-xs text-txt-disabled">Este workflow no tiene triggers programados.</p>
+              <p className="text-xs text-txt-disabled">{t('Este workflow no tiene triggers programados.')}</p>
             ) : (
               (schedules ?? []).map((s) => (
                 <div key={s.id} className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs">
                   <Badge tone={s.active ? 'accent' : 'default'}>
-                    <Clock size={11} /> {s.cron ? 'cron' : 'intervalo'}
+                    <Clock size={11} /> {s.cron ? 'cron' : t('intervalo')}
                   </Badge>
                   <span className="min-w-0 flex-1 truncate font-mono text-txt-secondary">{s.cron ?? humanEvery(s.everyMs ?? 0)}</span>
-                  <button onClick={() => remove(s.id)} className="flex h-7 w-7 items-center justify-center rounded-md text-txt-secondary hover:bg-danger/15 hover:text-danger" aria-label="Eliminar">
+                  <button onClick={() => remove(s.id)} className="flex h-7 w-7 items-center justify-center rounded-md text-txt-secondary hover:bg-danger/15 hover:text-danger" aria-label={t('Eliminar')}>
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -322,6 +327,7 @@ const PROVIDER_GRADIENT: Record<string, string> = {
 /** Conectores OAuth (M11): conectar con el proveedor `dev` (funcional) y dispatch por el nodo Conector. */
 function ConnectorsManager() {
   const { token, role } = useAuth();
+  const t = useT();
   const { data: providers } = useConnectorProviders();
   const [connecting, setConnecting] = useState<string | null>(null);
   const { data: connectors } = useConnectors(!!connecting);
@@ -348,7 +354,7 @@ function ConnectorsManager() {
       setConnecting(provider);
       window.open(authorizeUrl, 'agentflow-oauth', 'width=540,height=680');
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Error al conectar');
+      setErr(e instanceof Error ? e.message : t('Error al conectar'));
     }
   };
 
@@ -359,10 +365,10 @@ function ConnectorsManager() {
 
   return (
     <div>
-      <div className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-txt-disabled">Conectores</div>
+      <div className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-txt-disabled">{t('Conectores')}</div>
       {!token ? (
         <div className="flex items-center gap-2 rounded-lg border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
-          <ShieldAlert size={14} /> Necesitas una sesión (rol EDITOR o superior) para gestionar conectores.
+          <ShieldAlert size={14} /> {t('Necesitas una sesión (rol EDITOR o superior) para gestionar conectores.')}
         </div>
       ) : (
         <>
@@ -381,19 +387,19 @@ function ConnectorsManager() {
                       <div className="text-sm font-semibold text-txt-primary">{p.label}</div>
                       {connected ? (
                         <Badge tone="success">
-                          <Check size={11} /> conectado
+                          <Check size={11} /> {t('conectado')}
                         </Badge>
                       ) : p.configured ? (
-                        <span className="text-xs text-txt-secondary">sin conectar</span>
+                        <span className="text-xs text-txt-secondary">{t('sin conectar')}</span>
                       ) : (
-                        <span className="flex items-center gap-1 text-xs text-txt-disabled" title={`Configura ${p.provider.toUpperCase()}_CLIENT_ID y ${p.provider.toUpperCase()}_CLIENT_SECRET en el servidor`}>
-                          <Lock size={11} /> falta {p.provider.toUpperCase()}_CLIENT_ID/SECRET
+                        <span className="flex items-center gap-1 text-xs text-txt-disabled" title={`${t('Configura')} ${p.provider.toUpperCase()}_CLIENT_ID ${t('y')} ${p.provider.toUpperCase()}_CLIENT_SECRET ${t('en el servidor')}`}>
+                          <Lock size={11} /> {t('falta')} {p.provider.toUpperCase()}_CLIENT_ID/SECRET
                         </span>
                       )}
                     </div>
                     {connected ? (
                       <Button size="sm" variant="secondary" onClick={() => disconnect(c!.id)} disabled={!canApprove(role)}>
-                        <Unplug size={14} /> Desconectar
+                        <Unplug size={14} /> {t('Desconectar')}
                       </Button>
                     ) : (
                       <Button
@@ -402,7 +408,7 @@ function ConnectorsManager() {
                         onClick={() => connect(p.provider)}
                         disabled={!canApprove(role) || !p.configured || connecting === p.provider}
                       >
-                        <Plug size={14} /> {connecting === p.provider ? 'Conectando…' : 'Conectar'}
+                        <Plug size={14} /> {connecting === p.provider ? t('Conectando…') : t('Conectar')}
                       </Button>
                     )}
                   </Card>
@@ -411,7 +417,7 @@ function ConnectorsManager() {
             })}
           </div>
           <p className="mt-3 flex items-center gap-1.5 text-xs text-txt-disabled">
-            <Dot tone="default" /> «Dev» funciona sin configurar (OAuth simulado). Slack/Jira/GitHub se activan al fijar sus <span className="font-mono">*_CLIENT_ID/SECRET</span> en el servidor y registrar la redirect URI <span className="font-mono">/connectors/callback</span>.
+            <Dot tone="default" /> {t('«Dev» funciona sin configurar (OAuth simulado). Slack/Jira/GitHub se activan al fijar sus')} <span className="font-mono">*_CLIENT_ID/SECRET</span> {t('en el servidor y registrar la redirect URI')} <span className="font-mono">/connectors/callback</span>.
           </p>
         </>
       )}
@@ -420,9 +426,10 @@ function ConnectorsManager() {
 }
 
 export function Integrations() {
+  const t = useT();
   return (
     <Page className="space-y-6">
-      <PageHeader title="Integraciones" subtitle="Triggers entrantes y conectores. Todo desacoplado como plugins." />
+      <PageHeader title={t('Integraciones')} subtitle={t('Triggers entrantes y conectores. Todo desacoplado como plugins.')} />
 
       <WebhookManager />
 

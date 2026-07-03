@@ -8,23 +8,25 @@ import { useAgents } from '../lib/hooks';
 import { api, type AgentDto, type AgentInput } from '../lib/api';
 import { ROLE_PRESETS, AGENT_MODELS } from './agent-roles';
 import { agentGradient } from '../lib/agent-avatar';
+import { useT } from '../i18n';
 
 const selectCls =
   'h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm text-txt-primary outline-none transition-colors focus:border-primary/60 focus:ring-2 focus:ring-primary/20';
 
 export function Agents() {
+  const t = useT();
   const { data, isLoading } = useAgents();
   const [editing, setEditing] = useState<AgentDto | 'new' | null>(null);
 
   return (
     <Page className="space-y-6">
       <PageHeader
-        title="Agentes"
-        subtitle="Especialistas de IA: define su Rol, objetivo, instrucciones y modelo."
+        title={t('Agentes')}
+        subtitle={t('Especialistas de IA: define su Rol, objetivo, instrucciones y modelo.')}
         actions={
           !editing && (
             <Button variant="primary" onClick={() => setEditing('new')}>
-              <Plus size={15} /> Nuevo agente
+              <Plus size={15} /> {t('Nuevo agente')}
             </Button>
           )
         }
@@ -48,11 +50,11 @@ export function Agents() {
         !editing && (
           <EmptyState
             icon={<Bot size={22} />}
-            title="Sin agentes"
-            description="Crea agentes especializados con un Rol para tus workflows."
+            title={t('Sin agentes')}
+            description={t('Crea agentes especializados con un Rol para tus workflows.')}
             action={
               <Button variant="primary" onClick={() => setEditing('new')}>
-                <Plus size={15} /> Nuevo agente
+                <Plus size={15} /> {t('Nuevo agente')}
               </Button>
             }
           />
@@ -70,6 +72,7 @@ export function Agents() {
 
 /** Formulario de crear/editar agente. Rol→name, Objetivo→description, Instrucciones→systemPrompt. */
 function AgentForm({ initial, onDone, onCancel }: { initial: AgentDto | null; onDone: () => void; onCancel: () => void }) {
+  const t = useT();
   const qc = useQueryClient();
   const [role, setRole] = useState(initial?.name ?? '');
   const [goal, setGoal] = useState(initial?.description ?? '');
@@ -92,7 +95,7 @@ function AgentForm({ initial, onDone, onCancel }: { initial: AgentDto | null; on
 
   const submit = async () => {
     if (!role.trim()) {
-      setErr('El Rol es obligatorio.');
+      setErr(t('El Rol es obligatorio.'));
       return;
     }
     setSaving(true);
@@ -111,7 +114,7 @@ function AgentForm({ initial, onDone, onCancel }: { initial: AgentDto | null; on
       await qc.invalidateQueries({ queryKey: ['agents'] });
       onDone();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'No se pudo guardar el agente.');
+      setErr(e instanceof Error ? e.message : t('No se pudo guardar el agente.'));
     } finally {
       setSaving(false);
     }
@@ -120,15 +123,15 @@ function AgentForm({ initial, onDone, onCancel }: { initial: AgentDto | null; on
   return (
     <Card className="p-5">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-txt-primary">{initial ? 'Editar agente' : 'Nuevo agente'}</h2>
-        <IconButton onClick={onCancel} aria-label="Cerrar">
+        <h2 className="text-sm font-semibold text-txt-primary">{initial ? t('Editar agente') : t('Nuevo agente')}</h2>
+        <IconButton onClick={onCancel} aria-label={t('Cerrar')}>
           <X size={16} />
         </IconButton>
       </div>
 
       {!initial && (
         <div className="mb-4">
-          <div className="mb-1.5 text-[11px] font-medium text-txt-secondary">Empieza desde un rol predefinido (opcional)</div>
+          <div className="mb-1.5 text-[11px] font-medium text-txt-secondary">{t('Empieza desde un rol predefinido (opcional)')}</div>
           <div className="flex flex-wrap gap-1.5">
             {ROLE_PRESETS.map((p) => (
               <button
@@ -145,10 +148,10 @@ function AgentForm({ initial, onDone, onCancel }: { initial: AgentDto | null; on
       )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Field label="Rol / función *" hint="Quién es el agente (p. ej. «Investigador»)">
-          <Input value={role} onChange={(e) => setRole(e.target.value)} placeholder="Investigador" />
+        <Field label={t('Rol / función *')} hint={t('Quién es el agente (p. ej. «Investigador»)')}>
+          <Input value={role} onChange={(e) => setRole(e.target.value)} placeholder={t('Investigador')} />
         </Field>
-        <Field label="Modelo" hint="llama-* es gratis vía Groq/Ollama">
+        <Field label={t('Modelo')} hint={t('llama-* es gratis vía Groq/Ollama')}>
           <select value={model} onChange={(e) => setModel(e.target.value)} className={selectCls}>
             {AGENT_MODELS.map((m) => (
               <option key={m} value={m}>
@@ -157,13 +160,13 @@ function AgentForm({ initial, onDone, onCancel }: { initial: AgentDto | null; on
             ))}
           </select>
         </Field>
-        <Field label="Objetivo" hint="Qué debe conseguir (guía al orquestador)" className="md:col-span-2">
-          <Input value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="Buscar y resumir información fiable" />
+        <Field label={t('Objetivo')} hint={t('Qué debe conseguir (guía al orquestador)')} className="md:col-span-2">
+          <Input value={goal} onChange={(e) => setGoal(e.target.value)} placeholder={t('Buscar y resumir información fiable')} />
         </Field>
-        <Field label="Instrucciones (system prompt)" hint="Cómo se comporta" className="md:col-span-2">
-          <Textarea rows={4} value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="Eres un investigador meticuloso. Cita fuentes, sé conciso…" />
+        <Field label={t('Instrucciones (system prompt)')} hint={t('Cómo se comporta')} className="md:col-span-2">
+          <Textarea rows={4} value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder={t('Eres un investigador meticuloso. Cita fuentes, sé conciso…')} />
         </Field>
-        <Field label="Herramientas" hint="Opcional, separadas por comas" className="md:col-span-2">
+        <Field label={t('Herramientas')} hint={t('Opcional, separadas por comas')} className="md:col-span-2">
           <Input value={tools} onChange={(e) => setTools(e.target.value)} placeholder="tool:http, tool:mock" />
         </Field>
       </div>
@@ -171,7 +174,7 @@ function AgentForm({ initial, onDone, onCancel }: { initial: AgentDto | null; on
       <label className="mt-4 flex items-center gap-2.5">
         <Switch checked={isOrchestrator} onChange={setIsOrchestrator} />
         <span className="text-xs text-txt-secondary">
-          Agente coordinador (planifica y delega en otros agentes)
+          {t('Agente coordinador (planifica y delega en otros agentes)')}
         </span>
       </label>
 
@@ -179,10 +182,10 @@ function AgentForm({ initial, onDone, onCancel }: { initial: AgentDto | null; on
 
       <div className="mt-5 flex items-center gap-2">
         <Button variant="primary" onClick={submit} disabled={saving}>
-          {saving ? 'Guardando…' : initial ? 'Guardar cambios' : 'Crear agente'}
+          {saving ? t('Guardando…') : initial ? t('Guardar cambios') : t('Crear agente')}
         </Button>
         <Button variant="ghost" onClick={onCancel} disabled={saving}>
-          Cancelar
+          {t('Cancelar')}
         </Button>
       </div>
     </Card>
@@ -200,6 +203,7 @@ function Field({ label, hint, className, children }: { label: string; hint?: str
 }
 
 function AgentCard({ agent, index, onEdit }: { agent: AgentDto; index: number; onEdit: () => void }) {
+  const t = useT();
   const qc = useQueryClient();
   const gradient = agentGradient(agent.id);
   const role = agent.permissions?.role ?? 'EDITOR';
@@ -227,15 +231,15 @@ function AgentCard({ agent, index, onEdit }: { agent: AgentDto; index: number; o
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span className="truncate text-sm font-semibold text-txt-primary">{agent.name}</span>
-              {agent.isOrchestrator && <Badge tone="accent">líder</Badge>}
+              {agent.isOrchestrator && <Badge tone="accent">{t('líder')}</Badge>}
             </div>
-            <p className="mt-0.5 line-clamp-2 text-xs text-txt-secondary">{agent.description ?? 'Agente especializado.'}</p>
+            <p className="mt-0.5 line-clamp-2 text-xs text-txt-secondary">{agent.description ?? t('Agente especializado.')}</p>
           </div>
           <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-            <IconButton onClick={onEdit} aria-label="Editar">
+            <IconButton onClick={onEdit} aria-label={t('Editar')}>
               <Pencil size={14} />
             </IconButton>
-            <IconButton onClick={() => setConfirming(true)} aria-label="Borrar" className="hover:text-danger">
+            <IconButton onClick={() => setConfirming(true)} aria-label={t('Borrar')} className="hover:text-danger">
               <Trash2 size={14} />
             </IconButton>
           </div>
@@ -243,13 +247,13 @@ function AgentCard({ agent, index, onEdit }: { agent: AgentDto; index: number; o
 
         {confirming ? (
           <div className="flex items-center justify-between gap-2 border-t border-border bg-danger/5 px-5 py-3">
-            <span className="text-xs text-txt-secondary">¿Borrar «{agent.name}»?</span>
+            <span className="text-xs text-txt-secondary">{t('¿Borrar «')}{agent.name}{t('»?')}</span>
             <div className="flex items-center gap-2">
               <Button variant="danger" size="sm" onClick={del} disabled={deleting}>
-                {deleting ? 'Borrando…' : 'Borrar'}
+                {deleting ? t('Borrando…') : t('Borrar')}
               </Button>
               <Button variant="ghost" size="sm" onClick={() => setConfirming(false)} disabled={deleting}>
-                Cancelar
+                {t('Cancelar')}
               </Button>
             </div>
           </div>
@@ -265,7 +269,7 @@ function AgentCard({ agent, index, onEdit }: { agent: AgentDto; index: number; o
                 </span>
               ))
             ) : (
-              <span className="inline-flex items-center gap-1 rounded-md bg-elevated px-2 py-0.5 text-[11px] text-txt-disabled">sin tools</span>
+              <span className="inline-flex items-center gap-1 rounded-md bg-elevated px-2 py-0.5 text-[11px] text-txt-disabled">{t('sin tools')}</span>
             )}
             <Badge tone="default" className="ml-auto">
               {role}

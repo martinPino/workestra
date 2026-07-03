@@ -8,8 +8,10 @@ import { Card, Button, PageHeader, Badge, Dot, EmptyState, Skeleton } from '../u
 import { useWorkflows } from '../lib/hooks';
 import { api } from '../lib/api';
 import { STARTER_DOC, docToWorkflowGraph } from '../graph';
+import { useT } from '../i18n';
 
 export function Workflows() {
+  const t = useT();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const qc = useQueryClient();
@@ -37,10 +39,10 @@ export function Workflows() {
     <Page className="space-y-6">
       <PageHeader
         title="Workflows"
-        subtitle="Diseña y ejecuta equipos de agentes con el editor visual."
+        subtitle={t("Diseña y ejecuta equipos de agentes con el editor visual.")}
         actions={
           <Button variant="primary" onClick={create}>
-            <Plus size={15} /> Nuevo workflow
+            <Plus size={15} /> {t("Nuevo workflow")}
           </Button>
         }
       />
@@ -54,11 +56,11 @@ export function Workflows() {
       ) : !data || data.length === 0 ? (
         <EmptyState
           icon={<WorkflowIcon size={22} />}
-          title="Aún no hay workflows"
-          description="Crea tu primer workflow y empieza a orquestar agentes de IA."
+          title={t("Aún no hay workflows")}
+          description={t("Crea tu primer workflow y empieza a orquestar agentes de IA.")}
           action={
             <Button variant="primary" onClick={create}>
-              <Plus size={15} /> Crear workflow
+              <Plus size={15} /> {t("Crear workflow")}
             </Button>
           }
         />
@@ -78,14 +80,14 @@ export function Workflows() {
                 <div className="mt-4 text-sm font-semibold text-txt-primary">{wf.name}</div>
                 <div className="mt-1 flex items-center gap-3 text-xs text-txt-secondary">
                   <span className="flex items-center gap-1">
-                    <GitBranch size={12} /> {wf.graph?.nodes?.length ?? 0} nodos
+                    <GitBranch size={12} /> {wf.graph?.nodes?.length ?? 0} {t("nodos")}
                   </span>
                   <span>v{wf.version}</span>
                 </div>
                 <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
-                  <span className="text-xs text-txt-disabled">Editar en el canvas</span>
+                  <span className="text-xs text-txt-disabled">{t("Editar en el canvas")}</span>
                   <span className="flex items-center gap-1 text-xs font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
-                    <Play size={12} /> Abrir
+                    <Play size={12} /> {t("Abrir")}
                   </span>
                 </div>
               </Card>

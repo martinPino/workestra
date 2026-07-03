@@ -1,6 +1,7 @@
 import type { NodeConfigSchema, FieldSchema } from '../editor/node-types';
 import { CONNECTOR_ACTIONS } from '../editor/connector-actions';
 import { useConnectors, useAgents } from '../lib/hooks';
+import { useT } from '../i18n';
 
 const inputBase =
   'rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-txt-primary outline-none transition-colors focus:border-primary/60 focus:ring-2 focus:ring-primary/20 placeholder:text-txt-disabled';
@@ -38,13 +39,14 @@ function ActionTemplatePicker({
   value: Record<string, unknown>;
   onChange: (v: Record<string, unknown>) => void;
 }) {
+  const t = useT();
   const { data: connectors } = useConnectors();
   const provider = connectors?.find((c) => c.id === String(value.connectorId ?? ''))?.provider;
   const actions = provider ? (CONNECTOR_ACTIONS[provider] ?? []) : [];
   if (!provider || actions.length === 0) return null;
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-[11px] font-medium text-txt-secondary">Plantilla de acción ({provider})</span>
+      <span className="text-[11px] font-medium text-txt-secondary">{t('Plantilla de acción')} ({provider})</span>
       <select
         value=""
         onChange={(e) => {
@@ -53,7 +55,7 @@ function ActionTemplatePicker({
         }}
         className={inputBase}
       >
-        <option value="">— elige una acción para rellenar ruta + cuerpo —</option>
+        <option value="">{t('— elige una acción para rellenar ruta + cuerpo —')}</option>
         {actions.map((a) => (
           <option key={a.id} value={a.id}>
             {a.label}
@@ -66,19 +68,20 @@ function ActionTemplatePicker({
 
 /** Desplegable de agentes del workspace (el valor guardado es el id del agente). */
 function AgentSelect({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) {
+  const t = useT();
   const { data: agents } = useAgents();
   const list = agents ?? [];
   return (
     <select value={String(value ?? '')} onChange={(e) => onChange(e.target.value)} className={inputBase}>
-      <option value="">— agente inline (usa la config del nodo LLM) —</option>
+      <option value="">{t('— agente inline (usa la config del nodo LLM) —')}</option>
       {list.map((a) => (
         <option key={a.id} value={a.id}>
-          {a.name} ({a.model}){a.isOrchestrator ? ' · líder' : ''}
+          {a.name} ({a.model}){a.isOrchestrator ? ` · ${t('líder')}` : ''}
         </option>
       ))}
       {list.length === 0 && (
         <option value="" disabled>
-          No hay agentes — créalos en la sección Agentes
+          {t('No hay agentes — créalos en la sección Agentes')}
         </option>
       )}
     </select>
@@ -87,17 +90,18 @@ function AgentSelect({ value, onChange }: { value: unknown; onChange: (v: unknow
 
 /** Desplegable de conectores del workspace (el valor guardado es el id del conector). */
 function ConnectorSelect({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) {
+  const t = useT();
   const { data: connectors } = useConnectors();
   const list = connectors ?? [];
   return (
     <select value={String(value ?? '')} onChange={(e) => onChange(e.target.value)} className={inputBase}>
-      <option value="">— elige un conector —</option>
+      <option value="">{t('— elige un conector —')}</option>
       {list.map((c) => (
         <option key={c.id} value={c.id}>
-          {c.key} ({c.provider}){c.status !== 'connected' ? ' — sin conectar' : ''}
+          {c.key} ({c.provider}){c.status !== 'connected' ? ` ${t('— sin conectar')}` : ''}
         </option>
       ))}
-      {list.length === 0 && <option value="" disabled>No hay conectores — créalos en Integraciones</option>}
+      {list.length === 0 && <option value="" disabled>{t('No hay conectores — créalos en Integraciones')}</option>}
     </select>
   );
 }
@@ -110,9 +114,10 @@ interface Props {
 
 /** Genera un formulario a partir del JSON Schema del tipo de nodo (panel schema-driven). */
 export function SchemaForm({ schema, value, onChange }: Props) {
+  const t = useT();
   const entries = Object.entries(schema.fields);
   if (entries.length === 0) {
-    return <p className="text-xs text-txt-secondary">Este nodo no tiene propiedades configurables.</p>;
+    return <p className="text-xs text-txt-secondary">{t('Este nodo no tiene propiedades configurables.')}</p>;
   }
   const set = (key: string, v: unknown) => onChange({ ...value, [key]: v });
 
@@ -133,6 +138,7 @@ export function SchemaForm({ schema, value, onChange }: Props) {
 }
 
 function Field({ field, value, onChange }: { field: FieldSchema; value: unknown; onChange: (v: unknown) => void }) {
+  const t = useT();
   const base = inputBase;
 
   if (field.type === 'connector') {
@@ -180,10 +186,10 @@ function Field({ field, value, onChange }: { field: FieldSchema; value: unknown;
           className={`${base} resize-none ${jsonError ? 'border-danger/70 focus:border-danger/70 focus:ring-danger/20' : ''}`}
         />
         {field.format === 'json' && jsonError && (
-          <span className="text-[11px] text-danger">JSON inválido: {jsonError}</span>
+          <span className="text-[11px] text-danger">{t('JSON inválido:')} {jsonError}</span>
         )}
         {field.format === 'json' && !jsonError && text.trim() !== '' && (
-          <span className="text-[11px] text-txt-disabled">JSON válido · {'{{variables}}'} permitidas</span>
+          <span className="text-[11px] text-txt-disabled">{t('JSON válido ·')} {'{{variables}}'} {t('permitidas')}</span>
         )}
       </>
     );
