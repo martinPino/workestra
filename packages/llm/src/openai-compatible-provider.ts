@@ -59,7 +59,15 @@ export class OpenAiCompatibleProvider implements ILlmProvider {
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(this.timeoutMs),
     });
-    if (!res.ok) throw new Error(`LLM HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    if (!res.ok) {
+      // Error accionable: nombra el modelo y el endpoint. El fallo típico es elegir en el editor un
+      // modelo (p. ej. gpt-5 o claude-*) que NO existe en el LLM_BASE_URL configurado (Groq/Ollama).
+      const detail = (await res.text()).slice(0, 300);
+      throw new Error(
+        `LLM HTTP ${res.status} para el modelo «${req.model}» en ${this.baseUrl}: ${detail} — ` +
+          `verifica que ese modelo exista en el endpoint (LLM_BASE_URL) y que LLM_API_KEY sea válida.`,
+      );
+    }
     const data = (await res.json()) as OpenAiResponse;
 
     const msg = data.choices?.[0]?.message ?? {};

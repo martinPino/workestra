@@ -32,4 +32,29 @@ describe('interpolate (M12 · flujo de datos entre nodos)', () => {
     expect(hasTemplate('a {{x}} b')).toBe(true);
     expect(hasTemplate('sin nada')).toBe(false);
   });
+
+  // Revisión adversarial M12 — regresiones:
+
+  it('jsonSafe con valor NO-string (objeto/array) no rompe ni inyecta el JSON del cuerpo', () => {
+    const c = ctx({ 'connector:c': { payload: { a: 1, evil: '#atacante' } } });
+    const body = interpolate('{"channel":"#safe","text":"{{connector:c.payload}}"}', c, true);
+    expect(() => JSON.parse(body)).not.toThrow(); // el objeto va serializado DENTRO de la cadena
+    expect(JSON.parse(body).channel).toBe('#safe'); // no se inyecta ninguna clave nueva
+    expect(JSON.parse(body).text).toBe('{"a":1,"evil":"#atacante"}');
+  });
+
+  it('claves heredadas del prototipo resuelven a vacío (nunca funciones ni Object.prototype)', () => {
+    const empty = ctx({});
+    expect(interpolate('a{{toString}}b', empty)).toBe('ab');
+    expect(interpolate('a{{constructor}}b', empty)).toBe('ab');
+    expect(interpolate('a{{__proto__}}b', empty)).toBe('ab');
+    expect(interpolate('a{{constructor.name}}b', empty)).toBe('ab');
+    // y en modo jsonSafe no debe lanzar TypeError (era el bug)
+    expect(() => interpolate('{"t":"{{toString}}"}', empty, true)).not.toThrow();
+  });
+
+  it('resuelve claves compuestas cuya nodeKey contiene «.» (prefijo más largo)', () => {
+    const c = ctx({ 'connector:read.msg': { bodyPreview: 'hola' } });
+    expect(interpolate('{{connector:read.msg.bodyPreview}}', c)).toBe('hola');
+  });
 });

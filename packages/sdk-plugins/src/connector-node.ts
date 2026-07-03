@@ -33,6 +33,12 @@ export class ConnectorNodeExecutor implements INodeExecutor {
     });
 
     if (!connectorId) return store({ error: 'connector: falta connectorId en la config del nodo.' });
+    // Endurecimiento (M12): la ruta interpolada no debe poder escapar del endpoint del proveedor.
+    // Rechaza travesía de directorios (`..`), espacios/whitespace y caracteres de control, evitando
+    // que la salida (potencialmente influida por datos externos) redirija la llamada a `../admin/...`.
+    if (/\.\.|\s/u.test(path)) {
+      return store({ error: 'connector: la ruta interpolada contiene «..», espacios o caracteres no permitidos.' });
+    }
 
     // Deny-by-default por tenant: nunca resuelve un conector de otro workspace.
     const connector = await this.connectors.getInWorkspace(connectorId, ctx.workspaceId);

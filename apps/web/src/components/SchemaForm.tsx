@@ -6,14 +6,18 @@ const inputBase =
   'rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-txt-primary outline-none transition-colors focus:border-primary/60 focus:ring-2 focus:ring-primary/20 placeholder:text-txt-disabled';
 
 /**
- * Valida que `s` sea JSON válido, tolerando los `{{placeholders}}` de interpolación: cada uno se
- * sustituye por `1` (token válido tanto entre comillas `"{{x}}"` como como valor suelto `{{x}}`)
- * antes de parsear. Devuelve `null` si es válido o está vacío; si no, el mensaje del parser.
+ * Valida que `s` sea JSON válido, tolerando los `{{placeholders}}` de interpolación. En runtime, con
+ * jsonSafe, cada placeholder se incrusta como FRAGMENTO de string JSON (debe ir DENTRO de comillas:
+ * `"...{{x}}..."`), así que para validar se sustituye cada uno por vacío — reproduciendo esa
+ * semántica. De ese modo `"t":"{{x}}"` valida, pero un placeholder como valor SUELTO `{"a":{{x}}}`
+ * (que en runtime generaría JSON inválido) se marca correctamente como error, sin falsos positivos.
+ * Devuelve `null` si es válido o está vacío; si no, el mensaje del parser.
  */
 function validateJsonTemplate(s: string): string | null {
   const t = s.trim();
   if (t === '') return null; // el cuerpo es opcional
-  const probe = s.replace(/\{\{[^}]+\}\}/g, '1');
+  const probe = s.replace(/\{\{[^}]+\}\}/g, '');
+  if (probe.trim() === '') return null; // el cuerpo es solo placeholder(s): se resuelve en runtime
   try {
     JSON.parse(probe);
     return null;
