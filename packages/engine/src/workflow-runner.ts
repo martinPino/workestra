@@ -254,11 +254,17 @@ export class WorkflowRunner {
           .map((o) => ({ nodeKey: o.nodeKey, context: o.context }));
         ctx = mergeContexts(baseCtx, contributions);
         await this.deps.context.checkpoint(executionId, ctx);
-        // Los nodos pausados NO se marcan completados: re-ejecutan al reanudar.
-        for (const o of outcomes) if (o.control?.kind !== 'pause') completed.add(o.nodeKey);
+        const willPause = outcomes.some((o) => o.control?.kind === 'pause');
+        // Los nodos pausados NO se marcan completados (re-ejecutan al reanudar). Si en este nivel hay
+        // una PAUSA, tampoco completamos los nodos 'end': deben re-disparar su corte al reanudar; si no,
+        // al reanudar quedarían saltados y la ejecución continuaría más allá del punto de terminación.
+        for (const o of outcomes) {
+          const k = o.control?.kind;
+          if (k !== 'pause' && !(willPause && k === 'end')) completed.add(o.nodeKey);
+        }
 
         // Suspensión por escalado humano: la ejecución queda esperando aprobación.
-        if (outcomes.some((o) => o.control?.kind === 'pause')) {
+        if (willPause) {
           await this.deps.executions.updateStatus(executionId, 'WAITING_HUMAN');
           await this.emit(executionId, { type: 'execution.status', status: 'WAITING_HUMAN' });
           return executionId;

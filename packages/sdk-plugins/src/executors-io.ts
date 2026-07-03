@@ -42,9 +42,15 @@ export class ConditionNodeExecutor implements INodeExecutor {
   readonly type: NodeType = 'condition';
   async execute(ctx: NodeExecutionContext): Promise<NodeResult> {
     const result = evalCondition(String(ctx.config.expression ?? 'true'), ctx.context);
-    const variables = { ...ctx.context.variables, [`condition:${ctx.nodeKey}`]: result };
-    // Nota: el PRUNING de la rama no tomada llega con el control de flujo del engine (M4/M9).
-    return { context: { ...ctx.context, variables }, control: { kind: 'branch', handle: result ? 'true' : 'false' } };
+    const handle = result ? 'true' : 'false';
+    const variables = {
+      ...ctx.context.variables,
+      [`condition:${ctx.nodeKey}`]: result,
+      // M14: persiste la decisión de flujo para que el runner PODE la rama NO tomada. Solo poda las
+      // aristas etiquetadas con el otro handle; una arista sin `sourceHandle` fluye siempre.
+      [`flow:${ctx.nodeKey}`]: { handles: [handle] },
+    };
+    return { context: { ...ctx.context, variables }, control: { kind: 'branch', handle } };
   }
 }
 

@@ -84,9 +84,16 @@ export class RouterNodeExecutor implements INodeExecutor {
         ],
       });
       usage = { tokens: res.usage.inputTokens + res.usage.outputTokens, cost: 0 };
-      const parsed = JSON.parse(res.content || '{}') as { targets?: unknown };
-      const raw = Array.isArray(parsed.targets) ? parsed.targets.map(String) : [];
-      chosen = raw.filter((k) => candidates.some((c) => c.target === k));
+      // Robustez: quita fences ```json y acepta que el LLM devuelva CLAVES o NOMBRES de agente.
+      let content = (res.content || '{}').trim();
+      const fence = content.match(/```(?:json)?\s*([\s\S]*?)```/i);
+      if (fence) content = fence[1].trim();
+      const parsed = JSON.parse(content) as { targets?: unknown };
+      const raw = Array.isArray(parsed.targets) ? parsed.targets.map((x) => String(x)) : [];
+      const norm = (s: string): string => s.trim().toLowerCase();
+      chosen = raw
+        .map((k) => candidates.find((c) => c.target === k)?.target ?? candidates.find((c) => norm(c.name) === norm(k))?.target)
+        .filter((t): t is string => Boolean(t));
     } catch {
       /* fail-open: se activan todos abajo */
     }

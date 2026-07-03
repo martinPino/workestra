@@ -28,4 +28,17 @@ describe('Condition executor (evaluador seguro)', () => {
     expect(res.control).toEqual({ kind: 'branch', handle: 'true' });
     expect(res.context.variables['condition:c1']).toBe(true);
   });
+
+  it('persiste la decisión de flujo `flow:` para que el runner PODE la rama no tomada (M14)', async () => {
+    const exec = new ConditionNodeExecutor();
+    const run = (x: number) =>
+      exec.execute({
+        executionId: 'e', workspaceId: 'ws', nodeKey: 'c1',
+        config: { expression: 'variables.x > 10' },
+        context: { ...emptyContext(), variables: { x } },
+        signal: new AbortController().signal, emit: () => {},
+      });
+    expect((await run(42)).context.variables['flow:c1']).toEqual({ handles: ['true'] });
+    expect((await run(1)).context.variables['flow:c1']).toEqual({ handles: ['false'] });
+  });
 });
