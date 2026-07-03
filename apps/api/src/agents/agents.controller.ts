@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
 import { Workspace } from '../auth/workspace.decorator';
 import { AgentsService } from './agents.service';
 
@@ -19,5 +19,19 @@ export class AgentsController {
   @Post()
   create(@Body() body: Parameters<AgentsService['create']>[0], @Workspace() workspaceId: string) {
     return this.svc.create(body, workspaceId);
+  }
+
+  @Patch(':id')
+  update(
+    @Param('id') id: string,
+    @Body() body: Parameters<AgentsService['update']>[1],
+    @Workspace() workspaceId: string,
+  ) {
+    return this.svc.update(id, body, workspaceId);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string, @Workspace() workspaceId: string) {
+    return this.svc.remove(id, workspaceId);
   }
 }

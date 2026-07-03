@@ -33,6 +33,16 @@ function buildTask(ctx: ExecutionContext): string {
 }
 
 /**
+ * Prompt de sistema EFECTIVO: define un Rol/persona (M13). Si el agente tiene un objetivo
+ * (`description`), se antepone «Actúas como «{nombre}». Tu objetivo: …» al `systemPrompt`, de modo
+ * que la persona guíe el comportamiento. El nodo LLM inline (sin `description`) usa su prompt tal cual.
+ */
+function composeSystemPrompt(agent: Agent): string {
+  if (!agent.description) return agent.systemPrompt;
+  return `Actúas como «${agent.name}». Tu objetivo: ${agent.description}.\n\n${agent.systemPrompt}`;
+}
+
+/**
  * Runtime del agente: bucle de tool-calling AUTORIZADO (deny-by-default vía RBAC), guardrails
  * mínimos (límite de iteraciones) y acceso a memoria compartida. El proveedor LLM es intercambiable
  * por config a través del ModelRouter (el runtime no conoce proveedores concretos).
@@ -53,7 +63,7 @@ export class AgentRuntime implements IAgentRuntime {
       .map((t) => ({ name: t, description: `Tool ${t}`, parameters: {} }));
 
     const messages: LlmMessage[] = [
-      { role: 'system', content: agent.systemPrompt },
+      { role: 'system', content: composeSystemPrompt(agent) },
       { role: 'user', content: buildTask(ctx) },
     ];
 

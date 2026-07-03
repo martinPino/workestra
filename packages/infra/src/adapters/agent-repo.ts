@@ -52,6 +52,25 @@ export class InMemoryAgentRepository implements IAgentRepository {
     this.agents.set(id, agent);
     return agent;
   }
+
+  async update(id: string, workspaceId: string, patch: Partial<Omit<Agent, 'id'>>): Promise<Agent | null> {
+    const a = this.agents.get(id);
+    if (!a || a.workspaceId !== workspaceId) return null; // deny-by-default por tenant
+    // Solo se aplican las claves presentes en el patch (no pisa con undefined).
+    const next = { ...a } as Agent & { workspaceId: string };
+    for (const [k, v] of Object.entries(patch)) {
+      if (v !== undefined) (next as Record<string, unknown>)[k] = v;
+    }
+    this.agents.set(id, next);
+    return next;
+  }
+
+  async delete(id: string, workspaceId: string): Promise<boolean> {
+    const a = this.agents.get(id);
+    if (!a || a.workspaceId !== workspaceId) return false;
+    this.agents.delete(id);
+    return true;
+  }
 }
 
 
@@ -108,5 +127,22 @@ export class PrismaAgentRepository implements IAgentRepository {
       },
     });
     return toAgent(r);
+  }
+
+  async update(id: string, workspaceId: string, patch: Partial<Omit<Agent, 'id'>>): Promise<Agent | null> {
+    // updateMany con workspaceId en el WHERE = tenant-safe (no puede tocar agentes de otro workspace).
+    const data: Record<string, unknown> = {};
+    for (const k of ['name', 'description', 'systemPrompt', 'model', 'tools', 'memoryScope', 'variables', 'limits', 'permissions', 'isOrchestrator'] as const) {
+      if (patch[k] !== undefined) data[k] = patch[k];
+    }
+    const res = await this.prisma.agent.updateMany({ where: { id, workspaceId }, data: data as any });
+    if (res.count === 0) return null;
+    const r = await this.prisma.agent.findUnique({ where: { id } });
+    return r ? toAgent(r) : null;
+  }
+
+  async delete(id: string, workspaceId: string): Promise<boolean> {
+    const res = await this.prisma.agent.deleteMany({ where: { id, workspaceId } });
+    return res.count > 0;
   }
 }

@@ -166,6 +166,10 @@ export interface IAgentRepository {
   /** Como `get`, pero devuelve el agente SOLO si pertenece al workspace (aislamiento por tenant, M8). */
   getInWorkspace(id: string, workspaceId: string): Promise<Agent | null>;
   create(input: Omit<Agent, 'id'> & { workspaceId: string }): Promise<Agent>;
+  /** Aplica un patch parcial SOLO si el agente es del workspace; devuelve el agente actualizado o null. */
+  update(id: string, workspaceId: string, patch: Partial<Omit<Agent, 'id'>>): Promise<Agent | null>;
+  /** Borra el agente SOLO si es del workspace (deny-by-default por tenant). `true` si se borró. */
+  delete(id: string, workspaceId: string): Promise<boolean>;
 }
 
 // --------- Puerto de revisiones humanas (escalado / human-in-the-loop, M5) ---------

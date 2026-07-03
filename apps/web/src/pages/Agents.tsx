@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Bot, Crown, Wrench, Cpu, Clock, DollarSign, Plus } from 'lucide-react';
+import { Bot, Crown, Wrench, Cpu, Plus, Pencil, Trash2, X } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Page } from '../app/AppShell';
-import { Card, Badge, Dot, PageHeader, Button, EmptyState, Skeleton } from '../ui';
+import { Card, Badge, PageHeader, Button, EmptyState, Skeleton, Input, Textarea, Switch, IconButton } from '../ui';
 import { useAgents } from '../lib/hooks';
-import type { AgentDto } from '../lib/api';
+import { api, type AgentDto, type AgentInput } from '../lib/api';
+import { ROLE_PRESETS, AGENT_MODELS, presetToInput } from './agent-roles';
 
 const GRADIENTS = [
   'from-indigo-500 to-fuchsia-500',
@@ -13,20 +16,34 @@ const GRADIENTS = [
   'from-rose-500 to-pink-500',
 ];
 
+const selectCls =
+  'h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm text-txt-primary outline-none transition-colors focus:border-primary/60 focus:ring-2 focus:ring-primary/20';
+
 export function Agents() {
   const { data, isLoading } = useAgents();
+  const [editing, setEditing] = useState<AgentDto | 'new' | null>(null);
 
   return (
     <Page className="space-y-6">
       <PageHeader
         title="Agentes"
-        subtitle="Especialistas de IA con modelo, herramientas y permisos propios."
+        subtitle="Especialistas de IA: define su Rol, objetivo, instrucciones y modelo."
         actions={
-          <Button variant="primary">
-            <Plus size={15} /> Nuevo agente
-          </Button>
+          !editing && (
+            <Button variant="primary" onClick={() => setEditing('new')}>
+              <Plus size={15} /> Nuevo agente
+            </Button>
+          )
         }
       />
+
+      {editing && (
+        <AgentForm
+          initial={editing === 'new' ? null : editing}
+          onDone={() => setEditing(null)}
+          onCancel={() => setEditing(null)}
+        />
+      )}
 
       {isLoading ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -35,11 +52,22 @@ export function Agents() {
           ))}
         </div>
       ) : !data || data.length === 0 ? (
-        <EmptyState icon={<Bot size={22} />} title="Sin agentes" description="Crea agentes especializados para tus workflows." />
+        !editing && (
+          <EmptyState
+            icon={<Bot size={22} />}
+            title="Sin agentes"
+            description="Crea agentes especializados con un Rol para tus workflows."
+            action={
+              <Button variant="primary" onClick={() => setEditing('new')}>
+                <Plus size={15} /> Nuevo agente
+              </Button>
+            }
+          />
+        )
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {data.map((agent, i) => (
-            <AgentCard key={agent.id} agent={agent} gradient={GRADIENTS[i % GRADIENTS.length]} index={i} />
+            <AgentCard key={agent.id} agent={agent} gradient={GRADIENTS[i % GRADIENTS.length]} index={i} onEdit={() => setEditing(agent)} />
           ))}
         </div>
       )}
@@ -47,8 +75,154 @@ export function Agents() {
   );
 }
 
-function AgentCard({ agent, gradient, index }: { agent: AgentDto; gradient: string; index: number }) {
+/** Formulario de crear/editar agente. Rol→name, Objetivo→description, Instrucciones→systemPrompt. */
+function AgentForm({ initial, onDone, onCancel }: { initial: AgentDto | null; onDone: () => void; onCancel: () => void }) {
+  const qc = useQueryClient();
+  const [role, setRole] = useState(initial?.name ?? '');
+  const [goal, setGoal] = useState(initial?.description ?? '');
+  const [model, setModel] = useState(initial?.model ?? 'llama-3.3-70b-versatile');
+  const [instructions, setInstructions] = useState(initial?.systemPrompt ?? '');
+  const [tools, setTools] = useState((initial?.tools ?? []).join(', '));
+  const [isOrchestrator, setIsOrchestrator] = useState(initial?.isOrchestrator ?? false);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  const applyPreset = (id: string) => {
+    const p = ROLE_PRESETS.find((x) => x.id === id);
+    if (!p) return;
+    setRole(p.role);
+    setGoal(p.goal);
+    setInstructions(p.instructions);
+    setTools(p.tools.join(', '));
+    setIsOrchestrator(p.isOrchestrator ?? false);
+  };
+
+  const submit = async () => {
+    if (!role.trim()) {
+      setErr('El Rol es obligatorio.');
+      return;
+    }
+    setSaving(true);
+    setErr('');
+    const body: AgentInput = {
+      name: role.trim(),
+      description: goal.trim() || null,
+      systemPrompt: instructions.trim() || 'Eres un asistente útil.',
+      model,
+      tools: tools.split(',').map((t) => t.trim()).filter(Boolean),
+      isOrchestrator,
+    };
+    try {
+      if (initial) await api.updateAgent(initial.id, body);
+      else await api.createAgent(body);
+      await qc.invalidateQueries({ queryKey: ['agents'] });
+      onDone();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'No se pudo guardar el agente.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card className="p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-txt-primary">{initial ? 'Editar agente' : 'Nuevo agente'}</h2>
+        <IconButton onClick={onCancel} aria-label="Cerrar">
+          <X size={16} />
+        </IconButton>
+      </div>
+
+      {!initial && (
+        <div className="mb-4">
+          <div className="mb-1.5 text-[11px] font-medium text-txt-secondary">Empieza desde un rol predefinido (opcional)</div>
+          <div className="flex flex-wrap gap-1.5">
+            {ROLE_PRESETS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => applyPreset(p.id)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-txt-secondary transition-colors hover:border-primary/50 hover:text-txt-primary"
+              >
+                <span>{p.emoji}</span> {p.role}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <Field label="Rol / función *" hint="Quién es el agente (p. ej. «Investigador»)">
+          <Input value={role} onChange={(e) => setRole(e.target.value)} placeholder="Investigador" />
+        </Field>
+        <Field label="Modelo" hint="llama-* es gratis vía Groq/Ollama">
+          <select value={model} onChange={(e) => setModel(e.target.value)} className={selectCls}>
+            {AGENT_MODELS.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Objetivo" hint="Qué debe conseguir (guía al orquestador)" className="md:col-span-2">
+          <Input value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="Buscar y resumir información fiable" />
+        </Field>
+        <Field label="Instrucciones (system prompt)" hint="Cómo se comporta" className="md:col-span-2">
+          <Textarea rows={4} value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="Eres un investigador meticuloso. Cita fuentes, sé conciso…" />
+        </Field>
+        <Field label="Herramientas" hint="Opcional, separadas por comas" className="md:col-span-2">
+          <Input value={tools} onChange={(e) => setTools(e.target.value)} placeholder="tool:http, tool:mock" />
+        </Field>
+      </div>
+
+      <label className="mt-4 flex items-center gap-2.5">
+        <Switch checked={isOrchestrator} onChange={setIsOrchestrator} />
+        <span className="text-xs text-txt-secondary">
+          Agente coordinador (planifica y delega en otros agentes)
+        </span>
+      </label>
+
+      {err && <p className="mt-3 text-xs text-danger">{err}</p>}
+
+      <div className="mt-5 flex items-center gap-2">
+        <Button variant="primary" onClick={submit} disabled={saving}>
+          {saving ? 'Guardando…' : initial ? 'Guardar cambios' : 'Crear agente'}
+        </Button>
+        <Button variant="ghost" onClick={onCancel} disabled={saving}>
+          Cancelar
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+function Field({ label, hint, className, children }: { label: string; hint?: string; className?: string; children: React.ReactNode }) {
+  return (
+    <label className={`flex flex-col gap-1 ${className ?? ''}`}>
+      <span className="text-[11px] font-medium text-txt-secondary">{label}</span>
+      {children}
+      {hint && <span className="text-[10px] text-txt-disabled">{hint}</span>}
+    </label>
+  );
+}
+
+function AgentCard({ agent, gradient, index, onEdit }: { agent: AgentDto; gradient: string; index: number; onEdit: () => void }) {
+  const qc = useQueryClient();
   const role = agent.permissions?.role ?? 'EDITOR';
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const del = async () => {
+    setDeleting(true);
+    try {
+      await api.deleteAgent(agent.id);
+      await qc.invalidateQueries({ queryKey: ['agents'] });
+    } finally {
+      setDeleting(false);
+      setConfirming(false);
+    }
+  };
+
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.04 }}>
       <Card hover className="group overflow-hidden">
@@ -63,40 +237,48 @@ function AgentCard({ agent, gradient, index }: { agent: AgentDto; gradient: stri
             </div>
             <p className="mt-0.5 line-clamp-2 text-xs text-txt-secondary">{agent.description ?? 'Agente especializado.'}</p>
           </div>
-          <Badge tone="default">{role}</Badge>
+          <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+            <IconButton onClick={onEdit} aria-label="Editar">
+              <Pencil size={14} />
+            </IconButton>
+            <IconButton onClick={() => setConfirming(true)} aria-label="Borrar" className="hover:text-danger">
+              <Trash2 size={14} />
+            </IconButton>
+          </div>
         </div>
 
-        <div className="flex flex-wrap gap-1.5 px-5 pb-4">
-          <span className="inline-flex items-center gap-1 rounded-md bg-elevated px-2 py-0.5 text-[11px] text-txt-secondary">
-            <Cpu size={11} /> {agent.model}
-          </span>
-          {agent.tools.length > 0 ? (
-            agent.tools.map((t) => (
-              <span key={t} className="inline-flex items-center gap-1 rounded-md bg-elevated px-2 py-0.5 text-[11px] text-txt-secondary">
-                <Wrench size={11} /> {t}
-              </span>
-            ))
-          ) : (
-            <span className="inline-flex items-center gap-1 rounded-md bg-elevated px-2 py-0.5 text-[11px] text-txt-disabled">sin tools</span>
-          )}
-        </div>
-
-        <div className="grid grid-cols-3 divide-x divide-border border-t border-border text-center">
-          <Metric icon={<Clock size={12} />} label="Latencia" value="0.6s" />
-          <Metric icon={<DollarSign size={12} />} label="Coste/ejec" value="$0.01" />
-          <Metric icon={<Dot tone="success" />} label="Estado" value="listo" />
-        </div>
+        {confirming ? (
+          <div className="flex items-center justify-between gap-2 border-t border-border bg-danger/5 px-5 py-3">
+            <span className="text-xs text-txt-secondary">¿Borrar «{agent.name}»?</span>
+            <div className="flex items-center gap-2">
+              <Button variant="danger" size="sm" onClick={del} disabled={deleting}>
+                {deleting ? 'Borrando…' : 'Borrar'}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setConfirming(false)} disabled={deleting}>
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-1.5 border-t border-border px-5 py-3">
+            <span className="inline-flex items-center gap-1 rounded-md bg-elevated px-2 py-0.5 text-[11px] text-txt-secondary">
+              <Cpu size={11} /> {agent.model}
+            </span>
+            {agent.tools.length > 0 ? (
+              agent.tools.map((t) => (
+                <span key={t} className="inline-flex items-center gap-1 rounded-md bg-elevated px-2 py-0.5 text-[11px] text-txt-secondary">
+                  <Wrench size={11} /> {t}
+                </span>
+              ))
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-md bg-elevated px-2 py-0.5 text-[11px] text-txt-disabled">sin tools</span>
+            )}
+            <Badge tone="default" className="ml-auto">
+              {role}
+            </Badge>
+          </div>
+        )}
       </Card>
     </motion.div>
-  );
-}
-
-function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <div className="px-2 py-3">
-      <div className="flex items-center justify-center gap-1 text-txt-secondary">{icon}</div>
-      <div className="mt-1 text-xs font-semibold text-txt-primary">{value}</div>
-      <div className="text-[10px] text-txt-disabled">{label}</div>
-    </div>
   );
 }

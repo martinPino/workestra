@@ -56,10 +56,21 @@ export interface AgentDto {
   id: string;
   name: string;
   description?: string | null;
+  systemPrompt?: string;
   model: string;
   tools: string[];
   isOrchestrator: boolean;
   permissions?: { role?: string } | null;
+}
+
+/** Campos que acepta crear/editar un agente. `name` = Rol, `description` = Objetivo, `systemPrompt` = Instrucciones. */
+export interface AgentInput {
+  name: string;
+  description?: string | null;
+  systemPrompt?: string;
+  model?: string;
+  tools?: string[];
+  isOrchestrator?: boolean;
 }
 
 async function json<T>(res: Response): Promise<T> {
@@ -176,6 +187,12 @@ export const api = {
       json<{ workspaceId: string; executions: ExecutionRow[] }>(r),
     ),
   listAgents: () => fetch(`${API}/agents`, { headers: authHeaders() }).then((r) => json<AgentDto[]>(r)),
+  createAgent: (body: AgentInput) =>
+    fetch(`${API}/agents`, { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) }).then((r) => json<AgentDto>(r)),
+  updateAgent: (id: string, body: Partial<AgentInput>) =>
+    fetch(`${API}/agents/${id}`, { method: 'PATCH', headers: authHeaders(), body: JSON.stringify(body) }).then((r) => json<AgentDto>(r)),
+  deleteAgent: (id: string) =>
+    fetch(`${API}/agents/${id}`, { method: 'DELETE', headers: authHeaders() }).then((r) => json<{ deleted: boolean }>(r)),
 
   // --- Escalado humano (M5-B) ---
   devToken: (role: Role, sub = `dev_${role.toLowerCase()}`) =>

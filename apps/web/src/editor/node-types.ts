@@ -3,8 +3,8 @@ import { Zap, Wrench, GitBranch, Globe, BrainCircuit, Sparkles, Timer, UserCheck
 
 /** Subconjunto de JSON Schema que entiende el NodePropertiesPanel. */
 export interface FieldSchema {
-  // `connector`: desplegable poblado con los conectores del workspace (el valor guardado es su id).
-  type: 'string' | 'number' | 'boolean' | 'enum' | 'connector';
+  // `connector`/`agent`: desplegables poblados con los conectores/agentes del workspace (guarda su id).
+  type: 'string' | 'number' | 'boolean' | 'enum' | 'connector' | 'agent';
   label: string;
   default?: unknown;
   placeholder?: string;
@@ -130,7 +130,13 @@ registerNodeType({
   configSchema: {
     title: 'Agente',
     fields: {
-      agentId: { type: 'string', label: 'Agent ID', placeholder: 'agent_1 (del registro de agentes)' },
+      agentId: { type: 'agent', label: 'Agente' },
+      input: {
+        type: 'string',
+        label: 'Tarea / entrada (opcional · admite {{variables}})',
+        placeholder: 'Responde a este mensaje: {{connector:leer.bodyPreview}}',
+        multiline: true,
+      },
     },
   },
 });

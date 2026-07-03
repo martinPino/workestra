@@ -1,6 +1,6 @@
 import type { NodeConfigSchema, FieldSchema } from '../editor/node-types';
 import { CONNECTOR_ACTIONS } from '../editor/connector-actions';
-import { useConnectors } from '../lib/hooks';
+import { useConnectors, useAgents } from '../lib/hooks';
 
 const inputBase =
   'rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-txt-primary outline-none transition-colors focus:border-primary/60 focus:ring-2 focus:ring-primary/20 placeholder:text-txt-disabled';
@@ -64,6 +64,27 @@ function ActionTemplatePicker({
   );
 }
 
+/** Desplegable de agentes del workspace (el valor guardado es el id del agente). */
+function AgentSelect({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) {
+  const { data: agents } = useAgents();
+  const list = agents ?? [];
+  return (
+    <select value={String(value ?? '')} onChange={(e) => onChange(e.target.value)} className={inputBase}>
+      <option value="">— agente inline (usa la config del nodo LLM) —</option>
+      {list.map((a) => (
+        <option key={a.id} value={a.id}>
+          {a.name} ({a.model}){a.isOrchestrator ? ' · líder' : ''}
+        </option>
+      ))}
+      {list.length === 0 && (
+        <option value="" disabled>
+          No hay agentes — créalos en la sección Agentes
+        </option>
+      )}
+    </select>
+  );
+}
+
 /** Desplegable de conectores del workspace (el valor guardado es el id del conector). */
 function ConnectorSelect({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) {
   const { data: connectors } = useConnectors();
@@ -116,6 +137,9 @@ function Field({ field, value, onChange }: { field: FieldSchema; value: unknown;
 
   if (field.type === 'connector') {
     return <ConnectorSelect value={value} onChange={onChange} />;
+  }
+  if (field.type === 'agent') {
+    return <AgentSelect value={value} onChange={onChange} />;
   }
   if (field.type === 'boolean') {
     return <input type="checkbox" checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 accent-[rgb(var(--primary))]" />;

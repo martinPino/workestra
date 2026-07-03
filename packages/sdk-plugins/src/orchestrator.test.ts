@@ -39,6 +39,13 @@ function repo(agents: Agent[]): IAgentRepository {
     async create(a) {
       return { id: 'x', ...a } as Agent;
     },
+    async update(id, _ws, patch) {
+      const a = agents.find((x) => x.id === id);
+      return a ? ({ ...a, ...patch } as Agent) : null;
+    },
+    async delete(id) {
+      return agents.some((a) => a.id === id);
+    },
   };
 }
 
