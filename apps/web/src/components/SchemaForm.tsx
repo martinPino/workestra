@@ -1,8 +1,47 @@
 import type { NodeConfigSchema, FieldSchema } from '../editor/node-types';
+import { CONNECTOR_ACTIONS } from '../editor/connector-actions';
 import { useConnectors } from '../lib/hooks';
 
 const inputBase =
   'rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-txt-primary outline-none transition-colors focus:border-primary/60 focus:ring-2 focus:ring-primary/20 placeholder:text-txt-disabled';
+
+/**
+ * Selector de "acción" (plantilla) según el proveedor del conector elegido. Al elegir una acción
+ * rellena method + path + body del nodo; luego el usuario los puede ajustar. Depende de `connectorId`
+ * ya seleccionado en el mismo config (para saber el proveedor).
+ */
+function ActionTemplatePicker({
+  value,
+  onChange,
+}: {
+  value: Record<string, unknown>;
+  onChange: (v: Record<string, unknown>) => void;
+}) {
+  const { data: connectors } = useConnectors();
+  const provider = connectors?.find((c) => c.id === String(value.connectorId ?? ''))?.provider;
+  const actions = provider ? (CONNECTOR_ACTIONS[provider] ?? []) : [];
+  if (!provider || actions.length === 0) return null;
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-[11px] font-medium text-txt-secondary">Plantilla de acción ({provider})</span>
+      <select
+        value=""
+        onChange={(e) => {
+          const a = actions.find((x) => x.id === e.target.value);
+          if (a) onChange({ ...value, method: a.method, path: a.path, body: a.body ?? '' });
+        }}
+        className={inputBase}
+      >
+        <option value="">— elige una acción para rellenar ruta + cuerpo —</option>
+        {actions.map((a) => (
+          <option key={a.id} value={a.id}>
+            {a.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
 
 /** Desplegable de conectores del workspace (el valor guardado es el id del conector). */
 function ConnectorSelect({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) {
@@ -38,10 +77,14 @@ export function SchemaForm({ schema, value, onChange }: Props) {
   return (
     <div className="flex flex-col gap-3">
       {entries.map(([key, field]) => (
-        <label key={key} className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium text-txt-secondary">{field.label}</span>
-          <Field field={field} value={value[key]} onChange={(v) => set(key, v)} />
-        </label>
+        <div key={key} className="flex flex-col gap-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-[11px] font-medium text-txt-secondary">{field.label}</span>
+            <Field field={field} value={value[key]} onChange={(v) => set(key, v)} />
+          </label>
+          {/* Tras elegir el conector, ofrece plantillas de acción que rellenan método/ruta/cuerpo. */}
+          {field.type === 'connector' && <ActionTemplatePicker value={value} onChange={onChange} />}
+        </div>
       ))}
     </div>
   );
