@@ -1,4 +1,25 @@
 import type { NodeConfigSchema, FieldSchema } from '../editor/node-types';
+import { useConnectors } from '../lib/hooks';
+
+const inputBase =
+  'rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-txt-primary outline-none transition-colors focus:border-primary/60 focus:ring-2 focus:ring-primary/20 placeholder:text-txt-disabled';
+
+/** Desplegable de conectores del workspace (el valor guardado es el id del conector). */
+function ConnectorSelect({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) {
+  const { data: connectors } = useConnectors();
+  const list = connectors ?? [];
+  return (
+    <select value={String(value ?? '')} onChange={(e) => onChange(e.target.value)} className={inputBase}>
+      <option value="">— elige un conector —</option>
+      {list.map((c) => (
+        <option key={c.id} value={c.id}>
+          {c.key} ({c.provider}){c.status !== 'connected' ? ' — sin conectar' : ''}
+        </option>
+      ))}
+      {list.length === 0 && <option value="" disabled>No hay conectores — créalos en Integraciones</option>}
+    </select>
+  );
+}
 
 interface Props {
   schema: NodeConfigSchema;
@@ -27,9 +48,11 @@ export function SchemaForm({ schema, value, onChange }: Props) {
 }
 
 function Field({ field, value, onChange }: { field: FieldSchema; value: unknown; onChange: (v: unknown) => void }) {
-  const base =
-    'rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-txt-primary outline-none transition-colors focus:border-primary/60 focus:ring-2 focus:ring-primary/20 placeholder:text-txt-disabled';
+  const base = inputBase;
 
+  if (field.type === 'connector') {
+    return <ConnectorSelect value={value} onChange={onChange} />;
+  }
   if (field.type === 'boolean') {
     return <input type="checkbox" checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 accent-[rgb(var(--primary))]" />;
   }

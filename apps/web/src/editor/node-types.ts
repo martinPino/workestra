@@ -3,7 +3,8 @@ import { Zap, Wrench, GitBranch, Globe, BrainCircuit, Sparkles, Timer, UserCheck
 
 /** Subconjunto de JSON Schema que entiende el NodePropertiesPanel. */
 export interface FieldSchema {
-  type: 'string' | 'number' | 'boolean' | 'enum';
+  // `connector`: desplegable poblado con los conectores del workspace (el valor guardado es su id).
+  type: 'string' | 'number' | 'boolean' | 'enum' | 'connector';
   label: string;
   default?: unknown;
   placeholder?: string;
@@ -194,10 +195,10 @@ registerNodeType({
   configSchema: {
     title: 'Conector (dispatch autenticado)',
     fields: {
-      connectorId: { type: 'string', label: 'Connector ID', placeholder: 'conn_… (de Integraciones)' },
+      connectorId: { type: 'connector', label: 'Conector' },
       method: { type: 'enum', label: 'Método', options: ['GET', 'POST', 'PUT', 'DELETE'], default: 'GET' },
-      path: { type: 'string', label: 'Ruta', placeholder: '/whoami' },
-      body: { type: 'string', label: 'Cuerpo (JSON, opcional)', placeholder: '{"key":"value"}', multiline: true },
+      path: { type: 'string', label: 'Ruta', placeholder: '/chat.postMessage' },
+      body: { type: 'string', label: 'Cuerpo (JSON, opcional)', placeholder: '{"channel":"#general","text":"hola"}', multiline: true },
     },
   },
 });
