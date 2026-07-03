@@ -22,9 +22,10 @@ async function bootstrap(): Promise<void> {
   if (process.env.RLS_ENABLED === '1' || process.env.RLS_ENABLED === 'true') {
     app.use((_req: unknown, _res: unknown, next: () => void) => runInWorkspaceContext({}, next));
   }
-  const port = Number(process.env.API_PORT ?? 3001);
-  await app.listen(port);
-  console.log(`AgentFlow API escuchando en http://localhost:${port}`);
+  // Railway (y otros PaaS) inyectan PORT; en local usamos API_PORT. Escucha en 0.0.0.0 para el contenedor.
+  const port = Number(process.env.PORT ?? process.env.API_PORT ?? 3001);
+  await app.listen(port, '0.0.0.0');
+  console.log(`AgentFlow API escuchando en el puerto ${port}`);
 }
 
 void bootstrap();
