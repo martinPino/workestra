@@ -12,7 +12,8 @@ import ReactFlow, {
   type Node as RFNode,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Undo2, Redo2, LayoutGrid, StickyNote, Play, Save, Boxes, Loader2, UploadCloud, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { Undo2, Redo2, LayoutGrid, StickyNote, Play, Save, Boxes, Loader2, UploadCloud, PanelRightClose, PanelRightOpen, Menu, X } from 'lucide-react';
+import { cn } from '../lib/cn';
 import type { ExecutionEvent } from '@core/contracts';
 import { reduceExecution, type NodeRunStatus } from '@core/domain';
 import { api } from '../lib/api';
@@ -188,22 +189,26 @@ export function Editor() {
   };
 
   const running = execStatus === 'RUNNING';
+  const [paletteOpen, setPaletteOpen] = useState(false); // overlay de la paleta en móvil
 
   return (
     <div className="flex h-full flex-col">
-      {/* Toolbar */}
-      <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-border bg-surface px-4">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/12 text-primary">
+      {/* Toolbar (scroll horizontal en móvil) */}
+      <div className="flex h-12 shrink-0 items-center gap-3 overflow-x-auto border-b border-border bg-surface px-3 sm:px-4">
+        <div className="flex shrink-0 items-center gap-2.5">
+          <IconButton className="md:hidden" aria-label={t('Nodos')} onClick={() => setPaletteOpen(true)}>
+            <Menu size={16} />
+          </IconButton>
+          <div className="hidden h-7 w-7 items-center justify-center rounded-lg bg-primary/12 text-primary sm:flex">
             <Boxes size={16} />
           </div>
-          <span className="text-sm font-medium text-txt-primary">{workflowName}</span>
+          <span className="hidden max-w-[160px] truncate text-sm font-medium text-txt-primary sm:inline">{workflowName}</span>
           {publishedVersion != null && <Badge tone="primary">v{publishedVersion}</Badge>}
           <Badge tone={STATUS_TONE[execStatus] ?? 'default'}>
             {running ? <Loader2 size={11} className="animate-spin" /> : <Dot tone={STATUS_TONE[execStatus] ?? 'default'} />} {execStatus}
           </Badge>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
           <IconButton disabled={!canUndo} onClick={() => s().undo()} aria-label={t('Deshacer')}>
             <Undo2 size={16} />
           </IconButton>
@@ -230,17 +235,33 @@ export function Editor() {
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1">
-        {/* Paleta */}
-        <aside className="w-44 shrink-0 border-r border-border bg-surface p-3">
-          <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-txt-disabled">{t('Nodos')}</div>
+      <div className="relative flex min-h-0 flex-1">
+        {/* Backdrop de la paleta en móvil */}
+        {paletteOpen && <div className="absolute inset-0 z-20 bg-black/40 md:hidden" onClick={() => setPaletteOpen(false)} aria-hidden />}
+        {/* Paleta — overlay deslizante en móvil, fija en desktop */}
+        <aside
+          className={cn(
+            'absolute inset-y-0 left-0 z-30 w-44 shrink-0 overflow-y-auto border-r border-border bg-surface p-3 transition-transform duration-200',
+            'md:relative md:z-0 md:translate-x-0',
+            paletteOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+          )}
+        >
+          <div className="mb-2 flex items-center justify-between">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-txt-disabled">{t('Nodos')}</div>
+            <IconButton className="md:hidden" aria-label={t('Cerrar')} onClick={() => setPaletteOpen(false)}>
+              <X size={14} />
+            </IconButton>
+          </div>
           <div className="flex flex-col gap-1.5">
             {listNodeTypes().map((t) => {
               const Icon = t.icon;
               return (
                 <button
                   key={t.kind}
-                  onClick={() => addNode(t.kind)}
+                  onClick={() => {
+                    addNode(t.kind);
+                    setPaletteOpen(false);
+                  }}
                   className="group flex items-center gap-2.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-left text-xs text-txt-primary transition-all hover:border-border-strong hover:bg-elevated"
                 >
                   <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-elevated transition-transform group-hover:scale-105 ${t.color}`}>
@@ -293,7 +314,7 @@ export function Editor() {
 
         {/* Inspector (minimizable) */}
         {inspectorOpen ? (
-          <aside className="flex w-80 shrink-0 flex-col border-l border-border bg-surface">
+          <aside className="absolute inset-y-0 right-0 z-30 flex w-full max-w-xs flex-col border-l border-border bg-surface md:static md:z-0 md:w-80 md:max-w-none">
             <div className="flex items-center justify-between border-b border-border px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-txt-disabled">
               <span>{t('Inspector')}</span>
               <IconButton aria-label={t('Ocultar inspector')} onClick={() => setInspectorOpen(false)}>

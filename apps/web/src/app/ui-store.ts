@@ -7,11 +7,14 @@ interface UIState {
   theme: Theme;
   lang: Lang;
   collapsed: boolean;
+  /** Drawer de navegación en móvil (off-canvas). No se persiste: estado de sesión. */
+  mobileNav: boolean;
   cmdOpen: boolean;
   setTheme: (t: Theme) => void;
   toggleTheme: () => void;
   setLang: (l: Lang) => void;
   toggleCollapsed: () => void;
+  setMobileNav: (v: boolean) => void;
   setCmdOpen: (v: boolean) => void;
 }
 
@@ -40,6 +43,7 @@ export const useUI = create<UIState>((set, get) => ({
   theme: ls.get('af.theme', 'dark') as Theme,
   lang: ls.get('af.lang', 'es') as Lang,
   collapsed: ls.get('af.collapsed', '0') === '1',
+  mobileNav: false,
   cmdOpen: false,
   setTheme: (theme) => {
     ls.set('af.theme', theme);
@@ -57,6 +61,7 @@ export const useUI = create<UIState>((set, get) => ({
     ls.set('af.collapsed', collapsed ? '1' : '0');
     set({ collapsed });
   },
+  setMobileNav: (mobileNav) => set({ mobileNav }),
   setCmdOpen: (cmdOpen) => set({ cmdOpen }),
 }));
 

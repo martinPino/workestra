@@ -1,5 +1,5 @@
 import { useLocation } from 'react-router-dom';
-import { Search, Sun, Moon, Bell } from 'lucide-react';
+import { Search, Sun, Moon, Bell, Menu } from 'lucide-react';
 import { NAV } from './nav';
 import { useUI, type Lang } from './ui-store';
 import { IconButton } from '../ui';
@@ -40,13 +40,17 @@ export function Topbar() {
   const theme = useUI((s) => s.theme);
   const toggleTheme = useUI((s) => s.toggleTheme);
   const setCmdOpen = useUI((s) => s.setCmdOpen);
+  const setMobileNav = useUI((s) => s.setMobileNav);
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border bg-surface/80 px-5 backdrop-blur">
-      <div className="flex items-center gap-2 text-sm">
-        <span className="text-txt-secondary">AgentFlow</span>
-        <span className="text-txt-disabled">/</span>
-        <span className="font-medium text-txt-primary">{titleFor(pathname)}</span>
+    <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-surface/80 px-3 backdrop-blur sm:px-5">
+      <div className="flex min-w-0 items-center gap-2 text-sm">
+        <IconButton className="md:hidden" aria-label="Menu" onClick={() => setMobileNav(true)}>
+          <Menu size={18} />
+        </IconButton>
+        <span className="hidden text-txt-secondary sm:inline">AgentFlow</span>
+        <span className="hidden text-txt-disabled sm:inline">/</span>
+        <span className="truncate font-medium text-txt-primary">{titleFor(pathname)}</span>
       </div>
 
       <div className="flex items-center gap-1.5">

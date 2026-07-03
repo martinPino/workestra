@@ -294,12 +294,12 @@ export function Tabs({
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: ReactNode }) {
   return (
-    <div className="flex items-end justify-between gap-4">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight text-txt-primary">{title}</h1>
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+      <div className="min-w-0">
+        <h1 className="text-lg font-semibold tracking-tight text-txt-primary sm:text-xl">{title}</h1>
         {subtitle && <p className="mt-0.5 text-sm text-txt-secondary">{subtitle}</p>}
       </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
   );
 }

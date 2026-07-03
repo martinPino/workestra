@@ -21,7 +21,7 @@ export function AppShell() {
 export function Page({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <div className="h-full overflow-y-auto">
-      <div className={`mx-auto max-w-[1400px] px-6 py-6 ${className ?? ''}`}>{children}</div>
+      <div className={`mx-auto max-w-[1400px] px-4 py-4 sm:px-6 sm:py-6 ${className ?? ''}`}>{children}</div>
     </div>
   );
 }
