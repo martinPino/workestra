@@ -6,6 +6,8 @@ import type { GraphDoc, EditorNode } from './editor/model';
 export interface AfNodeData {
   kind: EditorNode['kind'];
   status?: NodeRunStatus;
+  /** Config del nodo: la carta la usa para resolver identidad (p. ej. el agente elegido). */
+  config?: Record<string, unknown>;
 }
 export interface CommentNodeData {
   id: string;
@@ -28,7 +30,7 @@ export function docToReactFlow(
     id: n.id,
     type: 'af',
     position: n.position,
-    data: { kind: n.kind, status: nodeStatus[n.id] } satisfies AfNodeData,
+    data: { kind: n.kind, status: nodeStatus[n.id], config: n.config } satisfies AfNodeData,
   }));
   const edges: RFEdge[] = doc.edges.map((e) => ({
     id: e.id,

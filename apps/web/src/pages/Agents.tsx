@@ -6,15 +6,8 @@ import { Page } from '../app/AppShell';
 import { Card, Badge, PageHeader, Button, EmptyState, Skeleton, Input, Textarea, Switch, IconButton } from '../ui';
 import { useAgents } from '../lib/hooks';
 import { api, type AgentDto, type AgentInput } from '../lib/api';
-import { ROLE_PRESETS, AGENT_MODELS, presetToInput } from './agent-roles';
-
-const GRADIENTS = [
-  'from-indigo-500 to-fuchsia-500',
-  'from-emerald-500 to-teal-500',
-  'from-amber-500 to-orange-500',
-  'from-sky-500 to-blue-500',
-  'from-rose-500 to-pink-500',
-];
+import { ROLE_PRESETS, AGENT_MODELS } from './agent-roles';
+import { agentGradient } from '../lib/agent-avatar';
 
 const selectCls =
   'h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm text-txt-primary outline-none transition-colors focus:border-primary/60 focus:ring-2 focus:ring-primary/20';
@@ -67,7 +60,7 @@ export function Agents() {
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {data.map((agent, i) => (
-            <AgentCard key={agent.id} agent={agent} gradient={GRADIENTS[i % GRADIENTS.length]} index={i} onEdit={() => setEditing(agent)} />
+            <AgentCard key={agent.id} agent={agent} index={i} onEdit={() => setEditing(agent)} />
           ))}
         </div>
       )}
@@ -206,8 +199,9 @@ function Field({ label, hint, className, children }: { label: string; hint?: str
   );
 }
 
-function AgentCard({ agent, gradient, index, onEdit }: { agent: AgentDto; gradient: string; index: number; onEdit: () => void }) {
+function AgentCard({ agent, index, onEdit }: { agent: AgentDto; index: number; onEdit: () => void }) {
   const qc = useQueryClient();
+  const gradient = agentGradient(agent.id);
   const role = agent.permissions?.role ?? 'EDITOR';
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
