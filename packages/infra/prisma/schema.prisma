@@ -1,0 +1,375 @@
+// Modelo de datos AgentFlow — multitenant por organizationId/workspaceId.
+// Los Workflows son inmutables vía WorkflowVersion (snapshot). ExecutionLog es append-only (replay).
+// RLS: ver prisma/rls.sql (segunda barrera de aislamiento entre tenants, además del middleware por workspaceId).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------- Tenancy / IAM -----------------------------
+
+model Organization {
+  id          String       @id @default(cuid())
+  name        String
+  slug        String       @unique
+  plan        String       @default("free")
+  createdAt   DateTime     @default(now())
+  workspaces  Workspace[]
+  memberships Membership[]
+}
+
+model Workspace {
+  id             String       @id @default(cuid())
+  organizationId String
+  org            Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  slug           String
+  createdAt      DateTime     @default(now())
+
+  workflows  Workflow[]
+  agents     Agent[]
+  tools      Tool[]
+  connectors Connector[]
+  secrets    Secret[]
+  prompts    Prompt[]
+  memories   Memory[]
+  webhooks   Webhook[]
+  plugins    Plugin[]
+
+  @@unique([organizationId, slug])
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime     @default(now())
+  memberships  Membership[]
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+model Membership {
+  id             String       @id @default(cuid())
+  userId         String
+  organizationId String
+  workspaceId    String?
+  role           Role         @default(VIEWER)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org            Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId, workspaceId])
+  @@index([organizationId])
+}
+
+// ----------------------------- Workflows -----------------------------
+
+model Workflow {
+  id               String            @id @default(cuid())
+  workspaceId      String
+  workspace        Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name             String
+  status           WorkflowStatus    @default(DRAFT)
+  currentVersionId String?
+  createdAt        DateTime          @default(now())
+  versions         WorkflowVersion[]
+  executions       Execution[]
+  webhooks         Webhook[]
+  schedules        ScheduledTrigger[]
+
+  @@index([workspaceId])
+}
+
+enum WorkflowStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+model WorkflowVersion {
+  id            String      @id @default(cuid())
+  workflowId    String
+  workflow      Workflow    @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  version       Int
+  state         String      @default("draft") // draft | published | archived
+  graphSnapshot Json
+  createdBy     String
+  publishedAt   DateTime?
+  createdAt     DateTime    @default(now())
+  nodes         Node[]
+  edges         Edge[]
+  executions    Execution[]
+
+  @@unique([workflowId, version])
+}
+
+model Node {
+  id                String          @id @default(cuid())
+  workflowVersionId String
+  version           WorkflowVersion @relation(fields: [workflowVersionId], references: [id], onDelete: Cascade)
+  type              String
+  key               String
+  config            Json
+  position          Json
+  agentId           String?
+  toolId            String?
+
+  @@unique([workflowVersionId, key])
+}
+
+model Edge {
+  id                String          @id @default(cuid())
+  workflowVersionId String
+  version           WorkflowVersion @relation(fields: [workflowVersionId], references: [id], onDelete: Cascade)
+  sourceNodeKey     String
+  targetNodeKey     String
+  sourceHandle      String?
+  condition         Json?
+}
+
+// ----------------------------- Executions -----------------------------
+
+model Execution {
+  id                String          @id @default(cuid())
+  workflowId        String?
+  workflow          Workflow?       @relation(fields: [workflowId], references: [id])
+  workflowVersionId String
+  version           WorkflowVersion @relation(fields: [workflowVersionId], references: [id])
+  workspaceId       String
+  parentExecutionId String?
+  parent            Execution?      @relation("ExecutionTree", fields: [parentExecutionId], references: [id])
+  children          Execution[]     @relation("ExecutionTree")
+  status            ExecutionStatus @default(QUEUED)
+  triggerType       String
+  context           Json
+  tokensUsed        Int             @default(0)
+  costEstimate      Decimal         @default(0)
+  startedAt         DateTime?
+  finishedAt        DateTime?
+  createdAt         DateTime        @default(now())
+  logs              ExecutionLog[]
+  nodeRuns          NodeRun[]
+  pendingReviews    PendingReview[]
+  events            ExecutionEventRecord[]
+
+  @@index([workspaceId, status])
+  @@index([parentExecutionId])
+}
+
+// Trigger PROGRAMADO (M7-B): dispara ejecuciones de un workflow por cron o por intervalo. La
+// planificación real vive en BullMQ (repeatable jobs, jobId = id); esta fila es el registro durable
+// (para listar/borrar por tenant y re-registrar los repeatables al arrancar).
+model ScheduledTrigger {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workflowId  String
+  workflow    Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  cron        String? // patrón cron de 5 campos (excluyente con everyMs)
+  everyMs     Int? // intervalo en ms (excluyente con cron)
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  @@index([workspaceId])
+  @@index([workflowId])
+}
+
+// Stream de eventos APPEND-ONLY (M6: observabilidad/replay). Fuente de verdad del replay
+// determinista: el payload guarda el ExecutionEvent completo (versionado); la unique
+// (executionId, seq) hace el append idempotente ante retries y el doble camino worker→hub.
+model ExecutionEventRecord {
+  id          String    @id @default(cuid())
+  executionId String
+  execution   Execution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  seq         Int
+  type        String
+  at          DateTime
+  payload     Json
+
+  @@unique([executionId, seq])
+  @@index([executionId, seq])
+}
+
+// Revisión humana (human-in-the-loop, M5). Una por (ejecución, nodo): el nodo Humano la crea
+// `pending` y suspende la ejecución; la resolución (aprobar/rechazar) es idempotente y DURABLE, de
+// modo que el worker que reanuda en otro proceso lee el veredicto persistido.
+model PendingReview {
+  id          String    @id @default(cuid())
+  executionId String
+  execution   Execution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  nodeKey     String
+  status      String    @default("pending") // pending | approved | rejected
+  reason      String
+  decision    String?
+  resolvedBy  String?
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime?
+
+  @@unique([executionId, nodeKey])
+  @@index([executionId])
+}
+
+// Estado runtime por nodo de una ejecución (proyección derivada del stream de eventos).
+model NodeRun {
+  id          String    @id @default(cuid())
+  executionId String
+  execution   Execution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  nodeKey     String
+  status      String
+  attempt     Int       @default(1)
+  startedAt   DateTime?
+  finishedAt  DateTime?
+
+  @@unique([executionId, nodeKey])
+  @@index([executionId])
+}
+
+enum ExecutionStatus {
+  QUEUED
+  RUNNING
+  PAUSED
+  WAITING_HUMAN
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+model ExecutionLog {
+  id            String    @id @default(cuid())
+  executionId   String
+  execution     Execution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  nodeKey       String
+  stepKey       String
+  level         String
+  status        String
+  input         Json?
+  output        Json?
+  prompt        Json?
+  modelResponse Json?
+  tokens        Int       @default(0)
+  cost          Decimal   @default(0)
+  durationMs    Int       @default(0)
+  createdAt     DateTime  @default(now())
+
+  @@unique([executionId, stepKey])
+  @@index([executionId, createdAt])
+}
+
+// ----------------------------- Agents / Plugins / Integrations -----------------------------
+
+model Agent {
+  id             String    @id @default(cuid())
+  workspaceId    String
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  systemPrompt   String
+  model          String
+  tools          String[]
+  memoryScope    String?
+  variables      Json?
+  limits         Json?
+  permissions    Json?
+  isOrchestrator Boolean   @default(false)
+
+  @@index([workspaceId])
+}
+
+model Tool {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  key         String
+  pluginId    String?
+  schema      Json
+  authConfig  Json?
+
+  @@unique([workspaceId, key])
+}
+
+model Connector {
+  id                  String    @id @default(cuid())
+  workspaceId         String
+  workspace           Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  key                 String
+  pluginId            String?
+  provider            String
+  status              String    @default("disconnected") // disconnected | connected
+  credentialsSecretId String?
+
+  @@unique([workspaceId, key])
+}
+
+model Secret {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  key         String
+  ciphertext  String
+  kmsKeyId    String
+  version     Int       @default(1)
+
+  @@unique([workspaceId, key])
+}
+
+model Webhook {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workflowId      String
+  workflow        Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  event           String
+  url             String
+  signingSecretId String
+  active          Boolean   @default(true)
+
+  @@index([workspaceId])
+}
+
+model Memory {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  scope       String
+  ownerId     String?
+  key         String
+  value       Json
+  kind        String
+  expiresAt   DateTime?
+
+  @@index([workspaceId, scope, ownerId])
+}
+
+model Prompt {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  template    String
+  variables   Json?
+  version     Int       @default(1)
+}
+
+model Plugin {
+  id          String     @id @default(cuid())
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  key         String
+  kind        String
+  version     String
+  manifest    Json
+  status      String
+  source      String
+
+  @@unique([workspaceId, key, version])
+}

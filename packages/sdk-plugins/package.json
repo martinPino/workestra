@@ -1,0 +1,25 @@
+{
+  "name": "@core/sdk-plugins",
+  "version": "0.1.0",
+  "description": "Runtime de plugins: registro de NodeExecutors/Tools/Connectors. Añadir capacidades sin tocar el núcleo.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@core/contracts": "workspace:*",
+    "@core/domain": "workspace:*",
+    "@core/engine": "workspace:*",
+    "@core/llm": "workspace:*"
+  }
+}

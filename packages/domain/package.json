@@ -1,0 +1,22 @@
+{
+  "name": "@core/domain",
+  "version": "0.1.0",
+  "description": "Entidades y reglas puras del dominio (validación DAG, plan de ejecución). Sin IO.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@core/contracts": "workspace:*"
+  }
+}

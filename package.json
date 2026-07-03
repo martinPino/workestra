@@ -1,0 +1,47 @@
+{
+  "name": "agentflow",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Plataforma SaaS de orquestacion de agentes de IA con editor visual de workflows",
+  "packageManager": "pnpm@10.8.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "typecheck": "turbo run typecheck",
+    "lint": "eslint .",
+    "test": "turbo run test",
+    "depcruise": "depcruise packages apps --config .dependency-cruiser.cjs",
+    "db:generate": "pnpm --filter @core/infra run prisma:generate",
+    "db:migrate": "pnpm --filter @core/infra run prisma:migrate",
+    "db:seed": "pnpm --filter @core/infra run prisma:seed",
+    "changeset": "changeset",
+    "verify": "pnpm build && pnpm typecheck && pnpm lint && pnpm depcruise && pnpm test"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.10",
+    "@eslint/js": "^9.17.0",
+    "dependency-cruiser": "^16.4.2",
+    "eslint": "^9.17.0",
+    "globals": "^15.14.0",
+    "turbo": "^2.3.3",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.18.1",
+    "vitest": "^2.1.8"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "@prisma/client",
+      "@prisma/engines",
+      "esbuild",
+      "msgpackr-extract",
+      "prisma"
+    ],
+    "overrides": {
+      "ioredis": "5.11.1"
+    }
+  }
+}

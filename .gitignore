@@ -1,0 +1,26 @@
+# deps
+node_modules/
+.pnpm-store/
+
+# build
+dist/
+build/
+.turbo/
+*.tsbuildinfo
+
+# env / secrets
+.env
+.env.*
+!.env.example
+!.env.connectors.example
+
+# prisma
+packages/infra/prisma/*.db
+
+# logs / os
+*.log
+.DS_Store
+coverage/
+
+# credenciales de conectores OAuth (local)
+.env.connectors

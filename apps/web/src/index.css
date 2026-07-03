@@ -1,0 +1,197 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================ Design tokens ============================ */
+/* Canales RGB (space-separated) para soportar utilidades de opacidad de Tailwind. */
+
+:root,
+[data-theme='dark'] {
+  --bg: 9 9 11;
+  --surface: 16 16 20;
+  --card: 22 22 27;
+  --elevated: 30 30 36;
+  --border: 38 38 45;
+  --border-strong: 55 55 64;
+  --muted: 63 63 70;
+
+  --primary: 129 140 248; /* indigo-400 */
+  --primary-strong: 99 102 241; /* indigo-500 */
+  --secondary: 45 212 191; /* teal-400 */
+  --accent: 217 70 239; /* fuchsia-500 */
+
+  --success: 52 211 153;
+  --warning: 251 191 36;
+  --danger: 248 113 113;
+
+  --text-primary: 244 244 245;
+  --text-secondary: 161 161 170;
+  --text-disabled: 82 82 91;
+
+  --ring: 129 140 248;
+  --shadow-color: 0 0 0;
+}
+
+[data-theme='light'] {
+  --bg: 250 250 251;
+  --surface: 255 255 255;
+  --card: 255 255 255;
+  --elevated: 255 255 255;
+  --border: 228 228 231;
+  --border-strong: 212 212 216;
+  --muted: 113 113 122;
+
+  --primary: 99 102 241;
+  --primary-strong: 79 70 229;
+  --secondary: 13 148 136;
+  --accent: 192 38 211;
+
+  --success: 16 185 129;
+  --warning: 217 119 6;
+  --danger: 220 38 38;
+
+  --text-primary: 24 24 27;
+  --text-secondary: 82 82 91;
+  --text-disabled: 161 161 170;
+
+  --ring: 99 102 241;
+  --shadow-color: 24 24 27;
+}
+
+/* ============================ Base ============================ */
+
+* {
+  border-color: rgb(var(--border));
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: rgb(var(--bg));
+  color: rgb(var(--text-primary));
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: rgb(var(--primary) / 0.3);
+}
+
+/* Scrollbars sutiles */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--border-strong));
+  border-radius: 999px;
+  border: 3px solid rgb(var(--bg));
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--muted));
+}
+
+/* Malla de fondo sutil */
+.bg-grid {
+  background-image: radial-gradient(rgb(var(--border) / 0.6) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* Glass */
+.glass {
+  background: rgb(var(--card) / 0.7);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* Animaciones */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-in {
+  animation: fade-in 0.25s ease-out;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: -16;
+  }
+}
+
+/* Gradiente de marca reutilizable */
+.brand-gradient {
+  background: linear-gradient(135deg, rgb(var(--primary)), rgb(var(--accent)));
+}
+.brand-text {
+  background: linear-gradient(135deg, rgb(var(--primary)), rgb(var(--accent)));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* React Flow overrides para look premium */
+.react-flow__attribution {
+  display: none;
+}
+.react-flow__edge-path {
+  stroke: rgb(var(--border-strong));
+  stroke-width: 1.5;
+}
+.react-flow__edge.animated .react-flow__edge-path {
+  stroke: rgb(var(--primary) / 0.7);
+  stroke-dasharray: 6;
+  animation: dash 0.6s linear infinite;
+}
+.react-flow__handle {
+  border: none;
+  background: rgb(var(--muted));
+  width: 8px;
+  height: 8px;
+}
+.react-flow__controls {
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgb(var(--border));
+  box-shadow: 0 8px 24px rgb(var(--shadow-color) / 0.25);
+}
+.react-flow__controls-button {
+  background: rgb(var(--card));
+  border-bottom: 1px solid rgb(var(--border));
+  color: rgb(var(--text-secondary));
+}
+.react-flow__controls-button:hover {
+  background: rgb(var(--elevated));
+}
+.react-flow__controls-button svg {
+  fill: currentColor;
+}
+.react-flow__minimap {
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgb(var(--border));
+  background: rgb(var(--surface)) !important;
+}

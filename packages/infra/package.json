@@ -1,0 +1,36 @@
+{
+  "name": "@core/infra",
+  "version": "0.1.0",
+  "description": "Adaptadores de infraestructura (Prisma/Redis) que implementan los puertos del engine + schema de datos.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "prisma"],
+  "scripts": {
+    "build": "prisma generate && tsc -p tsconfig.json",
+    "typecheck": "prisma generate && tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "tsx prisma/seed.ts",
+    "rls:apply": "prisma db execute --file prisma/roles.sql --schema prisma/schema.prisma && prisma db execute --file prisma/rls.sql --schema prisma/schema.prisma"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@core/contracts": "workspace:*",
+    "@core/engine": "workspace:*",
+    "@prisma/client": "^5.22.0",
+    "ioredis": "^5.4.1"
+  },
+  "devDependencies": {
+    "prisma": "^5.22.0",
+    "tsx": "^4.19.2"
+  }
+}
