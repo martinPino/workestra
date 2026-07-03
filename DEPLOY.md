@@ -15,20 +15,24 @@ Redis    (add-on) ─┼─▶ api    (NestJS + WebSockets + OAuth callback)  �
 1. Crea un proyecto en Railway → **New Project → Deploy from GitHub repo** → elige `martinPino/agentflow`.
 2. En el proyecto: **+ New → Database → Add PostgreSQL**. Repite con **Add Redis**.
 
-## 2) Los tres servicios (mismo repo, distinto Start Command)
+## 2) Los tres servicios (mismo repo, variable `SERVICE`)
 Railway crea un primer servicio al conectar el repo. Renómbralo **api** y crea otros dos (**+ New →
-GitHub Repo →** el mismo repo) para **worker** y **web**. En cada uno, **Settings → Deploy → Custom
-Start Command**:
+GitHub Repo →** el mismo repo) para **worker** y **web**.
 
-| Servicio | Start Command | Dominio público |
-|---|---|---|
-| **api** | `sh scripts/start-api.sh` | **Sí** (Settings → Networking → Generate Domain) |
-| **worker** | `node apps/worker/dist/main.js` | No |
-| **web** | `node apps/web/serve.mjs` | **Sí** (Generate Domain) |
+Los tres usan la **misma imagen** (el `Dockerfile` de la raíz, via `railway.json`) y el **mismo CMD**
+(`scripts/start.sh`). Cada servicio elige qué arrancar con la variable de entorno **`SERVICE`** — NO
+uses "Custom Start Command" (déjalo **vacío**; en monorepos a veces no se propaga).
 
-Todos usan el `Dockerfile` de la raíz automáticamente (via `railway.json`). La **api** aplica las
-migraciones (`prisma migrate deploy`) al arrancar; el **worker** se reconecta solo hasta que la BD
-esté lista.
+| Servicio | Variable | Qué arranca | Dominio público |
+|---|---|---|---|
+| **api** | `SERVICE=api` | migra + siembra + API (NestJS + WS) | **Sí** (Settings → Networking → Generate Domain) |
+| **worker** | `SERVICE=worker` | BullMQ (durable + cron) | No |
+| **web** | `SERVICE=web` | SPA estática | **Sí** (Generate Domain) |
+
+> Si algún servicio tiene un "Custom Start Command" puesto, **bórralo** (Settings → Deploy) para que
+> corra el CMD del Dockerfile (`scripts/start.sh`), que lee `SERVICE`.
+
+La **api** aplica migraciones + seed al arrancar; el **worker** se reconecta solo hasta que la BD esté lista.
 
 ## 3) Variables de entorno
 Usa las **variables de referencia** de Railway (`${{Servicio.VAR}}`) para no copiar valores a mano.

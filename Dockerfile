@@ -19,8 +19,9 @@ RUN pnpm install --frozen-lockfile
 # `turbo run build`: compila packages (incl. prisma generate en @core/infra) + apps (api/worker/web).
 RUN pnpm build
 
-# ---- runtime: la misma app compilada; el CMD lo fija cada servicio en Railway ----
+# ---- runtime: la misma app compilada; el servicio elige qué arrancar con SERVICE=api|worker|web ----
 FROM base AS runtime
 COPY --from=build /app /app
-# Por defecto arranca la API (migra + escucha). Worker/web sobrescriben el Start Command.
-CMD ["sh", "scripts/start-api.sh"]
+# Entrypoint único que despacha según la variable SERVICE (api por defecto). NO fijes "custom start
+# command" en Railway: deja que corra este CMD y diferencia los servicios con la variable SERVICE.
+CMD ["sh", "scripts/start.sh"]
