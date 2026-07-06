@@ -88,15 +88,37 @@ export class TriggersService {
     const url = `${this.selfBase()}/hooks/jira/${connectorId}?token=${encodeURIComponent(stableToken)}`;
 
     const existing = await listJiraWebhookIds(oauthToken, cloudId, jiraFetch);
-    if (existing.length) await deleteJiraWebhooks(oauthToken, cloudId, existing, jiraFetch);
-
     const active = (await this.p.triggerBindings.listByConnector(connectorId)).filter((b) => b.active);
-    if (!active.length) return;
     const entries = active.map((b) => ({
       events: getTriggerEvent(b.eventId)?.providerEvents ?? [],
       jqlFilter: `project = ${String(b.params.projectKey ?? '')}`,
     }));
-    const ids = await registerJiraWebhooks(oauthToken, cloudId, url, entries, jiraFetch);
+
+    // Sin webhooks deseados: solo limpiar los existentes.
+    if (!entries.length) {
+      if (existing.length) await deleteJiraWebhooks(oauthToken, cloudId, existing, jiraFetch);
+      return;
+    }
+
+    // REGISTRAR-ANTES-DE-BORRAR: nunca dejar a Jira sin webhooks si el registro falla. Como todos usan la
+    // MISMA URL estable, registrar el set nuevo convive con los viejos (breve ventana de duplicados) hasta
+    // que borramos los viejos. Solo si el registro choca por «una URL por usuario» (huérfano con OTRA URL)
+    // limpiamos primero y reintentamos. Otros errores (Jira caído, 403) se propagan SIN borrar nada.
+    let ids: Array<number | null>;
+    try {
+      ids = await registerJiraWebhooks(oauthToken, cloudId, url, entries, jiraFetch);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/single URL|one URL/i.test(msg) && existing.length) {
+        await deleteJiraWebhooks(oauthToken, cloudId, existing, jiraFetch);
+        ids = await registerJiraWebhooks(oauthToken, cloudId, url, entries, jiraFetch);
+        for (let i = 0; i < active.length; i++) await this.p.triggerBindings.setRemoteId(active[i].id, ids[i] != null ? String(ids[i]) : null);
+        return;
+      }
+      throw e; // los webhooks previos siguen vivos
+    }
+    // Registro OK: ahora sí borramos los viejos (best-effort) y guardamos los ids nuevos.
+    if (existing.length) await deleteJiraWebhooks(oauthToken, cloudId, existing, jiraFetch).catch(() => undefined);
     for (let i = 0; i < active.length; i++) {
       await this.p.triggerBindings.setRemoteId(active[i].id, ids[i] != null ? String(ids[i]) : null);
     }
@@ -185,7 +207,9 @@ export class TriggersService {
    */
   async ingestJiraEvent(connectorId: string, presentedToken: string | undefined, payload: unknown): Promise<{ started: string[] }> {
     const bindings = (await this.p.triggerBindings.listByConnector(connectorId)).filter((b) => b.active);
-    if (!bindings.length) throw new NotFoundException('Sin disparadores activos para este conector.');
+    // Respuesta UNIFORME para no revelar existencia/estado del conector a un caller sin el secreto: sin
+    // bindings o con token inválido → 401 idéntico (no distinguimos «no existe» de «token incorrecto»).
+    if (!bindings.length) throw new UnauthorizedException('Token inválido.');
 
     // El ingreso es @Public (sin tenant en contexto); fijamos el workspace del binding para RLS/ejecución.
     const workspaceId = bindings[0].workspaceId;
@@ -197,16 +221,32 @@ export class TriggersService {
     const rec = asRecord(payload);
     const webhookEvent = String(rec.webhookEvent ?? '');
     const def = TRIGGER_EVENTS.find((e) => e.providerEvents?.includes(webhookEvent));
-    const fields = asRecord(asRecord(rec.issue).fields);
+    const issue = asRecord(rec.issue);
+    const fields = asRecord(issue.fields);
     const projectKey = String(asRecord(fields.project).key ?? '');
+
+    // Contexto AMIGABLE: exponemos los campos del ticket en la raíz (`{{ticket.key}}`, `{{ticket.summary}}`)
+    // además del payload crudo — así los pasos del flujo (p. ej. mover el ticket) no tienen que navegar la
+    // estructura completa del evento de Jira.
+    const ticket = {
+      key: String(issue.key ?? ''),
+      summary: String(fields.summary ?? ''),
+      description: fields.description ?? '',
+      project: projectKey,
+      event: webhookEvent,
+      webhook: payload,
+    };
 
     const matches = bindings.filter((b) => def && b.eventId === def.id && String(b.params.projectKey ?? '') === projectKey);
     const started: string[] = [];
+    const seen = new Set<string>(); // dedupe: un evento arranca cada flujo UNA vez (aunque haya recetas duplicadas)
     for (const b of matches) {
+      if (seen.has(b.workflowId)) continue;
+      seen.add(b.workflowId);
       const r = await this.executions.start(
         b.workflowId,
         b.workspaceId,
-        { ticket: { webhook: payload }, variables: { trigger: 'webhook', connectorId, payload } },
+        { ticket, variables: { trigger: 'webhook', connectorId, issueKey: ticket.key, payload } },
         'webhook',
       );
       started.push(r.executionId);
