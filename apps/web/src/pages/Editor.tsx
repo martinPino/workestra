@@ -12,7 +12,7 @@ import ReactFlow, {
   type Node as RFNode,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Undo2, Redo2, LayoutGrid, StickyNote, Play, Save, Boxes, Loader2, UploadCloud, PanelRightClose, PanelRightOpen, Menu, X } from 'lucide-react';
+import { Undo2, Redo2, LayoutGrid, StickyNote, Play, Check, Boxes, Loader2, UploadCloud, PanelRightClose, PanelRightOpen, Menu, X } from 'lucide-react';
 import { cn } from '../lib/cn';
 import { useMediaQuery } from '../lib/useMediaQuery';
 import type { ExecutionEvent } from '@core/contracts';
@@ -70,7 +70,9 @@ export function Editor() {
 
   const rf = useRef<ReactFlowInstance | null>(null);
   const dragStart = useRef<Record<string, { x: number; y: number }>>({});
-  const [publishedVersion, setPublishedVersion] = useState<number | null>(null);
+  const [activated, setActivated] = useState(false);
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle'); // indicador de autoguardado
+  const skipFirstSave = useRef(true); // no autoguardar la carga inicial del grafo
   const isDesktop = useMediaQuery('(min-width: 768px)');
   const [inspectorOpen, setInspectorOpen] = useState(isDesktop); // en móvil arranca cerrado (ver canvas)
   const nodeTypes = useMemo(() => ({ af: AfNode, comment: CommentNode }), []);
@@ -148,25 +150,37 @@ export function Editor() {
     setTimeout(() => rf.current?.fitView({ duration: 300 }), 0);
   };
 
-  const handleSave = async () => {
-    if (!workflowId || workflowId === 'local') return;
-    try {
-      await api.saveGraph(workflowId, docToWorkflowGraph(s().history.doc));
-      s().setError(t('Guardado ✓'));
-    } catch {
-      s().setError(t('No se pudo guardar. Revisa que el flujo no tenga pasos en bucle.'));
+  // Autoguardado (M17): el grafo se guarda solo, con debounce; sin botón «Guardar» ni modelo draft.
+  useEffect(() => {
+    if (!workflowId || workflowId === 'local') return undefined;
+    if (skipFirstSave.current) {
+      skipFirstSave.current = false;
+      return undefined;
     }
-  };
+    setSaveState('saving');
+    setActivated(false); // hay cambios sin activar
+    const timer = setTimeout(async () => {
+      try {
+        await api.saveGraph(workflowId, docToWorkflowGraph(s().history.doc));
+        setSaveState('saved');
+      } catch {
+        setSaveState('idle');
+        s().setError(t('No se pudo guardar. Revisa que el flujo no tenga pasos en bucle.'));
+      }
+    }, 900);
+    return () => clearTimeout(timer);
+  }, [doc, workflowId]);
 
-  const handlePublish = async () => {
+  // «Activar» (M17): guarda y publica; a partir de ahí las ejecuciones (webhook, horario…) usan estos cambios.
+  const handleActivate = async () => {
     if (!workflowId || workflowId === 'local') return;
     try {
       await api.saveGraph(workflowId, docToWorkflowGraph(s().history.doc));
-      const v = await api.publish(workflowId);
-      setPublishedVersion(v.version);
-      s().setError(`${t('Publicada')} v${v.version} ${t('✓ — las ejecuciones se anclan a esta versión')}`);
+      await api.publish(workflowId);
+      setActivated(true);
+      s().setError(t('Flujo activado. A partir de ahora funcionará con estos cambios.'));
     } catch {
-      s().setError(t('Error al publicar'));
+      s().setError(t('No se pudo activar el flujo.'));
     }
   };
 
@@ -206,7 +220,9 @@ export function Editor() {
             <Boxes size={16} />
           </div>
           <span className="hidden max-w-[160px] truncate text-sm font-medium text-txt-primary sm:inline">{workflowName}</span>
-          {publishedVersion != null && <Badge tone="primary">v{publishedVersion}</Badge>}
+          {saveState !== 'idle' && (
+            <span className="hidden text-[11px] text-txt-disabled sm:inline">{saveState === 'saving' ? t('Guardando…') : t('Guardado ✓')}</span>
+          )}
           <Badge tone={STATUS_TONE[execStatus] ?? 'default'}>
             {running ? <Loader2 size={11} className="animate-spin" /> : <Dot tone={STATUS_TONE[execStatus] ?? 'default'} />} {t(statusLabel(execStatus))}
           </Badge>
@@ -226,14 +242,11 @@ export function Editor() {
             <StickyNote size={14} /> {t('Nota')}
           </Button>
           <div className="mx-1 h-4 w-px bg-border" />
-          <Button size="sm" variant="secondary" onClick={handleSave}>
-            <Save size={14} /> {t('Guardar')}
-          </Button>
-          <Button size="sm" variant="secondary" onClick={handlePublish}>
-            <UploadCloud size={14} /> {t('Publicar')}
+          <Button size="sm" variant={activated ? 'secondary' : 'primary'} onClick={handleActivate}>
+            {activated ? <Check size={14} /> : <UploadCloud size={14} />} {activated ? t('Activo') : t('Activar')}
           </Button>
           <Button size="sm" variant="primary" onClick={handleRun}>
-            <Play size={14} /> {t('Ejecutar')}
+            <Play size={14} /> {t('Probar')}
           </Button>
         </div>
       </div>

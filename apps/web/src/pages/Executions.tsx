@@ -30,7 +30,7 @@ const fmtCost = (c: number) => (c === 0 ? '—' : `$${c.toFixed(c < 0.01 ? 4 : 3
 const fmtTime = (iso?: string | null): string =>
   iso ? new Date(iso).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—';
 
-const GRID = 'grid-cols-[1.4fr_0.9fr_1.1fr_0.5fr_0.5fr_0.6fr]';
+const GRID = 'grid-cols-[1.6fr_1fr_1.1fr_0.5fr_0.6fr]';
 
 /** Tarjeta de revisión: aprobar/rechazar una pausa humana. El scope lo valida el servidor (403). */
 export function ReviewActions({ executionId }: { executionId: string }) {
@@ -108,7 +108,6 @@ function ExecRow({ e, i }: { e: ExecutionRow; i: number }) {
         <span className="whitespace-nowrap text-xs text-txt-secondary">{fmtTime(e.createdAt)}</span>
         <span className="text-txt-secondary">{e.tokensUsed.toLocaleString()}</span>
         <span className="text-txt-secondary">{fmtCost(Number(e.costEstimate))}</span>
-        <span className="text-right font-mono text-[11px] text-txt-disabled">{e.workflowVersionId?.slice(0, 10)}</span>
       </div>
       {waiting && (
         <div className="mt-3 rounded-lg border border-warning/20 bg-warning/[0.06] p-3">
@@ -160,7 +159,6 @@ export function Executions() {
             <span>{t('Hora')}</span>
             <span>{t('Tokens')}</span>
             <span>{t('Coste')}</span>
-            <span className="text-right">{t('Versión')}</span>
           </div>
           {isLoading ? (
             <div className="px-5 py-10 text-center text-txt-secondary">

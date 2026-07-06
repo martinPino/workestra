@@ -189,6 +189,11 @@ export const EN: Record<string, string> = {
   'Una automatización está en cola': 'An automation is queued',
   'Una automatización está en pausa': 'An automation is paused',
   'Una automatización se canceló': 'An automation was cancelled',
+  // --- M17 · guardado automático + Activar ---
+  'Activar': 'Activate',
+  'Probar': 'Test',
+  'Flujo activado. A partir de ahora funcionará con estos cambios.': 'Flow activated. It will now run with these changes.',
+  'No se pudo activar el flujo.': 'Could not activate the flow.',
   '+18% vs. ayer': '+18% vs. yesterday',
   '+2 esta semana': '+2 this week',
   '0 pendientes': '0 pending',
