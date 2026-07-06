@@ -202,19 +202,32 @@ function buildCron(freq: Freq, everyN: number, hour: number, minute: number, wee
   }
 }
 
-/** Convierte un cron (el que genera el picker) a texto humano para la lista; si no encaja, muestra el crudo. */
-function humanCron(cron: string): string {
+const isCronInt = (s: string) => /^\d+$/.test(s);
+
+/**
+ * Convierte a texto humano SOLO los crons con la forma que genera el picker; cualquier otra forma
+ * (rangos «1-5», listas «0,12», pasos «* /5» en hora, etc.) cae con gracia al cron crudo — así un cron
+ * legacy escrito a mano nunca se muestra como «NaN» o con un rango mal etiquetado. `t` traduce las piezas.
+ */
+function humanCron(cron: string, t: (s: string) => string): string {
   const p = cron.trim().split(/\s+/);
   if (p.length !== 5) return cron;
-  const [mi, ho, dom, , dow] = p;
-  const every = mi.startsWith('*/') ? mi.slice(2) : null;
-  if (every && ho === '*') return `Cada ${every} minutos`;
-  if (ho === '*' && dom === '*' && dow === '*') return `Cada hora, al minuto ${mi}`;
+  const [mi, ho, dom, mon, dow] = p;
+  // «Cada pocos minutos»: */N * * * *
+  const everyN = /^\*\/(\d+)$/.exec(mi);
+  if (everyN && ho === '*' && dom === '*' && mon === '*' && dow === '*') return `${t('Cada')} ${everyN[1]} ${t('minutos')}`;
+  if (!isCronInt(mi)) return cron;
+  // «Cada hora, al minuto N»: N * * * *
+  if (ho === '*' && dom === '*' && mon === '*' && dow === '*') return `${t('Cada hora, al minuto')} ${mi}`;
+  if (!isCronInt(ho)) return cron;
   const at = `${pad2(Number(ho))}:${pad2(Number(mi))}`;
-  if (dom === '*' && dow === '*') return `Cada día a las ${at}`;
-  if (dom === '*' && dow !== '*') return `Cada ${WEEKDAYS[Number(dow)] ?? dow} a las ${at}`;
-  if (dom !== '*' && dow === '*') return `El día ${dom} de cada mes a las ${at}`;
-  return cron;
+  // «Cada día a las HH:MM»: N N * * *
+  if (dom === '*' && mon === '*' && dow === '*') return `${t('Cada día a las')} ${at}`;
+  // «Cada <día de la semana> a las HH:MM»: N N * * D
+  if (dom === '*' && mon === '*' && isCronInt(dow) && Number(dow) <= 6) return `${t('Cada')} ${t(WEEKDAYS[Number(dow)])} ${t('a las')} ${at}`;
+  // «El día D de cada mes a las HH:MM»: N N D * *
+  if (isCronInt(dom) && mon === '*' && dow === '*') return `${t('El día')} ${dom} ${t('de cada mes a las')} ${at}`;
+  return cron; // forma no reconocida: cron crudo
 }
 
 function ScheduleManager() {
@@ -340,7 +353,7 @@ function ScheduleManager() {
             </Button>
           </div>
           <p className="mt-2 text-xs text-txt-secondary">
-            {t('Se ejecutará:')} <span className="font-medium text-txt-primary">{humanCron(cron)}</span>
+            {t('Se ejecutará:')} <span className="font-medium text-txt-primary">{humanCron(cron, t)}</span>
           </p>
           {wfId && !allowed && <TriggerMismatch event={triggerEvent} need="cron" wfId={wfId} />}
           {!canApprove(role) && <p className="mt-1 text-[11px] text-warning">{t('El rol')} {role} {t('no puede programar (requiere workflow:write).')}</p>}
@@ -355,7 +368,7 @@ function ScheduleManager() {
                   <Badge tone={s.active ? 'accent' : 'default'}>
                     <Clock size={11} /> {s.active ? t('Activo') : t('En pausa')}
                   </Badge>
-                  <span className="min-w-0 flex-1 truncate text-txt-secondary">{s.cron ? humanCron(s.cron) : humanEvery(s.everyMs ?? 0)}</span>
+                  <span className="min-w-0 flex-1 truncate text-txt-secondary">{s.cron ? humanCron(s.cron, t) : humanEvery(s.everyMs ?? 0)}</span>
                   <button onClick={() => remove(s.id)} className="flex h-7 w-7 items-center justify-center rounded-md text-txt-secondary hover:bg-danger/15 hover:text-danger" aria-label={t('Eliminar')}>
                     <Trash2 size={14} />
                   </button>
