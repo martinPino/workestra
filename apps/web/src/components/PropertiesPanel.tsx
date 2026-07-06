@@ -37,7 +37,10 @@ export function PropertiesPanel() {
         </div>
       </div>
       <div className="h-px bg-border" />
-      <SchemaForm schema={def.configSchema} value={node.config} onChange={(config) => updateConfig(node.id, config)} />
+      {/* key={node.id}: remonta el formulario al cambiar de nodo para que los campos con estado local
+          (p. ej. la unidad del campo `duration`) se re-inicialicen desde el nodo recién seleccionado en
+          vez de heredar el estado del anterior. Editar el MISMO nodo no remonta (node.id estable). */}
+      <SchemaForm key={node.id} schema={def.configSchema} value={node.config} onChange={(config) => updateConfig(node.id, config)} />
     </div>
   );
 }
