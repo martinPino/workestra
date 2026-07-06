@@ -30,6 +30,7 @@ export class InMemoryExecutionRepository implements IExecutionRepository {
       costEstimate: 0,
       startedAt: null,
       finishedAt: null,
+      createdAt: new Date().toISOString(),
     };
     this.executions.set(id, execution);
     return execution;

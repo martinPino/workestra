@@ -24,6 +24,12 @@ const STATUS: Record<string, { tone: Tone; icon: React.ReactNode; label: string 
 
 const fmtCost = (c: number) => (c === 0 ? '—' : `$${c.toFixed(c < 0.01 ? 4 : 3)}`);
 
+/** Hora de la ejecución (día + hora local) para correlacionar con eventos externos (p. ej. Jira). */
+const fmtTime = (iso?: string | null): string =>
+  iso ? new Date(iso).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—';
+
+const GRID = 'grid-cols-[1.4fr_0.9fr_1.1fr_0.5fr_0.5fr_0.6fr]';
+
 /** Tarjeta de revisión: aprobar/rechazar una pausa humana. El scope lo valida el servidor (403). */
 export function ReviewActions({ executionId }: { executionId: string }) {
   const t = useT();
@@ -88,14 +94,15 @@ function ExecRow({ e, i }: { e: ExecutionRow; i: number }) {
   const waiting = e.status === 'WAITING_HUMAN';
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.02 }} className="px-5 py-3">
-      <div className="grid grid-cols-[1.6fr_0.9fr_0.6fr_0.6fr_0.7fr] items-center gap-4 text-sm">
-        <Link to={`/executions/${e.id}`} className="group flex items-center gap-2">
+      <div className={`grid ${GRID} items-center gap-4 text-sm`}>
+        <Link to={`/executions/${e.id}`} className="group flex min-w-0 items-center gap-2">
           <span className="font-mono text-[11px] text-txt-disabled group-hover:text-primary">{e.id.slice(0, 12)}</span>
           <span className="truncate text-txt-secondary group-hover:text-txt-primary group-hover:underline">{e.triggerType}</span>
         </Link>
         <Badge tone={s.tone}>
           {s.icon} {s.label}
         </Badge>
+        <span className="whitespace-nowrap text-xs text-txt-secondary">{fmtTime(e.createdAt)}</span>
         <span className="text-txt-secondary">{e.tokensUsed.toLocaleString()}</span>
         <span className="text-txt-secondary">{fmtCost(Number(e.costEstimate))}</span>
         <span className="text-right font-mono text-[11px] text-txt-disabled">{e.workflowVersionId?.slice(0, 10)}</span>
@@ -144,9 +151,10 @@ export function Executions() {
         <EmptyState icon={<CircleX size={20} />} title={t('No se pudo conectar con la API')} description={t('Arranca la API para ver las ejecuciones reales.')} />
       ) : (
         <Card>
-          <div className="grid grid-cols-[1.6fr_0.9fr_0.6fr_0.6fr_0.7fr] gap-4 border-b border-border px-5 py-2.5 text-[11px] font-medium uppercase tracking-wide text-txt-disabled">
+          <div className={`grid ${GRID} gap-4 border-b border-border px-5 py-2.5 text-[11px] font-medium uppercase tracking-wide text-txt-disabled`}>
             <span>{t('Ejecución')}</span>
             <span>{t('Estado')}</span>
+            <span>{t('Hora')}</span>
             <span>{t('Tokens')}</span>
             <span>{t('Coste')}</span>
             <span className="text-right">{t('Versión')}</span>

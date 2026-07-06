@@ -56,6 +56,8 @@ export const ExecutionSchema = z.object({
   costEstimate: z.number().default(0),
   startedAt: z.string().datetime().nullish(),
   finishedAt: z.string().datetime().nullish(),
+  /** Instante de creación de la ejecución (siempre presente). Es la «hora» que ve el usuario. */
+  createdAt: z.string().datetime().nullish(),
 });
 export type Execution = z.infer<typeof ExecutionSchema>;
 

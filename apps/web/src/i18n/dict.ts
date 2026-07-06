@@ -125,6 +125,7 @@ export const EN: Record<string, string> = {
   'Herramienta de eco determinista para pruebas.': 'Deterministic echo tool for testing.',
   'Herramientas': 'Tools',
   'Historial, monitorización en vivo y bandeja de revisiones humanas.': 'History, live monitoring, and human review inbox.',
+  'Hora': 'Time',
   'Identidad de tu espacio de trabajo.': 'Your workspace identity.',
   'Idioma': 'Language',
   'Inspector': 'Inspector',

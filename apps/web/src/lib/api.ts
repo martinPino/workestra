@@ -20,6 +20,7 @@ export interface ExecutionRow {
   tokensUsed: number;
   costEstimate: number;
   workflowVersionId: string;
+  createdAt?: string | null;
 }
 
 export interface ReviewDto {

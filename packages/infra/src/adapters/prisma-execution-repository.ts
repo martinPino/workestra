@@ -87,6 +87,7 @@ export class PrismaExecutionRepository implements IExecutionRepository {
       costEstimate: Number(row.costEstimate),
       startedAt: row.startedAt ? row.startedAt.toISOString() : null,
       finishedAt: row.finishedAt ? row.finishedAt.toISOString() : null,
+      createdAt: row.createdAt ? row.createdAt.toISOString() : null,
     };
   }
 }
