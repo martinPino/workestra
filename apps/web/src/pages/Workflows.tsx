@@ -8,6 +8,7 @@ import { Card, Button, PageHeader, Badge, Dot, EmptyState, Skeleton } from '../u
 import { useWorkflows } from '../lib/hooks';
 import { api } from '../lib/api';
 import { STARTER_DOC, docToWorkflowGraph } from '../graph';
+import { WORKFLOW_TEMPLATES, type WorkflowTemplate } from '../editor/templates';
 import { useT } from '../i18n';
 
 export function Workflows() {
@@ -30,7 +31,13 @@ export function Workflows() {
   }, [params]);
 
   const create = async () => {
-    const wf = await api.createWorkflow('Nuevo workflow', docToWorkflowGraph(STARTER_DOC));
+    const wf = await api.createWorkflow('Mi automatización', docToWorkflowGraph(STARTER_DOC));
+    qc.invalidateQueries({ queryKey: ['workflows'] });
+    navigate(`/workflows/${wf.id}`);
+  };
+
+  const createFromTemplate = async (tpl: WorkflowTemplate) => {
+    const wf = await api.createWorkflow(tpl.name, docToWorkflowGraph(tpl.doc));
     qc.invalidateQueries({ queryKey: ['workflows'] });
     navigate(`/workflows/${wf.id}`);
   };
@@ -38,14 +45,28 @@ export function Workflows() {
   return (
     <Page className="space-y-6">
       <PageHeader
-        title="Workflows"
-        subtitle={t("Diseña y ejecuta equipos de agentes con el editor visual.")}
-        actions={
-          <Button variant="primary" onClick={create}>
-            <Plus size={15} /> {t("Nuevo workflow")}
-          </Button>
-        }
+        title={t('Automatizaciones')}
+        subtitle={t('Elige una plantilla o empieza en blanco. Cada automatización es un flujo visual.')}
       />
+
+      {/* Galería de plantillas (M23): el primer contacto no es un lienzo en blanco. */}
+      <div>
+        <div className="mb-3 text-sm font-medium text-txt-secondary">{t('Empezar con una plantilla')}</div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {WORKFLOW_TEMPLATES.map((tpl) => (
+            <Card key={tpl.id} hover className="cursor-pointer p-4" onClick={() => createFromTemplate(tpl)}>
+              <div className="text-2xl">{tpl.icon}</div>
+              <div className="mt-2 text-sm font-semibold text-txt-primary">{t(tpl.name)}</div>
+              <div className="mt-1 text-xs leading-relaxed text-txt-secondary">{t(tpl.description)}</div>
+            </Card>
+          ))}
+          <Card hover className="flex cursor-pointer flex-col items-start justify-center border-dashed p-4" onClick={create}>
+            <Plus size={20} className="text-txt-secondary" />
+            <div className="mt-2 text-sm font-semibold text-txt-primary">{t('Empezar en blanco')}</div>
+            <div className="mt-1 text-xs text-txt-secondary">{t('Un lienzo vacío para diseñar desde cero.')}</div>
+          </Card>
+        </div>
+      </div>
 
       {isLoading ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
