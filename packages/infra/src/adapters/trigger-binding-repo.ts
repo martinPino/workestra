@@ -28,8 +28,15 @@ export class InMemoryTriggerBindingRepository implements ITriggerBindingReposito
   async listByWorkflow(workflowId: string): Promise<TriggerBindingRecord[]> {
     return [...this.byId.values()].filter((b) => b.workflowId === workflowId);
   }
+  async listByConnector(connectorId: string): Promise<TriggerBindingRecord[]> {
+    return [...this.byId.values()].filter((b) => b.connectorId === connectorId);
+  }
   async listActive(): Promise<TriggerBindingRecord[]> {
     return [...this.byId.values()].filter((b) => b.active);
+  }
+  async setRemoteId(id: string, remoteId: string | null): Promise<void> {
+    const b = this.byId.get(id);
+    if (b) this.byId.set(id, { ...b, remoteId });
   }
   async setActive(id: string, active: boolean): Promise<void> {
     const b = this.byId.get(id);
@@ -67,9 +74,16 @@ export class PrismaTriggerBindingRepository implements ITriggerBindingRepository
     const rows = await this.prisma.triggerBinding.findMany({ where: { workflowId } });
     return rows.map((r) => this.toDomain(r));
   }
+  async listByConnector(connectorId: string): Promise<TriggerBindingRecord[]> {
+    const rows = await this.prisma.triggerBinding.findMany({ where: { connectorId } });
+    return rows.map((r) => this.toDomain(r));
+  }
   async listActive(): Promise<TriggerBindingRecord[]> {
     const rows = await this.prisma.triggerBinding.findMany({ where: { active: true } });
     return rows.map((r) => this.toDomain(r));
+  }
+  async setRemoteId(id: string, remoteId: string | null): Promise<void> {
+    await this.prisma.triggerBinding.update({ where: { id }, data: { remoteId } });
   }
   async setActive(id: string, active: boolean): Promise<void> {
     await this.prisma.triggerBinding.update({ where: { id }, data: { active } });

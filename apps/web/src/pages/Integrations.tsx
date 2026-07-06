@@ -512,16 +512,6 @@ const JIRA_RECIPES = [
 ];
 const recipeLabel = (eventId: string) => JIRA_RECIPES.find((r) => r.eventId === eventId)?.label ?? eventId;
 
-/** Fija el nodo Trigger del grafo a «webhook» (lo exige el auto-registro); el resto del grafo no cambia. */
-function ensureWebhookTrigger(graph: WorkflowGraph): WorkflowGraph {
-  return {
-    ...graph,
-    nodes: graph.nodes.map((n) =>
-      n.type === 'trigger' ? { ...n, config: { ...(n.config as Record<string, unknown>), event: 'webhook' } } : n,
-    ),
-  };
-}
-
 /**
  * Receta «Cuando pase algo en una app conectada» (M19): elegir el evento de Jira + el proyecto y pulsar
  * Activar. Por debajo: fija el Trigger del flujo a «webhook», guarda, y registra el webhook EN Jira. El
@@ -602,25 +592,9 @@ function TriggerRecipes() {
     setBusy(true);
     setErr(null);
     try {
-      const wf = await api.getWorkflow(wfId);
-      // El auto-registro necesita un disparador «webhook». Si el flujo no tiene bloque Disparador, avisamos
-      // claro aquí (en vez de dejar que el backend responda con un «el Trigger es manual» confuso).
-      if (!wf.graph.nodes.some((n) => n.type === 'trigger')) {
-        setErr(t('Este flujo no tiene un disparador. Ábrelo en el editor y añade el bloque «Disparador».'));
-        return;
-      }
-      // 1) Fijar el disparador a «webhook» y guardar (solo si cambia). Guardamos el grafo ORIGINAL para
-      //    restaurarlo si el registro falla — no dejar el flujo del usuario mutado en silencio.
-      const patched = ensureWebhookTrigger(wf.graph);
-      const changed = JSON.stringify(patched) !== JSON.stringify(wf.graph);
-      if (changed) await api.saveGraph(wfId, patched);
-      // 2) Registrar la receta → crea el webhook EN Jira y persiste el binding. Si falla, revertir el grafo.
-      try {
-        await api.createTriggerBinding(wfId, { eventId, connectorId: jira.id, params: { projectKey, cloudId } });
-      } catch (e) {
-        if (changed) await api.saveGraph(wfId, wf.graph).catch(() => undefined); // restaura el disparador original
-        throw e;
-      }
+      // El backend registra el webhook EN Jira (URL estable por conector) y enruta por el contenido del
+      // evento al flujo — no hace falta tocar el grafo del usuario.
+      await api.createTriggerBinding(wfId, { eventId, connectorId: jira.id, params: { projectKey, cloudId } });
       await qc.invalidateQueries({ queryKey: ['triggerBindings', wfId] });
     } catch (e) {
       setErr(e instanceof Error ? e.message : t('Error al activar'));

@@ -1,36 +1,45 @@
-import { Injectable, Inject, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import {
+  TRIGGER_EVENTS,
   getTriggerEvent,
   jiraAccessibleResources,
   listJiraProjects,
-  registerJiraWebhook,
+  listJiraWebhookIds,
+  registerJiraWebhooks,
   deleteJiraWebhooks,
   type JiraFetch,
   type JiraProject,
 } from '@core/sdk-plugins';
-import type { ConnectorRecord, TriggerBindingRecord } from '@core/engine';
+import type { TriggerBindingRecord } from '@core/engine';
+import { setCurrentWorkspace } from '@core/infra';
 import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
 import { assertInWorkspace } from '../tenant/tenant.util';
-import { WebhooksService } from '../webhooks/webhooks.service';
+import { ExecutionsService } from '../execution/executions.service';
 
-/**
- * Adaptador del fetch global de Node al tipo mínimo `JiraFetch` de los helpers. Acota cada llamada con
- * un timeout de 10s (como connector-node/executors-io): un endpoint de Jira colgado no debe bloquear la
- * petición del usuario indefinidamente.
- */
+/** Adaptador del fetch global con timeout de 10s (un endpoint de Jira colgado no debe colgar la petición). */
 const jiraFetch: JiraFetch = (url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(10_000) });
 
+const stableTokenKey = (connectorId: string) => `jira-hook:${connectorId}`;
+
+function asRecord(x: unknown): Record<string, unknown> {
+  return x && typeof x === 'object' ? (x as Record<string, unknown>) : {};
+}
+
 /**
- * Triggers sin código (M19): materializa una RECETA («Cuando se crea un ticket de Jira») en un webhook
- * REAL registrado EN el proveedor, para que el usuario no tenga que tocar una URL, un secreto ni la
- * consola de Jira. Reutiliza `WebhooksService` para el webhook interno de ingreso y guarda el binding
- * (con el `remoteId` del webhook creado en Jira) para poder borrarlo/renovarlo después.
+ * Triggers sin código (M19): materializa una RECETA («Cuando se crea un ticket de Jira») en webhooks REALES
+ * registrados EN Jira, sin que el usuario toque una URL, un secreto ni la consola de Jira.
+ *
+ * Jira solo permite UNA URL por usuario, así que TODAS las recetas de un conector comparten una URL estable
+ * `/hooks/jira/<connectorId>?token=<secreto>` y se enrutan por el CONTENIDO del evento (proyecto + tipo) al
+ * flujo correcto. Cada cambio RECONCILIA: borra todos los webhooks del usuario (limpia huérfanos) y
+ * re-registra los bindings activos bajo la URL estable.
  */
 @Injectable()
 export class TriggersService {
   constructor(
     @Inject(PERSISTENCE) private readonly p: PersistenceBundle,
-    private readonly webhooks: WebhooksService,
+    private readonly executions: ExecutionsService,
   ) {}
 
   private selfBase(): string {
@@ -38,7 +47,7 @@ export class TriggersService {
   }
 
   /** Lee el token OAuth del conector (deny-by-default por tenant) y valida que esté conectado. */
-  private async connectorToken(connectorId: string, workspaceId: string): Promise<{ token: string; connector: ConnectorRecord }> {
+  private async connectorToken(connectorId: string, workspaceId: string): Promise<string> {
     const connector = await this.p.connectors.getInWorkspace(connectorId, workspaceId);
     if (!connector) throw new NotFoundException('Conector no encontrado.');
     if (connector.status !== 'connected' || !connector.credentialsSecretId) {
@@ -46,7 +55,7 @@ export class TriggersService {
     }
     const token = await this.p.secrets.get(workspaceId, connector.credentialsSecretId);
     if (!token) throw new BadRequestException('Token del conector no disponible (reconéctalo).');
-    return { token, connector };
+    return token;
   }
 
   /** Resuelve el cloudId: el pasado en params, o el único sitio; si hay varios, exige elegir. */
@@ -58,9 +67,44 @@ export class TriggersService {
     return sites[0].id;
   }
 
+  /** Token estable por conector (una URL por usuario en Jira): se genera una vez y se reutiliza. */
+  private async ensureStableToken(connectorId: string, workspaceId: string): Promise<string> {
+    const key = stableTokenKey(connectorId);
+    let tok = await this.p.secrets.get(workspaceId, key);
+    if (!tok) {
+      tok = `whsec_${randomBytes(24).toString('base64url')}`;
+      await this.p.secrets.set(workspaceId, key, tok);
+    }
+    return tok;
+  }
+
+  /**
+   * Reconcilia Jira con nuestros bindings activos del conector: borra TODOS los webhooks del usuario (limpia
+   * huérfanos y evita el conflicto de «una URL por usuario») y re-registra los activos bajo la URL estable,
+   * guardando el remoteId de cada uno. Idempotente: dejar el estado remoto = nuestro estado local.
+   */
+  private async reconcile(connectorId: string, workspaceId: string, oauthToken: string, cloudId: string): Promise<void> {
+    const stableToken = await this.ensureStableToken(connectorId, workspaceId);
+    const url = `${this.selfBase()}/hooks/jira/${connectorId}?token=${encodeURIComponent(stableToken)}`;
+
+    const existing = await listJiraWebhookIds(oauthToken, cloudId, jiraFetch);
+    if (existing.length) await deleteJiraWebhooks(oauthToken, cloudId, existing, jiraFetch);
+
+    const active = (await this.p.triggerBindings.listByConnector(connectorId)).filter((b) => b.active);
+    if (!active.length) return;
+    const entries = active.map((b) => ({
+      events: getTriggerEvent(b.eventId)?.providerEvents ?? [],
+      jqlFilter: `project = ${String(b.params.projectKey ?? '')}`,
+    }));
+    const ids = await registerJiraWebhooks(oauthToken, cloudId, url, entries, jiraFetch);
+    for (let i = 0; i < active.length; i++) {
+      await this.p.triggerBindings.setRemoteId(active[i].id, ids[i] != null ? String(ids[i]) : null);
+    }
+  }
+
   /** Proyectos del sitio Jira para poblar el desplegable del picker. */
   async jiraProjects(connectorId: string, workspaceId: string, cloudId?: string): Promise<{ cloudId: string; projects: JiraProject[] }> {
-    const { token } = await this.connectorToken(connectorId, workspaceId);
+    const token = await this.connectorToken(connectorId, workspaceId);
     const resolved = await this.resolveCloudId(token, cloudId);
     const projects = await listJiraProjects(token, resolved, jiraFetch);
     return { cloudId: resolved, projects };
@@ -73,9 +117,9 @@ export class TriggersService {
   }
 
   /**
-   * Crea la receta: 1) webhook interno (reutiliza WebhooksService.create), 2) registra el webhook EN
-   * Jira con la URL de ingreso (secreto en `?token=`), 3) persiste el binding con el `remoteId`. Si el
-   * registro en Jira falla, COMPENSA borrando el webhook interno (evita huérfanos).
+   * Crea la receta: persiste el binding y RECONCILIA (registra el/los webhook(s) en Jira bajo la URL estable).
+   * Si Jira falla, COMPENSA borrando el binding nuevo y re-reconciliando (best-effort) para no dejar rotos los
+   * demás disparadores del conector.
    */
   async create(
     workflowId: string,
@@ -93,68 +137,88 @@ export class TriggersService {
     const projectKey = typeof params.projectKey === 'string' ? params.projectKey.trim() : '';
     if (!projectKey) throw new BadRequestException('Elige un proyecto de Jira.');
 
-    const { token } = await this.connectorToken(input.connectorId, workspaceId);
+    const token = await this.connectorToken(input.connectorId, workspaceId);
     const cloudId = await this.resolveCloudId(token, typeof params.cloudId === 'string' ? params.cloudId : undefined);
 
-    // 1) Webhook interno (exige que el nodo Trigger del grafo sea «webhook»; el picker lo fija).
-    const wh = await this.webhooks.create(workflowId, workspaceId, input.eventId);
-    const url = `${this.selfBase()}/hooks/${wh.id}?token=${encodeURIComponent(wh.signingSecret)}`;
-
-    // 2) Registrar en Jira. Si falla, compensar borrando el webhook interno.
-    let remoteIds: number[];
+    const binding = await this.p.triggerBindings.create({
+      workspaceId,
+      workflowId,
+      eventId: input.eventId,
+      connectorId: input.connectorId,
+      webhookId: `jira:${input.connectorId}`, // marcador: se enruta por la URL estable del conector, no por webhook interno
+      remoteId: null,
+      params: { projectKey, cloudId },
+    });
     try {
-      remoteIds = await registerJiraWebhook(
-        token,
-        cloudId,
-        { url, events: def.providerEvents ?? [], jqlFilter: `project = ${projectKey}` },
-        jiraFetch,
-      );
+      await this.reconcile(input.connectorId, workspaceId, token, cloudId);
     } catch (e) {
-      await this.webhooks.delete(wh.id, workspaceId).catch(() => undefined);
+      await this.p.triggerBindings.delete(binding.id).catch(() => undefined);
+      await this.reconcile(input.connectorId, workspaceId, token, cloudId).catch(() => undefined); // restaura los demás
       const msg = e instanceof Error ? e.message : String(e);
       if (/HTTP 40[13]/.test(msg)) {
         throw new BadRequestException('Jira rechazó el registro. Reautoriza Jira (permiso «gestionar webhooks») y reintenta.');
       }
       throw new BadRequestException(`No se pudo registrar el disparador en Jira: ${msg}`);
     }
-
-    // 3) Persistir el binding. Si la escritura falla (error transitorio de DB, timeout del pool…), COMPENSA
-    //    borrando lo ya creado: el webhook EN Jira y el interno. Sin binding no habría forma de localizar el
-    //    `remoteId` para desregistrarlo → quedaría un webhook huérfano disparando ejecuciones para siempre.
-    try {
-      return await this.p.triggerBindings.create({
-        workspaceId,
-        workflowId,
-        eventId: input.eventId,
-        connectorId: input.connectorId,
-        webhookId: wh.id,
-        remoteId: remoteIds.join(','),
-        params: { projectKey, cloudId },
-      });
-    } catch (e) {
-      await deleteJiraWebhooks(token, cloudId, remoteIds, jiraFetch).catch(() => undefined);
-      await this.webhooks.delete(wh.id, workspaceId).catch(() => undefined);
-      throw e;
-    }
+    return (await this.p.triggerBindings.get(binding.id)) ?? binding;
   }
 
-  /** Borra la receta: desregistra en Jira (best-effort) + borra el webhook interno + el binding. */
+  /** Borra la receta: quita el binding y reconcilia Jira (desregistra el suyo, deja los demás). Best-effort. */
   async delete(id: string, workspaceId: string): Promise<void> {
     const b = await this.p.triggerBindings.get(id);
     if (!b) return;
     assertInWorkspace(b.workspaceId, workspaceId, 'TriggerBinding');
-
-    if (b.remoteId) {
-      try {
-        const { token } = await this.connectorToken(b.connectorId, workspaceId);
-        const cloudId = typeof b.params.cloudId === 'string' ? b.params.cloudId : '';
-        const ids = b.remoteId.split(',').map((x) => Number(x)).filter((n) => Number.isFinite(n));
-        if (cloudId && ids.length) await deleteJiraWebhooks(token, cloudId, ids, jiraFetch);
-      } catch {
-        // Desregistro remoto best-effort: si el conector ya no existe, seguimos limpiando lo local.
-      }
-    }
-    await this.webhooks.delete(b.webhookId, workspaceId).catch(() => undefined);
     await this.p.triggerBindings.delete(id);
+    try {
+      const token = await this.connectorToken(b.connectorId, workspaceId);
+      const cloudId = String(b.params.cloudId ?? '');
+      if (cloudId) await this.reconcile(b.connectorId, workspaceId, token, cloudId);
+    } catch {
+      // Best-effort: si el conector ya no existe o Jira falla, el binding local ya está borrado.
+    }
   }
+
+  /**
+   * Ingreso PÚBLICO de eventos de Jira (URL estable por conector). Verifica el token, y enruta el evento al
+   * flujo(s) correcto(s) según el CONTENIDO: tipo de evento (`webhookEvent`) + clave de proyecto. Arranca una
+   * ejecución por cada binding que coincida.
+   */
+  async ingestJiraEvent(connectorId: string, presentedToken: string | undefined, payload: unknown): Promise<{ started: string[] }> {
+    const bindings = (await this.p.triggerBindings.listByConnector(connectorId)).filter((b) => b.active);
+    if (!bindings.length) throw new NotFoundException('Sin disparadores activos para este conector.');
+
+    // El ingreso es @Public (sin tenant en contexto); fijamos el workspace del binding para RLS/ejecución.
+    const workspaceId = bindings[0].workspaceId;
+    setCurrentWorkspace(workspaceId);
+
+    const stableToken = await this.p.secrets.get(workspaceId, stableTokenKey(connectorId));
+    if (!stableToken || !tokenMatches(presentedToken, stableToken)) throw new UnauthorizedException('Token inválido.');
+
+    const rec = asRecord(payload);
+    const webhookEvent = String(rec.webhookEvent ?? '');
+    const def = TRIGGER_EVENTS.find((e) => e.providerEvents?.includes(webhookEvent));
+    const fields = asRecord(asRecord(rec.issue).fields);
+    const projectKey = String(asRecord(fields.project).key ?? '');
+
+    const matches = bindings.filter((b) => def && b.eventId === def.id && String(b.params.projectKey ?? '') === projectKey);
+    const started: string[] = [];
+    for (const b of matches) {
+      const r = await this.executions.start(
+        b.workflowId,
+        b.workspaceId,
+        { ticket: { webhook: payload }, variables: { trigger: 'webhook', connectorId, payload } },
+        'webhook',
+      );
+      started.push(r.executionId);
+    }
+    return { started };
+  }
+}
+
+/** Compara el token presentado con el esperado en tiempo constante. */
+function tokenMatches(presented: string | undefined, expected: string): boolean {
+  if (!presented) return false;
+  const a = Buffer.from(presented, 'utf8');
+  const b = Buffer.from(expected, 'utf8');
+  return a.length === b.length && timingSafeEqual(a, b);
 }

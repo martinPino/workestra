@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   jiraAccessibleResources,
   listJiraProjects,
+  listJiraWebhookIds,
   registerJiraWebhook,
+  registerJiraWebhooks,
   deleteJiraWebhooks,
   refreshJiraWebhooks,
   type JiraFetch,
@@ -90,6 +92,48 @@ describe('jira-webhooks', () => {
     await deleteJiraWebhooks('tok', 'c', [], fetch);
     await refreshJiraWebhooks('tok', 'c', [], fetch);
     expect(calls).toHaveLength(0);
+  });
+
+  it('lista los ids de webhooks existentes recorriendo las páginas', async () => {
+    let call = 0;
+    const fetch: JiraFetch = async () => {
+      call += 1;
+      const body =
+        call === 1
+          ? { values: [{ id: 1 }, { id: 2 }], isLast: false }
+          : { values: [{ id: 3 }], isLast: true };
+      return { ok: true, status: 200, json: async () => body };
+    };
+    const ids = await listJiraWebhookIds('tok', 'cloud-123', fetch);
+    expect(ids).toEqual([1, 2, 3]);
+    expect(call).toBe(2);
+  });
+
+  it('registra varios webhooks bajo una URL y devuelve los ids EN ORDEN (null si una entrada falla)', async () => {
+    const { fetch, calls } = stubFetch(() => ({
+      json: { webhookRegistrationResult: [{ createdWebhookId: 10 }, { errors: ['jql malo'] }, { createdWebhookId: 12 }] },
+    }));
+    const ids = await registerJiraWebhooks(
+      'tok',
+      'cloud-123',
+      'https://api.example.com/hooks/jira/c1?token=s',
+      [
+        { events: ['jira:issue_created'], jqlFilter: 'project = A' },
+        { events: ['jira:issue_created'], jqlFilter: 'project = B' },
+        { events: ['jira:issue_updated'], jqlFilter: 'project = C' },
+      ],
+      fetch,
+    );
+    expect(ids).toEqual([10, null, 12]);
+    // Todas las entradas comparten la MISMA url (límite de Jira: una URL por usuario).
+    expect(calls[0].body).toEqual({
+      url: 'https://api.example.com/hooks/jira/c1?token=s',
+      webhooks: [
+        { events: ['jira:issue_created'], jqlFilter: 'project = A' },
+        { events: ['jira:issue_created'], jqlFilter: 'project = B' },
+        { events: ['jira:issue_updated'], jqlFilter: 'project = C' },
+      ],
+    });
   });
 
   it('renueva webhooks con PUT …/webhook/refresh', async () => {

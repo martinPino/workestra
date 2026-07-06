@@ -124,6 +124,66 @@ export async function deleteJiraWebhooks(token: string, cloudId: string, webhook
   if (!res.ok && res.status !== 202 && res.status !== 204) throw new Error(`Jira webhook delete: HTTP ${res.status}`);
 }
 
+/**
+ * Lista los ids de TODOS los webhooks dinámicos del usuario (paginado). Jira solo permite UNA URL por
+ * usuario, así que antes de registrar hay que borrar los que sobren (huérfanos de intentos previos).
+ */
+export async function listJiraWebhookIds(token: string, cloudId: string, fetchFn: JiraFetch): Promise<number[]> {
+  const ids: number[] = [];
+  let startAt = 0;
+  for (let page = 0; page < 50; page++) {
+    const res = await fetchFn(`${jiraApi(cloudId)}/webhook?startAt=${startAt}&maxResults=100`, {
+      headers: { authorization: `Bearer ${token}`, accept: 'application/json' },
+    });
+    if (!res.ok) throw new Error(`Jira webhook list: HTTP ${res.status}`);
+    const json = asRecord(await res.json());
+    const values = Array.isArray(json.values) ? json.values : [];
+    for (const v of values) {
+      const id = asRecord(v).id;
+      if (typeof id === 'number') ids.push(id);
+      else if (typeof id === 'string' && /^\d+$/.test(id)) ids.push(Number(id));
+    }
+    if (json.isLast === true || values.length === 0) break;
+    startAt += values.length;
+  }
+  return ids;
+}
+
+export interface WebhookEntry {
+  events: string[];
+  jqlFilter: string;
+}
+
+/**
+ * Registra VARIOS webhooks bajo UNA misma URL (el límite de Jira es una URL por usuario, pero admite
+ * múltiples configs con distinto evento/JQL). Devuelve el createdWebhookId de cada entrada EN ORDEN
+ * (null si esa entrada falló) — Atlassian garantiza que el resultado va en el mismo orden que la petición.
+ */
+export async function registerJiraWebhooks(
+  token: string,
+  cloudId: string,
+  url: string,
+  entries: WebhookEntry[],
+  fetchFn: JiraFetch,
+): Promise<Array<number | null>> {
+  if (!entries.length) return [];
+  const res = await fetchFn(`${jiraApi(cloudId)}/webhook`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify({ url, webhooks: entries.map((e) => ({ events: e.events, jqlFilter: e.jqlFilter })) }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`Jira webhook register: HTTP ${res.status} ${JSON.stringify(json).slice(0, 200)}`);
+  const results = asRecord(json).webhookRegistrationResult;
+  const arr = Array.isArray(results) ? results : [];
+  return entries.map((_, i) => {
+    const rec = asRecord(arr[i]);
+    if (typeof rec.createdWebhookId === 'number') return rec.createdWebhookId;
+    if (typeof rec.createdWebhookId === 'string' && /^\d+$/.test(rec.createdWebhookId)) return Number(rec.createdWebhookId);
+    return null;
+  });
+}
+
 /** Renueva la vida de los webhooks (caducan a los 30 días; cada refresh suma otros 30). */
 export async function refreshJiraWebhooks(token: string, cloudId: string, webhookIds: number[], fetchFn: JiraFetch): Promise<void> {
   if (!webhookIds.length) return;

@@ -328,8 +328,12 @@ export interface ITriggerBindingRepository {
   }): Promise<TriggerBindingRecord>;
   get(id: string): Promise<TriggerBindingRecord | null>;
   listByWorkflow(workflowId: string): Promise<TriggerBindingRecord[]>;
+  /** Todos los bindings de un conector (cross-workspace, para enrutar el ingreso público del proveedor). */
+  listByConnector(connectorId: string): Promise<TriggerBindingRecord[]>;
   /** Todos los bindings activos (para el job que renueva los webhooks antes de caducar). */
   listActive(): Promise<TriggerBindingRecord[]>;
+  /** Fija el id del webhook remoto tras (re)registrar en el proveedor. */
+  setRemoteId(id: string, remoteId: string | null): Promise<void>;
   setActive(id: string, active: boolean): Promise<void>;
   delete(id: string): Promise<void>;
 }

@@ -1,6 +1,7 @@
-import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ScopesGuard } from '../rbac/scopes.guard';
 import { RequireScopes } from '../rbac/scopes.decorator';
+import { Public } from '../auth/public.decorator';
 import { Workspace } from '../auth/workspace.decorator';
 import { TriggersService } from './triggers.service';
 
@@ -51,5 +52,33 @@ export class JiraProjectsController {
   @RequireScopes('workflow:read')
   list(@Param('connectorId') connectorId: string, @Query('cloudId') cloudId: string | undefined, @Workspace() workspaceId: string) {
     return this.svc.jiraProjects(connectorId, workspaceId, cloudId);
+  }
+}
+
+/**
+ * Ingreso PÚBLICO de eventos de Jira (M19): URL estable por conector `POST /hooks/jira/:connectorId?token=…`.
+ * Sin JWT; autenticado por el token en el query (los webhooks dinámicos de Jira no admiten cabeceras). El
+ * servicio enruta por el contenido del evento al flujo(s) correcto(s). Devuelve 202.
+ */
+@Public()
+@Controller('hooks/jira')
+export class JiraHooksController {
+  constructor(private readonly svc: TriggersService) {}
+
+  @Post(':connectorId')
+  @HttpCode(202)
+  async ingest(
+    @Param('connectorId') connectorId: string,
+    @Req() req: { rawBody?: Buffer; body?: unknown },
+    @Query('token') token?: string,
+  ) {
+    const rawBody = req.rawBody ?? Buffer.from(JSON.stringify(req.body ?? {}));
+    let payload: unknown = {};
+    try {
+      payload = rawBody.length ? JSON.parse(rawBody.toString('utf8')) : {};
+    } catch {
+      payload = {};
+    }
+    return this.svc.ingestJiraEvent(connectorId, token, payload);
   }
 }
