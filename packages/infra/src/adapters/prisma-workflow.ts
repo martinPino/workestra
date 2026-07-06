@@ -140,6 +140,15 @@ export class PrismaWorkflowRepository implements IWorkflowRepository {
     });
     return active ? toVersion(active) : this.publish(id);
   }
+
+  async delete(id: string): Promise<void> {
+    // UNA sola operación atómica: la FK Execution→WorkflowVersion es ahora ON DELETE CASCADE (migración
+    // 20260706130000), así que borrar el Workflow cascada a versiones → nodos/aristas/ejecuciones →
+    // eventos/nodeRuns/reviews/logs, y también a webhooks/horarios/disparadores. Al ser una única sentencia,
+    // no hay ventana no-atómica ni carrera con ejecuciones creadas en paralelo (Postgres serializa la
+    // cascada dentro de la transacción de la operación). Compatible con la extensión RLS (no anida $transaction).
+    await this.prisma.workflow.delete({ where: { id } });
+  }
 }
 
 /** Proyección NodeRun sobre Postgres. */

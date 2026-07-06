@@ -140,6 +140,11 @@ export interface IWorkflowRepository {
   getVersion(versionId: string): Promise<WorkflowVersionRecord | null>;
   /** Versión a ejecutar: la published activa; si no hay ninguna, publica el draft y la usa. */
   resolveRunVersion(id: string): Promise<WorkflowVersionRecord>;
+  /**
+   * Borra el workflow y TODA su historia (versiones, nodos/aristas, webhooks, horarios, disparadores y
+   * ejecuciones con sus eventos). La comprobación de pertenencia al workspace la hace el servicio.
+   */
+  delete(id: string): Promise<void>;
 }
 
 // --------- Puerto de proyección NodeRun (estado runtime por nodo) ---------

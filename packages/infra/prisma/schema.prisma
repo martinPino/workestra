@@ -146,7 +146,9 @@ model Execution {
   workflowId        String?
   workflow          Workflow?       @relation(fields: [workflowId], references: [id])
   workflowVersionId String
-  version           WorkflowVersion @relation(fields: [workflowVersionId], references: [id])
+  // onDelete: Cascade — borrar un workflow (→ sus versiones) arrastra sus ejecuciones e historial en UNA
+  // operación atómica. Antes era Restrict: exigía borrar las ejecuciones aparte (no atómico, con carrera).
+  version           WorkflowVersion @relation(fields: [workflowVersionId], references: [id], onDelete: Cascade)
   workspaceId       String
   parentExecutionId String?
   parent            Execution?      @relation("ExecutionTree", fields: [parentExecutionId], references: [id])

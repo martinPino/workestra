@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { UnauthorizedException } from '@nestjs/common';
 import type { TriggerBindingRecord } from '@core/engine';
 import { TriggersService } from './triggers.service';
@@ -79,5 +79,48 @@ describe('TriggersService.ingestJiraEvent', () => {
     const r = await svc.ingestJiraEvent('c1', 'sek', payload);
     expect(r.started).toHaveLength(1);
     expect(started).toHaveLength(1);
+  });
+});
+
+/** Servicio con lo justo para probar la reconciliación al borrar un flujo (conector conectado + Jira mockeado). */
+function makeReconcileService(activeByConnector: Record<string, TriggerBindingRecord[]>) {
+  const p = {
+    connectors: { getInWorkspace: async (id: string) => ({ id, key: 'jira', status: 'connected', credentialsSecretId: `sec:${id}` }) },
+    secrets: {
+      get: async (_ws: string, key: string) => (key.startsWith('sec:') ? 'oauth' : key.startsWith('jira-hook:') ? 'whsec_stable' : null),
+      set: async () => undefined,
+    },
+    triggerBindings: {
+      listByConnector: async (connectorId: string) => activeByConnector[connectorId] ?? [],
+      setRemoteId: async () => undefined,
+    },
+  } as unknown as PersistenceBundle;
+  return new TriggersService(p, {} as unknown as ExecutionsService);
+}
+
+describe('TriggersService.reconcileAfterWorkflowDelete', () => {
+  const origFetch = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = origFetch;
+  });
+
+  it('reconcilia CADA sitio (cloudId) distinto del conector, no solo uno (Map por par, no por conector)', async () => {
+    const urls: string[] = [];
+    globalThis.fetch = vi.fn(async (url: unknown) => {
+      urls.push(String(url));
+      return { ok: true, status: 200, json: async () => ({ values: [], isLast: true }) } as unknown as Response;
+    }) as unknown as typeof fetch;
+
+    // El flujo borrado tenía dos disparadores del MISMO conector c1 en sitios de Jira distintos (X e Y);
+    // tras el borrado no queda ninguno activo, así que cada sitio debe limpiarse por separado.
+    const svc = makeReconcileService({ c1: [] });
+    const removed: TriggerBindingRecord[] = [
+      binding({ id: 'b1', params: { projectKey: 'A', cloudId: 'X' } }),
+      binding({ id: 'b2', params: { projectKey: 'B', cloudId: 'Y' } }),
+    ];
+    await svc.reconcileAfterWorkflowDelete(removed, 'ws');
+
+    expect(urls.some((u) => u.includes('/ex/jira/X/'))).toBe(true);
+    expect(urls.some((u) => u.includes('/ex/jira/Y/'))).toBe(true);
   });
 });

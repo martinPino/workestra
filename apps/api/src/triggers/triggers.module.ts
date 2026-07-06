@@ -9,5 +9,6 @@ import { RbacModule } from '../rbac/rbac.module';
   imports: [ExecutionModule, AuthModule, RbacModule],
   controllers: [TriggersController, TriggerAdminController, JiraProjectsController, JiraHooksController],
   providers: [TriggersService],
+  exports: [TriggersService], // WorkflowsModule lo usa para limpiar disparadores al borrar un flujo
 })
 export class TriggersModule {}

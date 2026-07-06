@@ -36,4 +36,16 @@ describe('InMemoryWorkflowRepository — versionado y pin (M4p)', () => {
     expect(run.state).toBe('published');
     expect(run.version).toBe(1);
   });
+
+  it('delete quita el workflow de la lista del workspace y no se puede recuperar', async () => {
+    const repo = new InMemoryWorkflowRepository();
+    const a = await repo.create({ workspaceId: 'ws', name: 'A', graph: graph('a') });
+    const b = await repo.create({ workspaceId: 'ws', name: 'B', graph: graph('b') });
+
+    await repo.delete(a.id);
+
+    expect(await repo.get(a.id)).toBeNull();
+    const list = await repo.list('ws');
+    expect(list.map((w) => w.id)).toEqual([b.id]); // solo queda B
+  });
 });

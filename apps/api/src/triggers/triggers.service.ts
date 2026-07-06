@@ -88,7 +88,12 @@ export class TriggersService {
     const url = `${this.selfBase()}/hooks/jira/${connectorId}?token=${encodeURIComponent(stableToken)}`;
 
     const existing = await listJiraWebhookIds(oauthToken, cloudId, jiraFetch);
-    const active = (await this.p.triggerBindings.listByConnector(connectorId)).filter((b) => b.active);
+    // Solo los bindings de ESTE sitio (cloudId): las llamadas REST de Jira son por-sitio, así que registrar
+    // aquí un binding de otro cloudId crearía un webhook fantasma en el sitio equivocado. Un conector con
+    // varios sitios se reconcilia una vez por cada cloudId distinto.
+    const active = (await this.p.triggerBindings.listByConnector(connectorId)).filter(
+      (b) => b.active && String(asRecord(b.params).cloudId ?? '') === cloudId,
+    );
     const entries = active.map((b) => ({
       events: getTriggerEvent(b.eventId)?.providerEvents ?? [],
       jqlFilter: `project = ${String(b.params.projectKey ?? '')}`,
@@ -136,6 +141,30 @@ export class TriggersService {
     const wf = await this.p.workflows.get(workflowId);
     assertInWorkspace(wf?.workspaceId, workspaceId, 'Workflow');
     return this.p.triggerBindings.listByWorkflow(workflowId);
+  }
+
+  /**
+   * Al BORRAR un flujo: reconcilia en Jira los conectores que tenían disparadores suyos, para desregistrar
+   * los webhooks que ya no use ningún flujo (si otro flujo del mismo conector sigue activo, se conservan).
+   * Se llama DESPUÉS de borrar el flujo (sus bindings ya no existen), con los bindings capturados ANTES.
+   * Best-effort: cualquier fallo (conector borrado, Jira caído) no revierte el borrado; el hook expira en 30 días.
+   */
+  async reconcileAfterWorkflowDelete(removedBindings: TriggerBindingRecord[], workspaceId: string): Promise<void> {
+    // Clave COMPUESTA (conector + sitio): un flujo con dos bindings del mismo conector en cloudIds distintos
+    // debe reconciliar AMBOS sitios; colapsar por connectorId dejaría el webhook del otro sitio huérfano.
+    const pairs = new Map<string, { connectorId: string; cloudId: string }>();
+    for (const b of removedBindings) {
+      const cloudId = String(asRecord(b.params).cloudId ?? '');
+      if (b.connectorId && cloudId) pairs.set(`${b.connectorId}::${cloudId}`, { connectorId: b.connectorId, cloudId });
+    }
+    for (const { connectorId, cloudId } of pairs.values()) {
+      try {
+        const token = await this.connectorToken(connectorId, workspaceId);
+        await this.reconcile(connectorId, workspaceId, token, cloudId);
+      } catch {
+        // best-effort
+      }
+    }
   }
 
   /**

@@ -1,5 +1,7 @@
-import { Body, Controller, Get, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
 import { Workspace } from '../auth/workspace.decorator';
+import { ScopesGuard } from '../rbac/scopes.guard';
+import { RequireScopes } from '../rbac/scopes.decorator';
 import { WorkflowsService } from './workflows.service';
 
 @Controller('workflows')
@@ -34,5 +36,12 @@ export class WorkflowsController {
   @Get(':id/versions')
   versions(@Param('id') id: string, @Workspace() workspaceId: string) {
     return this.svc.listVersions(id, workspaceId);
+  }
+
+  @Delete(':id')
+  @UseGuards(ScopesGuard)
+  @RequireScopes('workflow:delete') // acción destructiva (borra todo el historial): solo ADMIN/OWNER
+  remove(@Param('id') id: string, @Workspace() workspaceId: string) {
+    return this.svc.remove(id, workspaceId);
   }
 }

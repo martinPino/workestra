@@ -137,6 +137,8 @@ export const api = {
       json<WorkflowDto>(r),
     ),
   getWorkflow: (id: string) => fetch(`${API}/workflows/${id}`, { headers: authHeaders() }).then((r) => json<WorkflowDto>(r)),
+  deleteWorkflow: (id: string) =>
+    fetch(`${API}/workflows/${id}`, { method: 'DELETE', headers: authHeaders() }).then((r) => json<{ deleted: boolean }>(r)),
   saveGraph: (id: string, graph: WorkflowGraph) =>
     fetch(`${API}/workflows/${id}/graph`, { method: 'PUT', headers: authHeaders(), body: JSON.stringify(graph) }).then((r) =>
       json<WorkflowDto>(r),

@@ -113,6 +113,10 @@ export class InMemoryWorkflowRepository implements IWorkflowRepository {
     return this.publish(id); // auto-publica el draft si no hay versión activa
   }
 
+  async delete(id: string): Promise<void> {
+    this.store.delete(id); // en memoria las ejecuciones viven en otro repo; quedan huérfanas (irrelevante en dev/test)
+  }
+
   private require(id: string): Stored {
     const s = this.store.get(id);
     if (!s) throw new Error(`Workflow no encontrado: ${id}`);

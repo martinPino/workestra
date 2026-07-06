@@ -3,10 +3,14 @@ import { WorkflowGraphSchema, type WorkflowGraph } from '@core/contracts';
 import { validateDag } from '@core/domain';
 import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
 import { assertInWorkspace } from '../tenant/tenant.util';
+import { TriggersService } from '../triggers/triggers.service';
 
 @Injectable()
 export class WorkflowsService {
-  constructor(@Inject(PERSISTENCE) private readonly p: PersistenceBundle) {}
+  constructor(
+    @Inject(PERSISTENCE) private readonly p: PersistenceBundle,
+    private readonly triggers: TriggersService,
+  ) {}
 
   /** Carga un workflow verificando que pertenece al workspace autenticado (404 si no). */
   private async getOwned(id: string, workspaceId: string) {
@@ -48,6 +52,19 @@ export class WorkflowsService {
   async listVersions(id: string, workspaceId: string) {
     await this.getOwned(id, workspaceId);
     return this.p.workflows.listVersions(id);
+  }
+
+  /**
+   * Borra el workflow SOLO si es del workspace (deny-by-default por tenant, 404 si no). Captura sus
+   * disparadores ANTES para, tras el borrado (que los elimina en cascada), desregistrar en Jira los
+   * webhooks huérfanos (best-effort, no bloquea el borrado).
+   */
+  async remove(id: string, workspaceId: string) {
+    await this.getOwned(id, workspaceId);
+    const bindings = await this.triggers.listByWorkflow(id, workspaceId);
+    await this.p.workflows.delete(id);
+    await this.triggers.reconcileAfterWorkflowDelete(bindings, workspaceId);
+    return { deleted: true };
   }
 
   private parseGraph(graph: unknown): WorkflowGraph {
