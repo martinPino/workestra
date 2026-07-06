@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Plus, Boxes, GitBranch, Play, Workflow as WorkflowIcon, Trash2, X } from 'lucide-react';
+import { Plus, Boxes, GitBranch, Play, Workflow as WorkflowIcon, Trash2, X, Sparkles, Plug } from 'lucide-react';
 import { Page } from '../app/AppShell';
-import { Card, Button, PageHeader, Badge, Dot, EmptyState, Skeleton, IconButton, Input } from '../ui';
+import { Card, Button, PageHeader, Badge, Dot, EmptyState, Skeleton, IconButton, Input, Textarea } from '../ui';
 import { useWorkflows } from '../lib/hooks';
 import { api, type WorkflowDto } from '../lib/api';
 import { STARTER_DOC, docToWorkflowGraph } from '../graph';
@@ -25,6 +25,12 @@ export function Workflows() {
   const [namer, setNamer] = useState<Namer>(CLOSED);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // «Construir con IA» (M29) y «Usar por MCP» (fase 2): diálogos propios.
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiErr, setAiErr] = useState<string | null>(null);
+  const [mcpOpen, setMcpOpen] = useState(false);
 
   // «Nueva automatización» (Dashboard, paleta ⌘K…) llega con ?new=1: abrimos el diálogo de nombre en vez
   // de crear a ciegas, para que el nombre se elija SIEMPRE antes de crear.
@@ -67,6 +73,25 @@ export function Workflows() {
     }
   };
 
+  const openAi = () => {
+    setAiErr(null);
+    setAiOpen(true);
+  };
+  const submitAi = async () => {
+    if (aiBusy || !aiPrompt.trim()) return;
+    setAiBusy(true);
+    setAiErr(null);
+    try {
+      const { name, graph } = await api.generateWorkflow(aiPrompt.trim());
+      const wf = await api.createWorkflow(name, graph);
+      await qc.invalidateQueries({ queryKey: ['workflows'] });
+      navigate(`/workflows/${wf.id}`);
+    } catch {
+      setAiErr(t('La IA no pudo montar el flujo. Reformula la descripción o inténtalo de nuevo.'));
+      setAiBusy(false);
+    }
+  };
+
   return (
     <Page className="space-y-6">
       <PageHeader
@@ -74,9 +99,45 @@ export function Workflows() {
         subtitle={t('Elige una plantilla o empieza en blanco. Cada automatización es un flujo visual.')}
       />
 
-      {/* Galería de plantillas (M23): el primer contacto no es un lienzo en blanco. */}
+      {/* Selector de creación (M29): 3 formas de empezar — en blanco, con IA, o vía MCP. */}
       <div>
-        <div className="mb-3 text-sm font-medium text-txt-secondary">{t('Empezar con una plantilla')}</div>
+        <div className="mb-3 text-sm font-medium text-txt-secondary">{t('¿Cómo quieres empezar?')}</div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Card hover className="cursor-pointer p-4" onClick={openBlank}>
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-elevated text-txt-secondary">
+              <Plus size={18} />
+            </div>
+            <div className="mt-2.5 text-sm font-semibold text-txt-primary">{t('Empezar en blanco')}</div>
+            <div className="mt-1 text-xs text-txt-secondary">{t('Un lienzo vacío para diseñar a mano.')}</div>
+          </Card>
+
+          <Card hover className="cursor-pointer border-primary/30 p-4" onClick={openAi}>
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/12 text-primary">
+              <Sparkles size={18} />
+            </div>
+            <div className="mt-2.5 flex items-center gap-1.5">
+              <span className="text-sm font-semibold text-txt-primary">{t('Construir con IA')}</span>
+              <Badge tone="primary">{t('nuevo')}</Badge>
+            </div>
+            <div className="mt-1 text-xs text-txt-secondary">{t('Descríbelo en tus palabras y la IA lo monta.')}</div>
+          </Card>
+
+          <Card hover className="cursor-pointer p-4" onClick={() => setMcpOpen(true)}>
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-elevated text-txt-secondary">
+              <Plug size={18} />
+            </div>
+            <div className="mt-2.5 flex items-center gap-1.5">
+              <span className="text-sm font-semibold text-txt-primary">{t('Usar desde tu IA (MCP)')}</span>
+              <Badge tone="default">{t('pronto')}</Badge>
+            </div>
+            <div className="mt-1 text-xs text-txt-secondary">{t('Ejecútalo desde Claude, Cursor o ChatGPT.')}</div>
+          </Card>
+        </div>
+      </div>
+
+      {/* Galería de plantillas (M23): atajos ya cableados. */}
+      <div>
+        <div className="mb-3 text-sm font-medium text-txt-secondary">{t('…o parte de una plantilla')}</div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {WORKFLOW_TEMPLATES.map((tpl) => (
             <Card key={tpl.id} hover className="cursor-pointer p-4" onClick={() => openTemplate(tpl)}>
@@ -85,11 +146,6 @@ export function Workflows() {
               <div className="mt-1 text-xs leading-relaxed text-txt-secondary">{t(tpl.description)}</div>
             </Card>
           ))}
-          <Card hover className="flex cursor-pointer flex-col items-start justify-center border-dashed p-4" onClick={openBlank}>
-            <Plus size={20} className="text-txt-secondary" />
-            <div className="mt-2 text-sm font-semibold text-txt-primary">{t('Empezar en blanco')}</div>
-            <div className="mt-1 text-xs text-txt-secondary">{t('Un lienzo vacío para diseñar desde cero.')}</div>
-          </Card>
         </div>
       </div>
 
@@ -128,7 +184,154 @@ export function Workflows() {
           onClose={close}
         />
       )}
+      {aiOpen && (
+        <AiDialog
+          prompt={aiPrompt}
+          busy={aiBusy}
+          err={aiErr}
+          onPrompt={setAiPrompt}
+          onSubmit={submitAi}
+          onClose={() => {
+            if (aiBusy) return;
+            setAiOpen(false);
+            setAiErr(null);
+          }}
+        />
+      )}
+      {mcpOpen && <McpDialog onClose={() => setMcpOpen(false)} />}
     </Page>
+  );
+}
+
+/** Envoltorio de modal reutilizable (backdrop + Escape para cerrar). */
+function Modal({ label, onClose, children, wide }: { label: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={label}>
+      <button type="button" aria-label="Cerrar" className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className={`relative w-full ${wide ? 'max-w-lg' : 'max-w-md'} rounded-xl border border-border bg-surface p-5 shadow-lg`}
+      >
+        {children}
+      </motion.div>
+    </div>
+  );
+}
+
+/** «Construir con IA»: describe la automatización y la IA la monta. */
+function AiDialog({
+  prompt,
+  busy,
+  err,
+  onPrompt,
+  onSubmit,
+  onClose,
+}: {
+  prompt: string;
+  busy: boolean;
+  err: string | null;
+  onPrompt: (v: string) => void;
+  onSubmit: () => void;
+  onClose: () => void;
+}) {
+  const t = useT();
+  const examples = [
+    t('Cuando llegue un ticket, resúmelo con IA y avísame por Slack.'),
+    t('Cada mañana, crea una hoja de cálculo con una idea del día.'),
+  ];
+  return (
+    <Modal label={t('Construir con IA')} onClose={onClose} wide>
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/12 text-primary">
+            <Sparkles size={16} />
+          </span>
+          <div>
+            <h2 className="text-base font-semibold text-txt-primary">{t('Construir con IA')}</h2>
+            <p className="mt-0.5 text-xs text-txt-secondary">{t('Describe qué quieres automatizar. La IA arma los pasos.')}</p>
+          </div>
+        </div>
+        <IconButton onClick={onClose} aria-label={t('Cancelar')}>
+          <X size={16} />
+        </IconButton>
+      </div>
+      <div className="mt-4">
+        <Textarea
+          autoFocus
+          rows={4}
+          value={prompt}
+          onChange={(e) => onPrompt(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              onSubmit();
+            }
+          }}
+          placeholder={t('Ej.: cuando reciba un correo, resúmelo y mándalo a Slack #general.')}
+          aria-label={t('Descripción de la automatización')}
+        />
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {examples.map((ex) => (
+            <button
+              key={ex}
+              onClick={() => onPrompt(ex)}
+              className="rounded-md border border-border bg-elevated px-2 py-1 text-[11px] text-txt-secondary hover:text-txt-primary"
+            >
+              {ex}
+            </button>
+          ))}
+        </div>
+        {err && <p className="mt-2 text-xs text-danger">{err}</p>}
+      </div>
+      <div className="mt-5 flex items-center justify-end gap-2">
+        <Button variant="ghost" onClick={onClose} disabled={busy}>
+          {t('Cancelar')}
+        </Button>
+        <Button variant="primary" onClick={onSubmit} disabled={busy || !prompt.trim()}>
+          <Sparkles size={14} /> {busy ? t('Montando el flujo…') : t('Construir con IA')}
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+/** «Usar desde tu IA (MCP)»: aún no disponible (fase 2). Explica qué será. */
+function McpDialog({ onClose }: { onClose: () => void }) {
+  const t = useT();
+  return (
+    <Modal label={t('Usar desde tu IA (MCP)')} onClose={onClose}>
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-elevated text-txt-secondary">
+            <Plug size={16} />
+          </span>
+          <div>
+            <h2 className="flex items-center gap-1.5 text-base font-semibold text-txt-primary">
+              {t('Usar desde tu IA (MCP)')} <Badge tone="default">{t('pronto')}</Badge>
+            </h2>
+          </div>
+        </div>
+        <IconButton onClick={onClose} aria-label={t('Cerrar')}>
+          <X size={16} />
+        </IconButton>
+      </div>
+      <p className="mt-4 text-sm leading-relaxed text-txt-secondary">
+        {t('Pronto podrás exponer esta automatización como un servidor MCP: copias un pequeño ajuste en Claude, Cursor o ChatGPT y podrás lanzarla desde tu propio asistente de IA.')}
+      </p>
+      <div className="mt-5 flex justify-end">
+        <Button variant="secondary" onClick={onClose}>
+          {t('Entendido')}
+        </Button>
+      </div>
+    </Modal>
   );
 }
 

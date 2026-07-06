@@ -13,6 +13,12 @@ export class WorkflowsController {
     return this.svc.create(body, workspaceId);
   }
 
+  // «Construir con IA» (M29): describe → la IA devuelve {name, graph}. El cliente crea el workflow con eso.
+  @Post('generate')
+  generate(@Body() body: { prompt: string }, @Workspace() workspaceId: string) {
+    return this.svc.generate(body?.prompt ?? '', workspaceId);
+  }
+
   @Get()
   list(@Workspace() workspaceId: string) {
     return this.svc.list(workspaceId);
