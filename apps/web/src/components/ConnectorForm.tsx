@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { CONNECTOR_ACTIONS, type ConnectorAction } from '../editor/connector-actions';
 import { useConnectors } from '../lib/hooks';
-import { api } from '../lib/api';
 import { useT } from '../i18n';
 
 const inputBase =
@@ -30,30 +29,16 @@ export function ConnectorForm({ value, onChange }: { value: Record<string, unkno
   const actionId = String(value.action ?? '');
   const action = actions.find((a) => a.id === actionId);
   const params = (value.actionParams && typeof value.actionParams === 'object' ? value.actionParams : {}) as Record<string, string>;
-  const [cloudId, setCloudId] = useState<string | undefined>(typeof value.cloudId === 'string' ? value.cloudId : undefined);
   const [advanced, setAdvanced] = useState(!actionId && !!value.path); // legacy: sin acción pero con path → mostrar crudo
 
-  // Para Jira, resolver el cloudId (para las rutas /ex/jira/{cloudid}/…) sin que el usuario lo pegue.
-  useEffect(() => {
-    if (provider !== 'jira' || !connectorId) return;
-    let alive = true;
-    api
-      .jiraProjects(connectorId)
-      .then((r) => {
-        if (alive) setCloudId(r.cloudId);
-      })
-      .catch(() => undefined);
-    return () => {
-      alive = false;
-    };
-  }, [provider, connectorId]);
-
-  const applyBuilt = (cid: string, aId: string, p: Record<string, string>, cloud: string | undefined) => {
+  // El cloudId de Jira (para las rutas /ex/jira/{cloudid}/…) se resuelve en RUNTIME por el executor, no aquí:
+  // así no hay carreras, estado obsoleto ni pisado de ediciones. `build` deja el marcador `{cloudid}` literal.
+  const applyBuilt = (cid: string, aId: string, p: Record<string, string>) => {
     const prov = list.find((c) => c.id === cid)?.provider;
     const act = (prov ? CONNECTOR_ACTIONS[prov] : undefined)?.find((a) => a.id === aId);
-    const base: Record<string, unknown> = { ...value, connectorId: cid, action: aId, actionParams: p, cloudId: cloud };
+    const base: Record<string, unknown> = { ...value, connectorId: cid, action: aId, actionParams: p };
     if (act) {
-      const built = act.build(p, { cloudId: cloud });
+      const built = act.build(p, {});
       base.method = built.method;
       base.path = built.path;
       base.body = built.body ?? '';
@@ -61,19 +46,13 @@ export function ConnectorForm({ value, onChange }: { value: Record<string, unkno
     onChange(base);
   };
 
-  // Cuando llega el cloudId de Jira, rehacer la petición para sustituir el marcador {cloudid} en la ruta.
-  // (deps intencionadamente solo [cloudId]: solo re-armamos al resolverse el sitio, no en cada tecla.)
-  useEffect(() => {
-    if (action && cloudId) applyBuilt(connectorId, actionId, params, cloudId);
-  }, [cloudId]);
-
   const onConnector = (cid: string) => {
     const prov = list.find((c) => c.id === cid)?.provider;
     const first = (prov ? CONNECTOR_ACTIONS[prov] : undefined)?.[0];
-    applyBuilt(cid, first?.id ?? '', defaultsFor(first), cloudId);
+    applyBuilt(cid, first?.id ?? '', defaultsFor(first));
   };
-  const onAction = (aId: string) => applyBuilt(connectorId, aId, defaultsFor(actions.find((a) => a.id === aId)), cloudId);
-  const onField = (k: string, v: string) => applyBuilt(connectorId, actionId, { ...params, [k]: v }, cloudId);
+  const onAction = (aId: string) => applyBuilt(connectorId, aId, defaultsFor(actions.find((a) => a.id === aId)));
+  const onField = (k: string, v: string) => applyBuilt(connectorId, actionId, { ...params, [k]: v });
   const setRaw = (k: 'method' | 'path' | 'body', v: string) => onChange({ ...value, [k]: v });
 
   return (

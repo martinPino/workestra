@@ -1,6 +1,7 @@
 import type { INodeExecutor, NodeExecutionContext, NodeResult, NodeType } from '@core/contracts';
 import type { IConnectorRepository, ISecretStore } from '@core/engine';
 import { getConnectorProvider } from './connector-providers';
+import { jiraAccessibleResources } from './jira-webhooks';
 import { interpolate } from './interpolate';
 
 /**
@@ -11,6 +12,8 @@ import { interpolate } from './interpolate';
  */
 export class ConnectorNodeExecutor implements INodeExecutor {
   readonly type: NodeType = 'connector';
+  /** Cache best-effort del cloudId de Jira por token (evita re-resolver en cada llamada). */
+  private readonly cloudIdCache = new Map<string, string>();
 
   constructor(
     private readonly connectors: IConnectorRepository,
@@ -18,6 +21,23 @@ export class ConnectorNodeExecutor implements INodeExecutor {
     private readonly selfBase?: string,
     private readonly timeoutMs = 10_000,
   ) {}
+
+  /** Resuelve el cloudId del sitio de Jira con el token OAuth (para sustituir `{cloudid}` en la ruta). */
+  private async jiraCloudId(token: string): Promise<string | null> {
+    const cached = this.cloudIdCache.get(token);
+    if (cached) return cached;
+    try {
+      const sites = await jiraAccessibleResources(token, (u, i) => fetch(u, i));
+      const id = sites[0]?.id;
+      if (id) {
+        this.cloudIdCache.set(token, id);
+        return id;
+      }
+    } catch {
+      /* red/permiso: se devuelve null y el nodo reporta un error claro */
+    }
+    return null;
+  }
 
   async execute(ctx: NodeExecutionContext): Promise<NodeResult> {
     const connectorId = String(ctx.config.connectorId ?? '');
@@ -53,7 +73,16 @@ export class ConnectorNodeExecutor implements INodeExecutor {
     const token = await this.secrets.get(ctx.workspaceId, connector.credentialsSecretId);
     if (!token) return store({ error: 'connector: token no disponible (reconecta el conector).' });
 
-    const url = provider.baseUrl.replace(/\/$/, '') + (path.startsWith('/') ? path : `/${path}`);
+    // Las acciones de Jira usan el marcador `{cloudid}` en la ruta; lo resolvemos aquí en runtime (no en el
+    // editor), evitando carreras/estado obsoleto en el cliente. El cloudId (uuid de Atlassian) es seguro.
+    let resolvedPath = path;
+    if (connector.provider === 'jira' && resolvedPath.includes('{cloudid}')) {
+      const cloudId = await this.jiraCloudId(token);
+      if (!cloudId) return store({ error: 'connector: no se pudo resolver el sitio de Jira (reconecta el conector).' });
+      resolvedPath = resolvedPath.split('{cloudid}').join(cloudId);
+    }
+
+    const url = provider.baseUrl.replace(/\/$/, '') + (resolvedPath.startsWith('/') ? resolvedPath : `/${resolvedPath}`);
     const headers: Record<string, string> = { authorization: `Bearer ${token}` };
     let body: string | undefined;
     if (method !== 'GET' && method !== 'HEAD' && rawBody != null) {

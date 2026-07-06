@@ -20,8 +20,8 @@ export interface ConnectorAction {
 }
 
 /** Envuelve texto plano en el formato ADF que exige Jira (así el usuario solo escribe texto). */
-function adf(text: string): unknown {
-  return { type: 'doc', version: 1, content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] };
+function adf(text: string | undefined): unknown {
+  return { type: 'doc', version: 1, content: [{ type: 'paragraph', content: [{ type: 'text', text: String(text ?? '') }] }] };
 }
 
 const jiraApi = (cloudId: string | undefined, suffix: string) => `/ex/jira/${cloudId ?? '{cloudid}'}/rest/api/3${suffix}`;
