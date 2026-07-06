@@ -75,7 +75,7 @@ export class RouterNodeExecutor implements INodeExecutor {
           {
             role: 'system',
             content:
-              'Eres un coordinador que asigna trabajo. Elige qué agente(s) deben encargarse de la tarea según su objetivo. Responde SOLO JSON: {"targets":["<key>", ...]} usando EXACTAMENTE las claves («key=...») dadas. Elige el mínimo necesario.',
+              'Eres un coordinador de triaje. Elige EL agente MÁS adecuado para la tarea según su objetivo — normalmente UNO SOLO. Responde SOLO JSON: {"targets":["<key>"]} usando EXACTAMENTE las claves («key=...») dadas. Reglas estrictas: elige el MÍNIMO imprescindible; para una tarea/bug concreto basta UN único agente; NO los elijas todos «por si acaso».',
           },
           {
             role: 'user',
