@@ -120,56 +120,62 @@ export class WorkflowsService {
 
   /** Bucle común: pide el JSON al LLM, extrae, valida (schema + DAG) y reintenta 1 vez con el error. */
   private async runLlmGraph(system: string, user: string): Promise<{ name: string; graph: WorkflowGraph }> {
-    const model = process.env.LLM_MODEL ?? 'llama-3.3-70b-versatile';
+    const primary = process.env.LLM_MODEL ?? 'llama-3.3-70b-versatile';
+    // Fallback de modelo: en Groq los límites son POR MODELO, así que si el grande agota su cuota diaria
+    // (429 TPD) probamos con uno más ligero, que tiene su propia cuota. Así «Construir con IA» no muere.
+    const models = [primary, 'llama-3.1-8b-instant'].filter((m, i, a) => m && a.indexOf(m) === i);
     const base = [
       { role: 'system' as const, content: system },
       { role: 'user' as const, content: user },
     ];
     let lastErr = 'sin respuesta';
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const messages =
-        attempt === 0
-          ? base
-          : [...base, { role: 'user' as const, content: `El JSON anterior no fue válido (${lastErr}). Devuelve SOLO el JSON corregido, sin texto.` }];
-      let res;
-      try {
-        res = await this.llm.chat({ model, messages });
-      } catch (e) {
-        // El LLM puede fallar (límite de peticiones, contexto, red). NO debe reventar con 500: reintenta.
-        lastErr = `error del modelo: ${e instanceof Error ? e.message : String(e)}`;
-        continue;
+    for (const model of models) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const messages =
+          attempt === 0
+            ? base
+            : [...base, { role: 'user' as const, content: `El JSON anterior no fue válido (${lastErr}). Devuelve SOLO el JSON corregido, sin texto.` }];
+        let res;
+        try {
+          res = await this.llm.chat({ model, messages });
+        } catch (e) {
+          // El modelo falló (límite diario, contexto, red). NO revienta con 500: pasa al siguiente modelo
+          // (reintentar el mismo modelo agotado no sirve).
+          lastErr = `error del modelo: ${e instanceof Error ? e.message : String(e)}`;
+          break;
+        }
+        const jsonStr = extractJsonObject(res.content ?? '');
+        if (!jsonStr) {
+          lastErr = 'no se encontró JSON en la respuesta';
+          continue;
+        }
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(jsonStr);
+        } catch {
+          lastErr = 'JSON mal formado';
+          continue;
+        }
+        const obj = (parsed ?? {}) as { name?: unknown; graph?: unknown };
+        const g = WorkflowGraphSchema.safeParse(obj.graph ?? parsed); // acepta {name,graph} o el grafo suelto
+        if (!g.success) {
+          lastErr = `estructura inválida: ${JSON.stringify(g.error.issues.slice(0, 2))}`;
+          continue;
+        }
+        const dag = validateDag(g.data);
+        if (!dag.valid) {
+          lastErr = `no es un DAG válido: ${dag.errors.join('; ')}`;
+          continue;
+        }
+        // Un grafo vacío/sin inicio es válido para el schema+DAG, pero NO es un flujo: reintenta en vez de
+        // devolverlo (si no, en la edición sobrescribiría y destruiría el flujo del usuario).
+        if (!g.data.nodes.some((n) => n.type === 'trigger')) {
+          lastErr = 'el flujo debe tener un nodo de inicio (trigger)';
+          continue;
+        }
+        const name = typeof obj.name === 'string' && obj.name.trim() ? obj.name.trim().slice(0, 80) : 'Automatización con IA';
+        return { name, graph: g.data };
       }
-      const jsonStr = extractJsonObject(res.content ?? '');
-      if (!jsonStr) {
-        lastErr = 'no se encontró JSON en la respuesta';
-        continue;
-      }
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(jsonStr);
-      } catch {
-        lastErr = 'JSON mal formado';
-        continue;
-      }
-      const obj = (parsed ?? {}) as { name?: unknown; graph?: unknown };
-      const g = WorkflowGraphSchema.safeParse(obj.graph ?? parsed); // acepta {name,graph} o el grafo suelto
-      if (!g.success) {
-        lastErr = `estructura inválida: ${JSON.stringify(g.error.issues.slice(0, 2))}`;
-        continue;
-      }
-      const dag = validateDag(g.data);
-      if (!dag.valid) {
-        lastErr = `no es un DAG válido: ${dag.errors.join('; ')}`;
-        continue;
-      }
-      // Un grafo vacío/sin inicio es válido para el schema+DAG, pero NO es un flujo: reintenta en vez de
-      // devolverlo (si no, en la edición sobrescribiría y destruiría el flujo del usuario).
-      if (!g.data.nodes.some((n) => n.type === 'trigger')) {
-        lastErr = 'el flujo debe tener un nodo de inicio (trigger)';
-        continue;
-      }
-      const name = typeof obj.name === 'string' && obj.name.trim() ? obj.name.trim().slice(0, 80) : 'Automatización con IA';
-      return { name, graph: g.data };
     }
     throw new BadRequestException(`La IA no pudo generar un flujo válido. ${lastErr}`);
   }
