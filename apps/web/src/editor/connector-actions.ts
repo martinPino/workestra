@@ -132,6 +132,24 @@ export const CONNECTOR_ACTIONS: Record<string, ConnectorAction[]> = {
       // El executor de Gmail transforma {to,subject,text} al formato RFC822/base64 que exige la API (M28).
       build: (p) => ({ method: 'POST', path: '/users/me/messages/send', body: JSON.stringify({ to: p.to, subject: p.subject, text: p.text }) }),
     },
+    {
+      id: 'list-recent',
+      label: 'Buscar correos recientes (de la bandeja de entrada)',
+      fields: [{ key: 'count', label: 'Cuántos', placeholder: '3', default: '3' }],
+      // Devuelve los IDs de los N correos más recientes de INBOX. El JSON queda en {{connector:nodo.json.messages}}
+      // para leer cada uno con la acción «Leer un correo».
+      build: (p) => ({ method: 'GET', path: `/users/me/messages?maxResults=${p.count || '3'}&labelIds=INBOX` }),
+    },
+    {
+      id: 'get-message',
+      label: 'Leer un correo (por ID)',
+      fields: [{ key: 'messageId', label: 'ID del correo', placeholder: '{{connector:buscar.json.messages.0.id}}' }],
+      // format=metadata + cabeceras: devuelve remitente/asunto/fecha + un fragmento del cuerpo (snippet).
+      build: (p) => ({
+        method: 'GET',
+        path: `/users/me/messages/${p.messageId}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
+      }),
+    },
   ],
   'google-calendar': [
     {

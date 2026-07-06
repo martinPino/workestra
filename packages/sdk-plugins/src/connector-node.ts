@@ -11,6 +11,20 @@ import { interpolate } from './interpolate';
  * El asunto va como encoded-word UTF-8 y el cuerpo en base64 (correcto con acentos/emoji). Los headers se
  * sanean de saltos de línea para evitar inyección de cabeceras. Puro y testeable.
  */
+/**
+ * Parsea la respuesta a JSON para EXPONERLA a nodos posteriores (`{{connector:nodo.json.…}}`), pero solo si
+ * es segura: JSON pequeño (≤32 KB, no infla el contexto persistido) y que NO contiene el token (no podemos
+ * redactarlo dentro de un objeto). `undefined` si no cumple o no es JSON. Puro y testeable.
+ */
+export function safeResponseJson(text: string, token: string): unknown {
+  if (text.length > 32_000 || (token && text.includes(token))) return undefined;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
 export function gmailRawMessage(msg: { to?: string; subject?: string; text?: string }): string {
   const headerSafe = (s: string): string => s.replace(/[\r\n]+/g, ' ').trim();
   const to = headerSafe(String(msg.to ?? ''));
@@ -142,9 +156,11 @@ export class ConnectorNodeExecutor implements INodeExecutor {
     const signal = AbortSignal.any([ctx.signal, AbortSignal.timeout(this.timeoutMs)]);
     try {
       const res = await fetch(url, { method, headers, body, signal });
+      const text = await res.text();
       // Redacta el propio token si el endpoint lo reflejara: nunca debe quedar en estado persistido.
-      const bodyPreview = (await res.text()).slice(0, 4000).split(token).join('«redacted»');
-      return store({ status: res.status, ok: res.ok, provider: connector.provider, bodyPreview });
+      const bodyPreview = text.slice(0, 4000).split(token).join('«redacted»');
+      const json = safeResponseJson(text, token); // respuesta parseada para {{connector:nodo.json.…}} (M28b)
+      return store({ status: res.status, ok: res.ok, provider: connector.provider, bodyPreview, json });
     } catch (e) {
       return store({ error: e instanceof Error ? e.message : String(e) });
     }

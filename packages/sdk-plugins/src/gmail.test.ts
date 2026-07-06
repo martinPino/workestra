@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { gmailRawMessage } from './connector-node';
+import { gmailRawMessage, safeResponseJson } from './connector-node';
 
 const decode = (raw: string): string => Buffer.from(raw, 'base64url').toString('utf8');
 
@@ -30,5 +30,24 @@ describe('gmailRawMessage (M28)', () => {
     expect(mime).toContain('MIME-Version: 1.0');
     expect(mime).not.toContain('=?UTF-8?B??='); // encoded-word vacío inválido (RFC 2047)
     expect(mime).toContain('Subject: \r\n'); // asunto vacío legítimo
+  });
+});
+
+describe('safeResponseJson (M28b)', () => {
+  it('JSON válido y pequeño → objeto parseado (para {{connector:nodo.json.…}})', () => {
+    expect(safeResponseJson('{"messages":[{"id":"a"}]}', 'tok')).toEqual({ messages: [{ id: 'a' }] });
+  });
+
+  it('respuesta que CONTIENE el token → no se expone (no filtrar el token en un objeto)', () => {
+    expect(safeResponseJson('{"echo":"Bearer secreto123"}', 'secreto123')).toBeUndefined();
+  });
+
+  it('respuesta demasiado grande (>32KB) → no se expone (no inflar el contexto)', () => {
+    const big = JSON.stringify({ x: 'a'.repeat(40_000) });
+    expect(safeResponseJson(big, 'tok')).toBeUndefined();
+  });
+
+  it('no-JSON (HTML, texto) → undefined', () => {
+    expect(safeResponseJson('<html>error</html>', 'tok')).toBeUndefined();
   });
 });

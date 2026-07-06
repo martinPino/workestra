@@ -106,7 +106,8 @@ export function connectorProviders(selfBase = 'http://localhost:3001'): Record<s
       authorizeUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
       tokenUrl: 'https://oauth2.googleapis.com/token',
       baseUrl: 'https://gmail.googleapis.com/gmail/v1',
-      scopes: ['https://www.googleapis.com/auth/gmail.send'],
+      // send: enviar correos; readonly: leer/listar (para las acciones «buscar/leer correos», M28b).
+      scopes: ['https://www.googleapis.com/auth/gmail.send', 'https://www.googleapis.com/auth/gmail.readonly'],
       requiresConfig: true,
       tokenExchange: 'form',
       tokenPath: 'access_token',
