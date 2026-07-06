@@ -30,11 +30,15 @@ function parseExpr(expr: string): { rules: Rule[]; combinator: Combinator } {
   return { rules: rules.length ? rules : [empty], combinator };
 }
 
-/** Compila las reglas a la expresión que evalúa el motor (`campo op valor && …`). */
+/** Compila las reglas a la expresión que evalúa el motor (`campo op valor && …`). Solo reglas COMPLETAS
+ * (campo Y valor): una regla a medias no se guarda ni corrompe la expresión (evita `a == ` sin valor). */
 function compileExpr(rules: Rule[], combinator: Combinator): string {
-  const clauses = rules.filter((r) => r.field.trim()).map((r) => `${r.field.trim()} ${r.op} ${r.value.trim()}`);
+  const clauses = rules.filter((r) => r.field.trim() && r.value.trim()).map((r) => `${r.field.trim()} ${r.op} ${r.value.trim()}`);
   return clauses.length ? clauses.join(` ${combinator} `) : 'true';
 }
+
+/** Quita los combinadores (&& / ||) del valor: si aparecieran en la cadena romperían el split de parseo. */
+const cleanValue = (v: string) => v.replace(/&&|\|\|/g, ' ');
 
 /**
  * Constructor de reglas VISUAL para el nodo Condición (M21): filas [dato][operador][valor] combinables con
@@ -84,7 +88,7 @@ export function ConditionForm({ value, onChange }: { value: Record<string, unkno
               </option>
             ))}
           </select>
-          <input value={r.value} onChange={(e) => setRule(i, { value: e.target.value })} placeholder={t('valor')} className={`${inputBase} w-24`} />
+          <input value={r.value} onChange={(e) => setRule(i, { value: cleanValue(e.target.value) })} placeholder={t('valor')} className={`${inputBase} w-24`} />
           {rules.length > 1 && (
             <button onClick={() => removeRule(i)} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-txt-secondary hover:bg-danger/15 hover:text-danger" aria-label={t('Quitar')}>
               <Trash2 size={13} />

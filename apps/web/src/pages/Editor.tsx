@@ -73,6 +73,9 @@ export function Editor() {
   const [activated, setActivated] = useState(false);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle'); // indicador de autoguardado
   const skipFirstSave = useRef(true); // no autoguardar la carga inicial del grafo
+  const dirtyRef = useRef(false); // hay cambios sin persistir (para el flush al salir)
+  const wfRef = useRef(workflowId);
+  wfRef.current = workflowId;
   const isDesktop = useMediaQuery('(min-width: 768px)');
   const [inspectorOpen, setInspectorOpen] = useState(isDesktop); // en móvil arranca cerrado (ver canvas)
   const nodeTypes = useMemo(() => ({ af: AfNode, comment: CommentNode }), []);
@@ -159,9 +162,11 @@ export function Editor() {
     }
     setSaveState('saving');
     setActivated(false); // hay cambios sin activar
+    dirtyRef.current = true; // hay un cambio pendiente de persistir
     const timer = setTimeout(async () => {
       try {
         await api.saveGraph(workflowId, docToWorkflowGraph(s().history.doc));
+        dirtyRef.current = false;
         setSaveState('saved');
       } catch {
         setSaveState('idle');
@@ -170,6 +175,17 @@ export function Editor() {
     }, 900);
     return () => clearTimeout(timer);
   }, [doc, workflowId]);
+
+  // Flush al salir (M17): si el usuario navega dentro de la ventana de debounce, el clearTimeout de arriba
+  // cancela el guardado pendiente; este efecto de desmontaje persiste el último cambio para no perderlo.
+  useEffect(
+    () => () => {
+      if (dirtyRef.current && wfRef.current && wfRef.current !== 'local') {
+        void api.saveGraph(wfRef.current, docToWorkflowGraph(s().history.doc)).catch(() => undefined);
+      }
+    },
+    [],
+  );
 
   // «Activar» (M17): guarda y publica; a partir de ahí las ejecuciones (webhook, horario…) usan estos cambios.
   const handleActivate = async () => {
