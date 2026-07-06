@@ -98,6 +98,9 @@ export class RouterNodeExecutor implements INodeExecutor {
       /* fail-open: se activan todos abajo */
     }
     if (chosen.length === 0) chosen = candidates.map((c) => c.target); // fail-open → fan-out
+    // `max` (opcional): limita a los N primeros elegidos (para TRIAJE, `max:1` → un único responsable).
+    const max = Number(ctx.config.max ?? 0);
+    if (max > 0 && chosen.length > max) chosen = chosen.slice(0, max);
 
     return store(chosen, { chosen, candidates: candidates.map((c) => ({ key: c.target, name: c.name })) }, usage);
   }

@@ -228,6 +228,8 @@ registerNodeType({
         placeholder: 'Investiga X y redacta un resumen',
         multiline: true,
       },
+      // Límite de agentes elegidos. 0 = sin límite (los que decida). 1 = triaje a un único responsable.
+      max: { type: 'number', label: 'Máx. agentes (0 = sin límite, 1 = uno solo)', default: 0 },
     },
   },
 });
