@@ -60,7 +60,9 @@ export function connectorProviders(selfBase = 'http://localhost:3001'): Record<s
       tokenUrl: 'https://auth.atlassian.com/oauth/token',
       // Base de Atlassian; el nodo debe apuntar a /ex/jira/{cloudid}/rest/api/3/… (ver docs).
       baseUrl: 'https://api.atlassian.com',
-      scopes: ['read:jira-work', 'write:jira-work', 'offline_access'],
+      // `manage:jira-webhook`: registrar/borrar webhooks dinámicos vía REST (triggers sin código, M19).
+      // `offline_access`: refresh token para renovar el webhook (caduca a los 30 días).
+      scopes: ['read:jira-work', 'write:jira-work', 'manage:jira-webhook', 'offline_access'],
       requiresConfig: true,
       tokenExchange: 'json',
       tokenPath: 'access_token',

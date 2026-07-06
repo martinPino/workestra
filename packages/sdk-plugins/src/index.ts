@@ -13,6 +13,8 @@ export * from './human-node';
 export * from './connector-node';
 export * from './router-node';
 export * from './connector-providers';
+export * from './jira-webhooks';
+export * from './trigger-events';
 export * from './interpolate';
 export * from './handoff';
 export * from './runtime-registry';
