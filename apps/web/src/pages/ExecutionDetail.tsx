@@ -16,6 +16,7 @@ import {
   CircleDollarSign,
   Loader2,
   CircleX,
+  AlertTriangle,
 } from 'lucide-react';
 import type { ExecutionEvent } from '@core/contracts';
 import { reduceExecution, type NodeRunStatus } from '@core/domain';
@@ -65,6 +66,69 @@ const EVENT_TONE: Record<string, Tone> = {
 function eventDetail(e: ExecutionEvent): string {
   if ('nodeKey' in e && e.nodeKey) return String(e.nodeKey);
   return '';
+}
+
+/** Narración humana de cada tipo de evento del motor (M25): «node.succeeded» → «Paso completado». */
+const EVENT_LABEL: Record<string, string> = {
+  'execution.queued': 'En cola',
+  'execution.started': 'Empezó',
+  'execution.status': 'Cambio de estado',
+  'node.started': 'Paso iniciado',
+  'node.succeeded': 'Paso completado',
+  'node.failed': 'Paso con error',
+  'node.skipped': 'Paso omitido',
+  'execution.succeeded': 'Completado',
+  'execution.failed': 'Con error',
+  'plan.created': 'Plan del asistente creado',
+  'plan.validation_failed': 'Plan inválido',
+  'subtask.started': 'Subtarea iniciada',
+  'subtask.succeeded': 'Subtarea completada',
+  'subtask.failed': 'Subtarea con error',
+  'plan.execution_failed': 'La ejecución del plan falló',
+  'plan.budget_exceeded': 'Se alcanzó el límite de trabajo permitido',
+  'results.merged': 'Resultados combinados',
+  'human.requested': 'Pidió tu aprobación',
+  'human.resolved': 'Aprobación resuelta',
+};
+const eventLabel = (type: string): string => EVENT_LABEL[type] ?? type;
+
+interface ConnectorWarning {
+  node: string;
+  status?: number;
+  message: string;
+}
+
+/** Intenta sacar un mensaje legible del cuerpo de error de un proveedor (Jira/Slack). */
+function extractProviderError(bodyPreview: unknown): string {
+  if (typeof bodyPreview !== 'string') return '';
+  try {
+    const j = JSON.parse(bodyPreview) as Record<string, unknown>;
+    const msgs = j.errorMessages; // Jira
+    if (Array.isArray(msgs) && msgs.length) return msgs.map(String).join(' ');
+    if (typeof j.error === 'string') return j.error; // Slack
+    if (typeof j.message === 'string') return j.message;
+  } catch {
+    /* no era JSON */
+  }
+  return bodyPreview.slice(0, 160);
+}
+
+/**
+ * Errores de nodos Conector que NO paran el flujo (M25): el nodo «completa» aunque el proveedor devuelva
+ * 4xx/5xx; el error queda en el contexto (`connector:<paso>={ok:false,status,bodyPreview}`). Aquí lo
+ * sacamos a la luz para que se vea en el historial en vez de quedar escondido.
+ */
+function connectorWarnings(context: Record<string, unknown> | undefined): ConnectorWarning[] {
+  const vars = (context?.variables ?? {}) as Record<string, unknown>;
+  const out: ConnectorWarning[] = [];
+  for (const [k, v] of Object.entries(vars)) {
+    if (!k.startsWith('connector:') || !v || typeof v !== 'object') continue;
+    const r = v as { ok?: boolean; status?: number; error?: string; bodyPreview?: unknown };
+    if (r.ok === false || r.error) {
+      out.push({ node: k.slice('connector:'.length), status: r.status, message: r.error ?? extractProviderError(r.bodyPreview) });
+    }
+  }
+  return out;
 }
 
 const fmtCost = (c: number) => (c === 0 ? '—' : `$${c.toFixed(c < 0.01 ? 4 : 3)}`);
@@ -282,16 +346,37 @@ export function ExecutionDetail() {
             </div>
           )}
 
+          {/* M25: errores de conector que no paran el flujo, sacados a la luz (el nodo «completa» con 4xx). */}
+          {(() => {
+            const warns = connectorWarnings(data.context);
+            return warns.length ? (
+              <div className="border-b border-border p-3">
+                <div className="mb-2 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-warning">
+                  <AlertTriangle size={12} /> {t('Avisos de apps conectadas')}
+                </div>
+                <div className="space-y-1.5">
+                  {warns.map((w, i) => (
+                    <div key={i} className="rounded-lg border border-warning/20 bg-warning/[0.06] px-2.5 py-1.5 text-[11px] text-txt-secondary">
+                      <span className="font-medium text-txt-primary">{w.node}</span>
+                      {w.status ? <span className="ml-1 font-mono text-warning">{w.status}</span> : null}
+                      {w.message ? <span className="mt-0.5 block text-txt-disabled">{w.message}</span> : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null;
+          })()}
+
           {state.plan && (
             <div className="border-b border-border p-3">
-              <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-txt-disabled">{t('Plan del Orchestrator')}</div>
+              <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-txt-disabled">{t('Pasos del asistente')}</div>
               <div className="space-y-1.5">
-                {state.plan.order.map((sid) => {
+                {state.plan.order.map((sid, i) => {
                   const st = state.plan!.subtasks[sid];
                   const tone: Tone = st.status === 'succeeded' ? 'success' : st.status === 'failed' ? 'danger' : st.status === 'running' ? 'primary' : 'default';
                   return (
                     <div key={sid} className="flex items-center gap-2 text-xs">
-                      <Badge tone={tone}>{sid}</Badge>
+                      <Badge tone={tone}>{t('Paso')} {i + 1}</Badge>
                       <span className="truncate text-txt-secondary">{st.task ?? st.agentId}</span>
                     </div>
                   );
@@ -324,7 +409,7 @@ export function ExecutionDetail() {
                         )}
                       >
                         <span className="w-8 shrink-0 text-right font-mono text-[10px] text-txt-disabled">{e.seq}</span>
-                        <Badge tone={EVENT_TONE[e.type] ?? 'default'}>{e.type}</Badge>
+                        <Badge tone={EVENT_TONE[e.type] ?? 'default'}><span title={e.type}>{t(eventLabel(e.type))}</span></Badge>
                         <span className="min-w-0 flex-1 truncate text-txt-secondary">{eventDetail(e)}</span>
                         <span className="shrink-0 font-mono text-[10px] text-txt-disabled">{fmtTime(e.at)}</span>
                       </button>
