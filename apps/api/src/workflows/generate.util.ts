@@ -32,6 +32,12 @@ export function extractJsonObject(text: string): string | null {
   return null; // llaves sin cerrar
 }
 
+/** ¿El error del proveedor de IA es un límite de uso (429 / rate limit / tokens por día o minuto)? Se usa
+ *  para dar al usuario un mensaje claro y accionable en vez de filtrar el error crudo del proveedor. */
+export function isRateLimitError(message: string): boolean {
+  return /\b429\b|rate.?limit|too many requests|tokens per (day|minute)/i.test(message);
+}
+
 /** Conector/agente mínimos para poblar el catálogo del prompt (solo ids reales; nada de secretos). */
 export interface GenConnector {
   id: string;

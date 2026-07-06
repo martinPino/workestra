@@ -1,5 +1,21 @@
 import { describe, it, expect } from 'vitest';
-import { extractJsonObject, buildGeneratePrompt } from './generate.util';
+import { extractJsonObject, buildGeneratePrompt, isRateLimitError } from './generate.util';
+
+describe('isRateLimitError (mensaje claro de límite de IA)', () => {
+  it('detecta el 429 real de Groq (tokens per day)', () => {
+    expect(isRateLimitError('LLM HTTP 429 para el modelo «llama-3.3-70b-versatile»: Rate limit reached ... on tokens per day (TPD): Limit 100000')).toBe(true);
+  });
+  it('detecta variantes de rate limit / too many requests', () => {
+    expect(isRateLimitError('Too Many Requests')).toBe(true);
+    expect(isRateLimitError('rate-limit exceeded')).toBe(true);
+    expect(isRateLimitError('tokens per minute (TPM) exceeded')).toBe(true);
+  });
+  it('NO marca otros errores como límite', () => {
+    expect(isRateLimitError('LLM HTTP 500: internal error')).toBe(false);
+    expect(isRateLimitError('no se encontró JSON en la respuesta')).toBe(false);
+    expect(isRateLimitError('ECONNREFUSED')).toBe(false);
+  });
+});
 
 describe('extractJsonObject (M29)', () => {
   it('JSON pelado → lo devuelve', () => {

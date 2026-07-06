@@ -5,7 +5,7 @@ import { createLlmRouter } from '@core/llm';
 import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
 import { assertInWorkspace } from '../tenant/tenant.util';
 import { TriggersService } from '../triggers/triggers.service';
-import { extractJsonObject, buildGeneratePrompt } from './generate.util';
+import { extractJsonObject, buildGeneratePrompt, isRateLimitError } from './generate.util';
 
 @Injectable()
 export class WorkflowsService {
@@ -129,6 +129,7 @@ export class WorkflowsService {
       { role: 'user' as const, content: user },
     ];
     let lastErr = 'sin respuesta';
+    let rateLimited = false; // ¿el fallo fue por límite de uso del proveedor? → mensaje claro al usuario
     for (const model of models) {
       for (let attempt = 0; attempt < 2; attempt++) {
         const messages =
@@ -139,9 +140,11 @@ export class WorkflowsService {
         try {
           res = await this.llm.chat({ model, messages });
         } catch (e) {
-          // El modelo falló (límite diario, contexto, red). NO revienta con 500: pasa al siguiente modelo
+          // El modelo falló (límite de uso, contexto, red). NO revienta con 500: pasa al siguiente modelo
           // (reintentar el mismo modelo agotado no sirve).
-          lastErr = `error del modelo: ${e instanceof Error ? e.message : String(e)}`;
+          const msg = e instanceof Error ? e.message : String(e);
+          if (isRateLimitError(msg)) rateLimited = true;
+          lastErr = `error del modelo: ${msg}`;
           break;
         }
         const jsonStr = extractJsonObject(res.content ?? '');
@@ -176,6 +179,12 @@ export class WorkflowsService {
         const name = typeof obj.name === 'string' && obj.name.trim() ? obj.name.trim().slice(0, 80) : 'Automatización con IA';
         return { name, graph: g.data };
       }
+    }
+    // Límite de uso del proveedor: mensaje claro y accionable, sin filtrar el error crudo (429, org id…).
+    if (rateLimited) {
+      throw new BadRequestException(
+        'La IA ha alcanzado su límite de uso por ahora. Inténtalo de nuevo en unos minutos, o conecta otro proveedor de IA (sube el plan de Groq o añade una clave de OpenAI).',
+      );
     }
     throw new BadRequestException(`La IA no pudo generar un flujo válido. ${lastErr}`);
   }
