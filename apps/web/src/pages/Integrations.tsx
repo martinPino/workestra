@@ -9,6 +9,7 @@ import { Page } from '../app/AppShell';
 import { Card, Badge, Dot, PageHeader, Button } from '../ui';
 import { useWorkflows, useWorkflow, useWebhooks, useSchedules, useConnectors, useConnectorProviders } from '../lib/hooks';
 import { api } from '../lib/api';
+import { ProviderLogo, hasProviderLogo } from '../lib/provider-logos';
 import { useAuth, canApprove } from '../lib/auth';
 import { useT } from '../i18n';
 
@@ -456,9 +457,16 @@ function ConnectorsManager() {
               return (
                 <motion.div key={p.provider} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
                   <Card hover className="flex items-center gap-3 p-4">
-                    <div className={`flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${PROVIDER_GRADIENT[p.provider] ?? 'from-neutral-500 to-neutral-700'} text-lg font-bold text-white`}>
-                      {p.label[0]}
-                    </div>
+                    {hasProviderLogo(p.provider) ? (
+                      // Logo de marca real (Slack/Jira/GitHub) sobre fondo blanco, como en las apps oficiales.
+                      <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-white text-neutral-900">
+                        <ProviderLogo provider={p.provider} size={24} />
+                      </div>
+                    ) : (
+                      <div className={`flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${PROVIDER_GRADIENT[p.provider] ?? 'from-neutral-500 to-neutral-700'} text-lg font-bold text-white`}>
+                        {p.label[0]}
+                      </div>
+                    )}
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-semibold text-txt-primary">{p.label}</div>
                       {connected ? (

@@ -3,6 +3,7 @@ import { Square, Crown, TriangleAlert } from 'lucide-react';
 import type { AfNodeData } from '../graph';
 import { getNodeType } from '../editor/node-types';
 import { nodeSetupIssues } from '../editor/node-issues';
+import { ProviderLogo, hasProviderLogo } from '../lib/provider-logos';
 import { useAgents, useConnectors } from '../lib/hooks';
 import { agentGradient, agentInitial } from '../lib/agent-avatar';
 import { useT } from '../i18n';
@@ -35,6 +36,13 @@ export function AfNode({ data, selected }: NodeProps<AfNodeData>) {
     (data.kind === 'agent' || data.kind === 'router') && data.config?.agentId
       ? agents?.find((a) => a.id === String(data.config?.agentId))
       : undefined;
+
+  // Nodo Conector: muestra el LOGO real de la app destino (Slack/Jira/GitHub) en vez del enchufe genérico.
+  const connectorProvider =
+    data.kind === 'connector' && data.config?.connectorId
+      ? connectors?.find((c) => c.id === String(data.config?.connectorId))?.provider
+      : undefined;
+  const showLogo = hasProviderLogo(connectorProvider);
 
   // «Falta configurar» (M26): avisos visibles en el propio nodo (estilo n8n), p. ej. app sin conectar o
   // asistente sin elegir. Vacío = el paso está listo. El flag de error distingue «falló la carga» de «cargando».
@@ -73,8 +81,12 @@ export function AfNode({ data, selected }: NodeProps<AfNodeData>) {
         </div>
       ) : (
         <div className="flex items-center gap-2.5">
-          <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border bg-elevated ${def?.color ?? 'text-txt-primary'}`}>
-            <Icon size={15} strokeWidth={2} />
+          <span
+            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border ${
+              showLogo ? 'bg-white text-neutral-900' : `bg-elevated ${def?.color ?? 'text-txt-primary'}`
+            }`}
+          >
+            {showLogo ? <ProviderLogo provider={connectorProvider} size={16} /> : <Icon size={15} strokeWidth={2} />}
           </span>
           <span className="truncate font-medium text-txt-primary">{def?.label ? t(def.label) : data.kind}</span>
         </div>

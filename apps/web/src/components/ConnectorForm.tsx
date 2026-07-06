@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { CONNECTOR_ACTIONS, type ConnectorAction } from '../editor/connector-actions';
+import { ProviderLogo, hasProviderLogo } from '../lib/provider-logos';
 import { useConnectors } from '../lib/hooks';
 import { useT } from '../i18n';
 
@@ -58,7 +59,10 @@ export function ConnectorForm({ value, onChange }: { value: Record<string, unkno
   return (
     <div className="flex flex-col gap-3">
       <label className="flex flex-col gap-1">
-        <span className="text-[11px] font-medium text-txt-secondary">{t('App conectada')}</span>
+        <span className="flex items-center gap-1.5 text-[11px] font-medium text-txt-secondary">
+          {hasProviderLogo(provider) && <ProviderLogo provider={provider} size={13} />}
+          {t('App conectada')}
+        </span>
         <select value={connectorId} onChange={(e) => onConnector(e.target.value)} className={inputBase}>
           <option value="">{t('— elige un conector —')}</option>
           {list.map((c) => (
