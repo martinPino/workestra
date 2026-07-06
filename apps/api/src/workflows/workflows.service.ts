@@ -77,7 +77,10 @@ export class WorkflowsService {
    * DAG). Si sale inválido, reintenta UNA vez pasándole el error. Devuelve el nombre sugerido + el grafo.
    */
   async generate(prompt: string, workspaceId: string): Promise<{ name: string; graph: WorkflowGraph }> {
-    if (!prompt?.trim()) throw new BadRequestException('Describe lo que quieres automatizar.');
+    const clean = (prompt ?? '').trim();
+    if (!clean) throw new BadRequestException('Describe lo que quieres automatizar.');
+    // Tope de entrada: acota el coste del LLM por petición (la salida ya está topada por el proveedor).
+    if (clean.length > 2000) throw new BadRequestException('La descripción es demasiado larga (máx. 2000 caracteres).');
     const [connectors, agents] = await Promise.all([
       this.p.connectors.listByWorkspace(workspaceId),
       this.p.agents.list(workspaceId),
@@ -89,7 +92,7 @@ export class WorkflowsService {
     const model = process.env.LLM_MODEL ?? 'llama-3.3-70b-versatile';
     const base = [
       { role: 'system' as const, content: system },
-      { role: 'user' as const, content: prompt.trim() },
+      { role: 'user' as const, content: clean },
     ];
 
     let lastErr = 'sin respuesta';

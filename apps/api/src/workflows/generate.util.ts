@@ -3,15 +3,33 @@
  * lenguaje natural. Puro y testeable; la llamada al LLM y la validación (schema + DAG) viven en el servicio.
  */
 
-/** Extrae el primer objeto JSON de la respuesta del LLM (tolera fences ```json y texto alrededor). null si no hay. */
+/**
+ * Extrae el PRIMER objeto JSON balanceado de la respuesta del LLM (tolera fences ```json y prosa alrededor).
+ * Escanea contando llaves y respetando strings (para no romper con un `}` en la prosa que sigue al JSON, muy
+ * común: `{...} Espero que esto {te sirva}`). null si no hay un objeto bien cerrado.
+ */
 export function extractJsonObject(text: string): string | null {
   if (!text) return null;
   const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const body = fence ? fence[1] : text;
   const start = body.indexOf('{');
-  const end = body.lastIndexOf('}');
-  if (start === -1 || end === -1 || end < start) return null;
-  return body.slice(start, end + 1);
+  if (start === -1) return null;
+  let depth = 0;
+  let inStr = false;
+  let esc = false;
+  for (let i = start; i < body.length; i++) {
+    const ch = body[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === '\\') esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') inStr = true;
+    else if (ch === '{') depth++;
+    else if (ch === '}' && --depth === 0) return body.slice(start, i + 1);
+  }
+  return null; // llaves sin cerrar
 }
 
 /** Conector/agente mínimos para poblar el catálogo del prompt (solo ids reales; nada de secretos). */

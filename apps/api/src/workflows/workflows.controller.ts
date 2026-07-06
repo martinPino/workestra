@@ -14,7 +14,10 @@ export class WorkflowsController {
   }
 
   // «Construir con IA» (M29): describe → la IA devuelve {name, graph}. El cliente crea el workflow con eso.
+  // Guardado con workflow:write: genera vía LLM (operación con coste), no debe poder lanzarla un VIEWER.
   @Post('generate')
+  @UseGuards(ScopesGuard)
+  @RequireScopes('workflow:write')
   generate(@Body() body: { prompt: string }, @Workspace() workspaceId: string) {
     return this.svc.generate(body?.prompt ?? '', workspaceId);
   }
