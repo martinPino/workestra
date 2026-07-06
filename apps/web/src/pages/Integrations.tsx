@@ -532,10 +532,16 @@ function TriggerRecipes() {
   const { token, role } = useAuth();
   const qc = useQueryClient();
   const { data: workflows } = useWorkflows();
-  const { data: connectors } = useConnectors();
+  const [connecting, setConnecting] = useState(false); // sondea los conectores mientras el OAuth está en curso
+  const { data: connectors } = useConnectors(connecting);
   const [workflowId, setWorkflowId] = useState('');
   const wfId = workflowId || workflows?.[0]?.id || '';
   const jira = (connectors ?? []).find((c) => c.provider === 'jira' && c.status === 'connected');
+
+  // Detiene el sondeo en cuanto Jira pasa a conectado (tras completar el popup de OAuth).
+  useEffect(() => {
+    if (connecting && jira) setConnecting(false);
+  }, [connecting, jira]);
 
   const [eventId, setEventId] = useState(JIRA_RECIPES[0].eventId);
   const [projectKey, setProjectKey] = useState('');
@@ -563,7 +569,8 @@ function TriggerRecipes() {
         if (!alive) return;
         setProjects(r.projects);
         setCloudId(r.cloudId);
-        setProjectKey((cur) => cur || r.projects[0]?.key || '');
+        // Conserva la elección si sigue siendo válida; si no (cambió de sitio/proyectos), al primero.
+        setProjectKey((cur) => (r.projects.some((p) => p.key === cur) ? cur : r.projects[0]?.key || ''));
       })
       .catch(() => {
         if (alive) setProjects([]);
@@ -584,6 +591,7 @@ function TriggerRecipes() {
       }
       const { authorizeUrl } = await api.connectConnector(existing.id);
       window.open(authorizeUrl, 'agentflow-oauth', 'width=540,height=680');
+      setConnecting(true); // empieza a sondear; el picker se actualizará solo al completar el OAuth
     } catch (e) {
       setErr(e instanceof Error ? e.message : t('Error al conectar'));
     }
@@ -594,11 +602,25 @@ function TriggerRecipes() {
     setBusy(true);
     setErr(null);
     try {
-      // 1) El auto-registro exige que el disparador del flujo sea «webhook»: lo fijamos y guardamos.
       const wf = await api.getWorkflow(wfId);
-      await api.saveGraph(wfId, ensureWebhookTrigger(wf.graph));
-      // 2) Registrar la receta → crea el webhook EN Jira y persiste el binding.
-      await api.createTriggerBinding(wfId, { eventId, connectorId: jira.id, params: { projectKey, cloudId } });
+      // El auto-registro necesita un disparador «webhook». Si el flujo no tiene bloque Disparador, avisamos
+      // claro aquí (en vez de dejar que el backend responda con un «el Trigger es manual» confuso).
+      if (!wf.graph.nodes.some((n) => n.type === 'trigger')) {
+        setErr(t('Este flujo no tiene un disparador. Ábrelo en el editor y añade el bloque «Disparador».'));
+        return;
+      }
+      // 1) Fijar el disparador a «webhook» y guardar (solo si cambia). Guardamos el grafo ORIGINAL para
+      //    restaurarlo si el registro falla — no dejar el flujo del usuario mutado en silencio.
+      const patched = ensureWebhookTrigger(wf.graph);
+      const changed = JSON.stringify(patched) !== JSON.stringify(wf.graph);
+      if (changed) await api.saveGraph(wfId, patched);
+      // 2) Registrar la receta → crea el webhook EN Jira y persiste el binding. Si falla, revertir el grafo.
+      try {
+        await api.createTriggerBinding(wfId, { eventId, connectorId: jira.id, params: { projectKey, cloudId } });
+      } catch (e) {
+        if (changed) await api.saveGraph(wfId, wf.graph).catch(() => undefined); // restaura el disparador original
+        throw e;
+      }
       await qc.invalidateQueries({ queryKey: ['triggerBindings', wfId] });
     } catch (e) {
       setErr(e instanceof Error ? e.message : t('Error al activar'));

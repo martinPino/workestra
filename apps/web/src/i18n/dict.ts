@@ -78,6 +78,8 @@ export const EN: Record<string, string> = {
   'Reautorizar Jira': 'Reauthorize Jira',
   'no puede crear disparadores (requiere workflow:write).': 'cannot create triggers (requires workflow:write).',
   'Este flujo no tiene disparadores de apps conectadas.': 'This flow has no connected-app triggers.',
+  'Este flujo no tiene un disparador. Ábrelo en el editor y añade el bloque «Disparador».':
+    'This flow has no trigger. Open it in the editor and add the «Trigger» block.',
   'Conecta tus flujos con las apps de tu equipo y elige cuándo se ejecutan.': 'Connect your flows to your team apps and choose when they run.',
   'Error al activar': 'Error activating',
   '+18% vs. ayer': '+18% vs. yesterday',
