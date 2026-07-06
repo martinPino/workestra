@@ -110,16 +110,25 @@ export class WebhooksService {
       payload = { raw: rawBody.toString('utf8') };
     }
 
-    // El ingreso es público (autenticado por HMAC); la ejecución se ancla al workspace del webhook.
-    // `triggerType: 'webhook'` queda grabado de forma durable → la tabla de Ejecuciones lo distingue
-    // de un disparo manual (antes todo salía como 'manual' porque start() lo fijaba por defecto).
+    // Contexto AMIGABLE: exponemos key/summary/description del ticket en la raíz, soportando tanto un payload
+    // PLANO ({key,summary,description}, p. ej. una Automation rule de Jira) como el evento COMPLETO de Jira
+    // ({issue:{key,fields:{summary}}}). Así `{{ticket.key}}` funciona igual que en el ingreso de recetas M19,
+    // sea cual sea el disparador. `ticket.webhook` sigue siendo el payload crudo (compatibilidad hacia atrás).
+    const rec = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
+    const issue = rec.issue && typeof rec.issue === 'object' ? (rec.issue as Record<string, unknown>) : {};
+    const fields = issue.fields && typeof issue.fields === 'object' ? (issue.fields as Record<string, unknown>) : {};
+    const ticket = {
+      key: String(rec.key ?? issue.key ?? ''),
+      summary: String(rec.summary ?? fields.summary ?? ''),
+      description: rec.description ?? fields.description ?? '',
+      webhook: payload,
+    };
+    // El ingreso es público (autenticado por HMAC/token); la ejecución se ancla al workspace del webhook.
+    // `triggerType: 'webhook'` queda grabado de forma durable → la tabla de Ejecuciones lo distingue del manual.
     const result = await this.executions.start(
       wh.workflowId,
       wh.workspaceId,
-      {
-        ticket: { webhook: payload },
-        variables: { trigger: 'webhook', webhookId, payload },
-      },
+      { ticket, variables: { trigger: 'webhook', webhookId, issueKey: ticket.key, payload } },
       'webhook',
     );
     return { executionId: result.executionId, status: result.status };
