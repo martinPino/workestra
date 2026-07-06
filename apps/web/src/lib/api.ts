@@ -23,6 +23,19 @@ export interface ExecutionRow {
   createdAt?: string | null;
 }
 
+/** Receta de disparador activa (M19): enlace workflow↔evento externo con auto-registro en el proveedor. */
+export interface TriggerBindingDto {
+  id: string;
+  workflowId: string;
+  eventId: string;
+  connectorId: string;
+  webhookId: string;
+  remoteId: string | null;
+  params: { projectKey?: string; cloudId?: string } & Record<string, unknown>;
+  active: boolean;
+  createdAt: string;
+}
+
 export interface ReviewDto {
   id: string;
   executionId: string;
@@ -183,6 +196,22 @@ export const api = {
   connectConnector: (id: string) =>
     fetch(`${API}/connectors/${id}/connect`, { method: 'POST', headers: authHeaders() }).then((r) => json<{ authorizeUrl: string }>(r)),
   deleteConnector: (id: string) => fetch(`${API}/connectors/${id}`, { method: 'DELETE', headers: authHeaders() }).then((r) => json<unknown>(r)),
+
+  // --- Triggers sin código (recetas + auto-registro en el proveedor, M19) ---
+  /** Proyectos de Jira accesibles con un conector (para el desplegable del picker). */
+  jiraProjects: (connectorId: string, cloudId?: string) =>
+    fetch(`${API}/connectors/${connectorId}/jira-projects${cloudId ? `?cloudId=${encodeURIComponent(cloudId)}` : ''}`, { headers: authHeaders() }).then((r) =>
+      json<{ cloudId: string; projects: Array<{ key: string; name: string }> }>(r),
+    ),
+  listTriggerBindings: (workflowId: string) =>
+    fetch(`${API}/workflows/${workflowId}/triggers`, { headers: authHeaders() }).then((r) => json<TriggerBindingDto[]>(r)),
+  createTriggerBinding: (workflowId: string, body: { eventId: string; connectorId: string; params?: Record<string, unknown> }) =>
+    fetch(`${API}/workflows/${workflowId}/triggers`, { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) }).then((r) =>
+      json<TriggerBindingDto>(r),
+    ),
+  deleteTriggerBinding: (id: string) =>
+    fetch(`${API}/triggers/${id}`, { method: 'DELETE', headers: authHeaders() }).then((r) => json<unknown>(r)),
+
   listExecutions: (status?: string) =>
     fetch(`${API}/executions${status ? `?status=${status}` : ''}`, { headers: authHeaders() }).then((r) =>
       json<{ workspaceId: string; executions: ExecutionRow[] }>(r),

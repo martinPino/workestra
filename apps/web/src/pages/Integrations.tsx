@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { useEffect } from 'react';
 import { Webhook, Plus, Copy, Check, Trash2, ShieldAlert, KeyRound, Clock, Zap, Plug, Unplug, Lock } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { WorkflowGraph } from '@core/contracts';
 import { Page } from '../app/AppShell';
 import { Card, Badge, Dot, PageHeader, Button } from '../ui';
@@ -55,6 +55,7 @@ function CopyButton({ value }: { value: string }) {
 }
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
+const SEL = 'h-9 rounded-lg border border-border bg-surface px-3 text-sm text-txt-primary outline-none focus:border-primary/60';
 
 function WebhookManager() {
   const { data: workflows } = useWorkflows();
@@ -503,15 +504,219 @@ function ConnectorsManager() {
   );
 }
 
+// Recetas de app conectada (M19). El usuario elige el evento en lenguaje natural; AgentFlow registra el
+// webhook EN el proveedor por él. El value técnico ('jira.issue_created') y el «webhook» quedan ocultos.
+const JIRA_RECIPES = [
+  { eventId: 'jira.issue_created', label: 'Cuando se crea un ticket de Jira' },
+  { eventId: 'jira.issue_updated', label: 'Cuando se actualiza un ticket de Jira' },
+];
+const recipeLabel = (eventId: string) => JIRA_RECIPES.find((r) => r.eventId === eventId)?.label ?? eventId;
+
+/** Fija el nodo Trigger del grafo a «webhook» (lo exige el auto-registro); el resto del grafo no cambia. */
+function ensureWebhookTrigger(graph: WorkflowGraph): WorkflowGraph {
+  return {
+    ...graph,
+    nodes: graph.nodes.map((n) =>
+      n.type === 'trigger' ? { ...n, config: { ...(n.config as Record<string, unknown>), event: 'webhook' } } : n,
+    ),
+  };
+}
+
+/**
+ * Receta «Cuando pase algo en una app conectada» (M19): elegir el evento de Jira + el proyecto y pulsar
+ * Activar. Por debajo: fija el Trigger del flujo a «webhook», guarda, y registra el webhook EN Jira. El
+ * usuario nunca ve una URL, un secreto ni la consola de Jira.
+ */
+function TriggerRecipes() {
+  const t = useT();
+  const { token, role } = useAuth();
+  const qc = useQueryClient();
+  const { data: workflows } = useWorkflows();
+  const { data: connectors } = useConnectors();
+  const [workflowId, setWorkflowId] = useState('');
+  const wfId = workflowId || workflows?.[0]?.id || '';
+  const jira = (connectors ?? []).find((c) => c.provider === 'jira' && c.status === 'connected');
+
+  const [eventId, setEventId] = useState(JIRA_RECIPES[0].eventId);
+  const [projectKey, setProjectKey] = useState('');
+  const [cloudId, setCloudId] = useState<string | undefined>(undefined);
+  const [projects, setProjects] = useState<Array<{ key: string; name: string }>>([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const { data: bindings } = useQuery({
+    queryKey: ['triggerBindings', wfId],
+    queryFn: () => api.listTriggerBindings(wfId),
+    enabled: !!wfId && !!token,
+  });
+
+  // Cuando hay un conector Jira conectado, poblamos los proyectos (y el cloudId) para el desplegable.
+  useEffect(() => {
+    if (!jira) {
+      setProjects([]);
+      return;
+    }
+    let alive = true;
+    api
+      .jiraProjects(jira.id)
+      .then((r) => {
+        if (!alive) return;
+        setProjects(r.projects);
+        setCloudId(r.cloudId);
+        setProjectKey((cur) => cur || r.projects[0]?.key || '');
+      })
+      .catch(() => {
+        if (alive) setProjects([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [jira?.id]);
+
+  const connectJira = async () => {
+    setErr(null);
+    try {
+      let existing = (connectors ?? []).find((c) => c.provider === 'jira');
+      if (!existing) {
+        const created = await api.createConnector('jira', 'jira-1');
+        existing = { id: created.id, key: created.key, provider: 'jira', status: 'disconnected', credentialsSecretId: null };
+        await qc.invalidateQueries({ queryKey: ['connectors'] });
+      }
+      const { authorizeUrl } = await api.connectConnector(existing.id);
+      window.open(authorizeUrl, 'agentflow-oauth', 'width=540,height=680');
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : t('Error al conectar'));
+    }
+  };
+
+  const activate = async () => {
+    if (!wfId || !jira || !projectKey) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      // 1) El auto-registro exige que el disparador del flujo sea «webhook»: lo fijamos y guardamos.
+      const wf = await api.getWorkflow(wfId);
+      await api.saveGraph(wfId, ensureWebhookTrigger(wf.graph));
+      // 2) Registrar la receta → crea el webhook EN Jira y persiste el binding.
+      await api.createTriggerBinding(wfId, { eventId, connectorId: jira.id, params: { projectKey, cloudId } });
+      await qc.invalidateQueries({ queryKey: ['triggerBindings', wfId] });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : t('Error al activar'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (id: string) => {
+    await api.deleteTriggerBinding(id).catch(() => undefined);
+    await qc.invalidateQueries({ queryKey: ['triggerBindings', wfId] });
+  };
+
+  return (
+    <Card className="p-5">
+      <div className="mb-4 flex items-start gap-3">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/12 text-primary">
+          <Zap size={17} />
+        </div>
+        <div className="flex-1">
+          <div className="text-sm font-semibold text-txt-primary">{t('Cuando pase algo en una app conectada')}</div>
+          <div className="text-xs text-txt-secondary">{t('Elige un evento de Jira y AgentFlow conectará tu flujo por ti. Sin URLs ni secretos.')}</div>
+        </div>
+      </div>
+
+      {!token ? (
+        <div className="flex items-center gap-2 rounded-lg border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
+          <ShieldAlert size={14} /> {t('Necesitas una sesión (rol EDITOR o superior) para crear disparadores.')}
+        </div>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <select value={eventId} onChange={(e) => setEventId(e.target.value)} className={SEL}>
+              {JIRA_RECIPES.map((r) => (
+                <option key={r.eventId} value={r.eventId}>
+                  {t(r.label)}
+                </option>
+              ))}
+            </select>
+            <span className="text-xs text-txt-secondary">{t('en')}</span>
+            <select value={wfId} onChange={(e) => setWorkflowId(e.target.value)} className={SEL}>
+              {(workflows ?? []).map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name}
+                </option>
+              ))}
+            </select>
+
+            {!jira ? (
+              <Button size="sm" variant="primary" onClick={connectJira} disabled={!canApprove(role)}>
+                <Plug size={14} /> {t('Conectar Jira')}
+              </Button>
+            ) : (
+              <>
+                <span className="text-xs text-txt-secondary">·</span>
+                <select value={projectKey} onChange={(e) => setProjectKey(e.target.value)} className={SEL} disabled={projects.length === 0}>
+                  {projects.length === 0 && <option value="">{t('Cargando proyectos…')}</option>}
+                  {projects.map((p) => (
+                    <option key={p.key} value={p.key}>
+                      {p.name} ({p.key})
+                    </option>
+                  ))}
+                </select>
+                <Button size="sm" variant="primary" onClick={activate} disabled={busy || !wfId || !projectKey || !canApprove(role)}>
+                  <Zap size={14} /> {busy ? t('Activando…') : t('Activar disparador')}
+                </Button>
+              </>
+            )}
+          </div>
+
+          {jira && projects.length === 0 && (
+            <p className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-txt-disabled">
+              {t('¿No aparecen tus proyectos? Puede que Jira necesite el permiso nuevo.')}
+              <button onClick={connectJira} className="font-medium text-primary underline">
+                {t('Reautorizar Jira')}
+              </button>
+            </p>
+          )}
+          {!canApprove(role) && <p className="mt-1 text-[11px] text-warning">{t('El rol')} {role} {t('no puede crear disparadores (requiere workflow:write).')}</p>}
+          {err && <p className="mt-2 text-xs text-danger">{err}</p>}
+
+          <div className="mt-4 space-y-1.5">
+            {(bindings ?? []).length === 0 ? (
+              <p className="text-xs text-txt-disabled">{t('Este flujo no tiene disparadores de apps conectadas.')}</p>
+            ) : (
+              (bindings ?? []).map((b) => (
+                <div key={b.id} className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs">
+                  <Badge tone={b.active ? 'accent' : 'default'}>
+                    <Check size={11} /> {t('Activo')}
+                  </Badge>
+                  <span className="min-w-0 flex-1 truncate text-txt-secondary">
+                    {t(recipeLabel(b.eventId))}
+                    {b.params.projectKey ? ` · ${b.params.projectKey}` : ''}
+                  </span>
+                  <button onClick={() => remove(b.id)} className="flex h-7 w-7 items-center justify-center rounded-md text-txt-secondary hover:bg-danger/15 hover:text-danger" aria-label={t('Eliminar')}>
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
+    </Card>
+  );
+}
+
 export function Integrations() {
   const t = useT();
   return (
     <Page className="space-y-6">
-      <PageHeader title={t('Integraciones')} subtitle={t('Triggers entrantes y conectores. Todo desacoplado como plugins.')} />
+      <PageHeader title={t('Conexiones')} subtitle={t('Conecta tus flujos con las apps de tu equipo y elige cuándo se ejecutan.')} />
 
-      <WebhookManager />
+      <TriggerRecipes />
 
       <ScheduleManager />
+
+      <WebhookManager />
 
       <ConnectorsManager />
     </Page>
