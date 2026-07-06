@@ -1,8 +1,9 @@
 import { Handle, Position, type NodeProps } from 'reactflow';
-import { Square, Crown } from 'lucide-react';
+import { Square, Crown, TriangleAlert } from 'lucide-react';
 import type { AfNodeData } from '../graph';
 import { getNodeType } from '../editor/node-types';
-import { useAgents } from '../lib/hooks';
+import { nodeSetupIssues } from '../editor/node-issues';
+import { useAgents, useConnectors } from '../lib/hooks';
 import { agentGradient, agentInitial } from '../lib/agent-avatar';
 import { useT } from '../i18n';
 
@@ -26,16 +27,37 @@ export function AfNode({ data, selected }: NodeProps<AfNodeData>) {
   // Nodo Agente: si hay un agente elegido, la carta muestra SU avatar + nombre (identidad real),
   // no el label genérico. El avatar (gradiente + inicial) es determinista por id → mismo color que
   // en la galería de Agentes. Corona si es coordinador. Se resuelve del registro del workspace.
-  const { data: agents } = useAgents();
+  const agentsQuery = useAgents();
+  const connectorsQuery = useConnectors();
+  const agents = agentsQuery.data;
+  const connectors = connectorsQuery.data;
   const agent =
     (data.kind === 'agent' || data.kind === 'router') && data.config?.agentId
       ? agents?.find((a) => a.id === String(data.config?.agentId))
       : undefined;
 
+  // «Falta configurar» (M26): avisos visibles en el propio nodo (estilo n8n), p. ej. app sin conectar o
+  // asistente sin elegir. Vacío = el paso está listo. El flag de error distingue «falló la carga» de «cargando».
+  const issues = nodeSetupIssues(data.kind, data.config, {
+    agents,
+    connectors,
+    agentsError: agentsQuery.isError,
+    connectorsError: connectorsQuery.isError,
+  });
+
   return (
     <div
-      className={`min-w-[156px] max-w-[220px] rounded-xl border border-border bg-card px-2.5 py-2 text-xs text-txt-primary shadow-card transition-all duration-150 hover:border-border-strong ${statusRing} ${selectedRing}`}
+      className={`relative min-w-[156px] max-w-[220px] rounded-xl border border-border bg-card px-2.5 py-2 text-xs text-txt-primary shadow-card transition-all duration-150 hover:border-border-strong ${statusRing} ${selectedRing}`}
     >
+      {issues.length > 0 && (
+        <span
+          title={issues.map((i) => t(i)).join('\n')}
+          aria-label={`${t('Falta configurar este paso')}: ${issues.map((i) => t(i)).join('. ')}`}
+          className="absolute -right-1.5 -top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full border-2 border-card bg-amber-400 text-amber-950 shadow-card"
+        >
+          <TriangleAlert size={11} strokeWidth={2.75} />
+        </span>
+      )}
       <Handle type="target" position={Position.Left} className={HANDLE_CLASS} />
       {agent ? (
         <div className="flex items-center gap-2.5">

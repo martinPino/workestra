@@ -26,9 +26,12 @@ import { PropertiesPanel } from '../components/PropertiesPanel';
 import { SubtaskTree } from '../components/SubtaskTree';
 import { docToReactFlow, docToWorkflowGraph, workflowGraphToDoc, STARTER_DOC } from '../graph';
 import { listNodeTypes } from '../editor/node-types';
+import { graphSetupIssues } from '../editor/node-issues';
 import { useEditorStore } from '../editor/store';
+import { useAgents, useConnectors } from '../lib/hooks';
 import { statusLabel } from '../lib/labels';
 import { Button, IconButton, Badge, Dot } from '../ui';
+import { TriangleAlert } from 'lucide-react';
 import { useT } from '../i18n';
 
 function SelectionSync() {
@@ -80,6 +83,19 @@ export function Editor() {
   const [inspectorOpen, setInspectorOpen] = useState(isDesktop); // en móvil arranca cerrado (ver canvas)
   const nodeTypes = useMemo(() => ({ af: AfNode, comment: CommentNode }), []);
   const base = useMemo(() => docToReactFlow(doc, nodeStatus), [doc, nodeStatus]);
+
+  // «Falta configurar» (M26): pasos que aún no funcionarían (app sin conectar, asistente sin elegir…).
+  // Se pintan como aviso en cada nodo (AfNode) y bloquean Probar/Activar con un mensaje claro.
+  const agentsQuery = useAgents();
+  const connectorsQuery = useConnectors();
+  const agents = agentsQuery.data;
+  const connectors = connectorsQuery.data;
+  const agentsError = agentsQuery.isError;
+  const connectorsError = connectorsQuery.isError;
+  const setupIssues = useMemo(
+    () => graphSetupIssues(doc.nodes, { agents, connectors, agentsError, connectorsError }),
+    [doc, agents, connectors, agentsError, connectorsError],
+  );
   // Selección CONTROLADA por el store: en modo controlado React Flow ignora los cambios de
   // selección que no re-aplicamos, así que marcamos `selected` desde el store (lo puebla onNodeClick).
   const nodes = useMemo(() => base.nodes.map((n) => ({ ...n, selected: selection.includes(n.id) })), [base.nodes, selection]);
@@ -190,6 +206,16 @@ export function Editor() {
   // «Activar» (M17): guarda y publica; a partir de ahí las ejecuciones (webhook, horario…) usan estos cambios.
   const handleActivate = async () => {
     if (!workflowId || workflowId === 'local') return;
+    if (setupIssues.length) {
+      s().setError(
+        `${setupIssues.length} ${
+          setupIssues.length === 1
+            ? t('paso necesita configuración antes de activar. Revísalo (marcado con ⚠) en el lienzo.')
+            : t('pasos necesitan configuración antes de activar. Revísalos (marcados con ⚠) en el lienzo.')
+        }`,
+      );
+      return;
+    }
     try {
       await api.saveGraph(workflowId, docToWorkflowGraph(s().history.doc));
       await api.publish(workflowId);
@@ -202,6 +228,16 @@ export function Editor() {
 
   const handleRun = async () => {
     if (!workflowId || workflowId === 'local') return;
+    if (setupIssues.length) {
+      s().setError(
+        `${setupIssues.length} ${
+          setupIssues.length === 1
+            ? t('paso necesita configuración antes de probar. Revísalo (marcado con ⚠) en el lienzo.')
+            : t('pasos necesitan configuración antes de probar. Revísalos (marcados con ⚠) en el lienzo.')
+        }`,
+      );
+      return;
+    }
     try {
       await api.saveGraph(workflowId, docToWorkflowGraph(s().history.doc));
       s().resetExec();
@@ -266,6 +302,19 @@ export function Editor() {
           </Button>
         </div>
       </div>
+
+      {/* Banner «falta configurar» (M26): resumen visible de los pasos por completar (estilo n8n). */}
+      {setupIssues.length > 0 && (
+        <div className="flex shrink-0 items-center gap-2 border-b border-warning/25 bg-warning/10 px-4 py-1.5 text-[11px] text-warning">
+          <TriangleAlert size={13} className="shrink-0" />
+          <span>
+            {setupIssues.length}{' '}
+            {setupIssues.length === 1
+              ? t('paso necesita configuración para funcionar. Está marcado con ⚠ en el lienzo.')
+              : t('pasos necesitan configuración para funcionar. Están marcados con ⚠ en el lienzo.')}
+          </span>
+        </div>
+      )}
 
       <div className="relative flex min-h-0 flex-1">
         {/* Backdrop de la paleta en móvil */}
