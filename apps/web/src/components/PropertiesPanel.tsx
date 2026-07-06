@@ -2,6 +2,7 @@ import { useEditorStore } from '../editor/store';
 import { getNodeType } from '../editor/node-types';
 import { SchemaForm } from './SchemaForm';
 import { ConnectorForm } from './ConnectorForm';
+import { ConditionForm } from './ConditionForm';
 import { useT } from '../i18n';
 
 /** Panel de propiedades: se genera desde el config schema del tipo del nodo seleccionado. */
@@ -44,6 +45,9 @@ export function PropertiesPanel() {
       {node.kind === 'connector' ? (
         // El nodo Conector usa un editor por ACCIONES (M20): sin method/path/JSON a la vista.
         <ConnectorForm key={node.id} value={node.config} onChange={(config) => updateConfig(node.id, config)} />
+      ) : node.kind === 'condition' ? (
+        // El nodo Condición usa un constructor de reglas VISUAL (M21): sin escribir «Expresión».
+        <ConditionForm key={node.id} value={node.config} onChange={(config) => updateConfig(node.id, config)} />
       ) : (
         <SchemaForm key={node.id} schema={def.configSchema} value={node.config} onChange={(config) => updateConfig(node.id, config)} />
       )}

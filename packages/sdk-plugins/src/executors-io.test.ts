@@ -14,6 +14,17 @@ describe('Condition executor (evaluador seguro)', () => {
     expect(evalCondition('nonsense', ctx)).toBe(false);
   });
 
+  it('soporta Y (&&), O (||) y «contiene» (~) del constructor visual (M21)', () => {
+    const ctx = { ...emptyContext(), variables: { count: 5, name: 'ada lovelace' } };
+    expect(evalCondition('variables.count > 0 && variables.name == ada lovelace', ctx)).toBe(true);
+    expect(evalCondition('variables.count > 10 && variables.name == ada lovelace', ctx)).toBe(false);
+    expect(evalCondition('variables.count > 10 || variables.count < 3', ctx)).toBe(false);
+    expect(evalCondition('variables.count > 10 || variables.count >= 5', ctx)).toBe(true);
+    expect(evalCondition('variables.name ~ lovelace', ctx)).toBe(true);
+    expect(evalCondition('variables.name ~ Lovelace', ctx)).toBe(true); // case-insensitive
+    expect(evalCondition('variables.name ~ xyz', ctx)).toBe(false);
+  });
+
   it('el executor devuelve la rama y anota el resultado en el contexto', async () => {
     const exec = new ConditionNodeExecutor();
     const res = await exec.execute({

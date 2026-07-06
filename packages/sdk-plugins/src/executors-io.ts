@@ -9,9 +9,22 @@ function getPath(root: Record<string, unknown>, path: string): unknown {
   return path.split('.').reduce<unknown>((o, k) => (o == null ? undefined : (o as Record<string, unknown>)[k]), root);
 }
 
-/** Evaluador SEGURO (sin eval): `path <op> literal`. Fallback: expr === 'true'. */
+/**
+ * Evaluador SEGURO (sin eval). Soporta VARIAS cláusulas `path <op> literal` unidas por `&&` (Y) o `||` (O)
+ * — el constructor de reglas visual (M21) compila a esta forma. Un solo tipo de combinador por expresión.
+ * Fallback: expr === 'true'.
+ */
 export function evalCondition(expr: string, ctx: ExecutionContext): boolean {
-  const m = expr.match(/^\s*([\w.]+)\s*(==|!=|>=|<=|>|<)\s*(.+?)\s*$/);
+  const trimmed = expr.trim();
+  if (trimmed === '') return false;
+  if (trimmed.includes('||')) return trimmed.split('||').some((c) => evalClause(c, ctx));
+  if (trimmed.includes('&&')) return trimmed.split('&&').every((c) => evalClause(c, ctx));
+  return evalClause(trimmed, ctx);
+}
+
+/** Una sola cláusula `path <op> literal`. `~` = «contiene» (subcadena, case-insensitive). */
+function evalClause(expr: string, ctx: ExecutionContext): boolean {
+  const m = expr.match(/^\s*([\w.]+)\s*(==|!=|>=|<=|>|<|~)\s*(.+?)\s*$/);
   if (!m) return expr.trim() === 'true';
   const [, path, op, rawRight] = m;
   const left = getPath({ variables: ctx.variables, ticket: ctx.ticket, repository: ctx.repository }, path);
@@ -33,6 +46,8 @@ export function evalCondition(expr: string, ctx: ExecutionContext): boolean {
       return Number(left) >= Number(right);
     case '<=':
       return Number(left) <= Number(right);
+    case '~':
+      return String(left ?? '').toLowerCase().includes(String(right).toLowerCase());
     default:
       return false;
   }
