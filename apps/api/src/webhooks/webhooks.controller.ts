@@ -39,9 +39,11 @@ export class WebhookAdminController {
 }
 
 /**
- * Ingreso PÚBLICO de webhooks: `POST /hooks/:token`. No lleva JWT; la autenticación es la FIRMA
- * HMAC-SHA256 del cuerpo con el secreto del webhook (`x-agentflow-signature`). Devuelve 202 con el
- * executionId de la ejecución arrancada; firma inválida ⇒ 401.
+ * Ingreso PÚBLICO de webhooks: `POST /hooks/:token`. No lleva JWT. Autenticación por CUALQUIERA de:
+ *  - FIRMA HMAC-SHA256 del cuerpo con el secreto (`x-agentflow-signature`), o
+ *  - el secreto presentado como TOKEN (`x-agentflow-token`), para clientes que no pueden firmar HMAC
+ *    (p. ej. Jira Automation / Zapier, que sí pueden enviar un header estático).
+ * Devuelve 202 con el executionId; auth inválida ⇒ 401.
  */
 @Public()
 @Controller('hooks')
@@ -54,10 +56,11 @@ export class HooksController {
     @Param('token') token: string,
     @Req() req: { rawBody?: Buffer; body?: unknown },
     @Headers('x-agentflow-signature') signature?: string,
+    @Headers('x-agentflow-token') authToken?: string,
   ) {
     const rawBody = req.rawBody ?? Buffer.from(JSON.stringify(req.body ?? {}));
     try {
-      return await this.svc.ingest(token, rawBody, signature);
+      return await this.svc.ingest(token, rawBody, signature, authToken);
     } catch (e) {
       if (e instanceof UnauthorizedSignature) throw new UnauthorizedException(e.message);
       throw e;

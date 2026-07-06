@@ -79,7 +79,12 @@ export class WebhooksService {
    * Recibe una petición de webhook: valida la firma HMAC contra el secreto cifrado y, si es válida,
    * arranca una ejecución del workflow ligado con el payload en el contexto. Devuelve el executionId.
    */
-  async ingest(webhookId: string, rawBody: Buffer, signature: string | undefined): Promise<{ executionId: string; status: string }> {
+  async ingest(
+    webhookId: string,
+    rawBody: Buffer,
+    signature: string | undefined,
+    presentedToken?: string,
+  ): Promise<{ executionId: string; status: string }> {
     const wh = await this.p.webhooks.get(webhookId);
     if (!wh || !wh.active) throw new NotFoundException('Webhook no encontrado o inactivo.');
 
@@ -91,8 +96,10 @@ export class WebhooksService {
     const signingSecret = await this.p.secrets.get(wh.workspaceId, wh.signingSecretKey);
     if (!signingSecret) throw new NotFoundException('Secreto de firma no disponible.');
 
-    if (!this.verify(rawBody, signature, signingSecret)) {
-      // Error 401 lo lanza el controlador; aquí señalamos el fallo de firma.
+    // Autenticación: HMAC del cuerpo (`x-agentflow-signature`) O el secreto presentado como token
+    // (`x-agentflow-token`, para clientes que no pueden firmar HMAC, p. ej. Jira Automation/Zapier).
+    if (!this.verify(rawBody, signature, signingSecret) && !this.verifyToken(presentedToken, signingSecret)) {
+      // Error 401 lo lanza el controlador; aquí señalamos el fallo de autenticación.
       throw new UnauthorizedSignature();
     }
 
@@ -116,6 +123,14 @@ export class WebhooksService {
     const expected = WebhooksService.sign(rawBody, signingSecret);
     const a = Buffer.from(expected, 'utf8');
     const b = Buffer.from(signature, 'utf8');
+    return a.length === b.length && timingSafeEqual(a, b);
+  }
+
+  /** Auth alternativa (bearer): el secreto presentado tal cual, comparado en tiempo constante. */
+  private verifyToken(presented: string | undefined, signingSecret: string): boolean {
+    if (!presented) return false;
+    const a = Buffer.from(presented, 'utf8');
+    const b = Buffer.from(signingSecret, 'utf8');
     return a.length === b.length && timingSafeEqual(a, b);
   }
 }

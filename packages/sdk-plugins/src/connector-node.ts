@@ -66,7 +66,7 @@ export class ConnectorNodeExecutor implements INodeExecutor {
     try {
       const res = await fetch(url, { method, headers, body, signal });
       // Redacta el propio token si el endpoint lo reflejara: nunca debe quedar en estado persistido.
-      const bodyPreview = (await res.text()).slice(0, 1000).split(token).join('«redacted»');
+      const bodyPreview = (await res.text()).slice(0, 4000).split(token).join('«redacted»');
       return store({ status: res.status, ok: res.ok, provider: connector.provider, bodyPreview });
     } catch (e) {
       return store({ error: e instanceof Error ? e.message : String(e) });
