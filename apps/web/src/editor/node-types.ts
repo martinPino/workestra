@@ -65,26 +65,26 @@ export function defaultConfig(kind: string): Record<string, unknown> {
 
 registerNodeType({
   kind: 'trigger',
-  label: 'Trigger',
+  label: 'Disparador',
   icon: Zap,
   color: 'text-amber-400',
   category: 'trigger',
   configSchema: {
-    title: 'Trigger',
+    title: 'Cuándo se ejecuta',
     fields: {
-      event: { type: 'enum', label: 'Evento', options: ['manual', 'webhook', 'cron'], default: 'manual' },
+      event: { type: 'enum', label: 'Cuándo arranca', options: ['manual', 'webhook', 'cron'], default: 'manual' },
     },
   },
 });
 
 registerNodeType({
   kind: 'tool',
-  label: 'Log / Tool',
+  label: 'Anotar',
   icon: Wrench,
   color: 'text-sky-400',
   category: 'logic',
   configSchema: {
-    title: 'Log / Tool',
+    title: 'Anotar / registrar',
     fields: {
       message: { type: 'string', label: 'Mensaje', placeholder: 'Texto a registrar', multiline: true },
     },
@@ -128,14 +128,14 @@ registerNodeType({
 
 registerNodeType({
   kind: 'agent',
-  label: 'Agente',
+  label: 'Asistente',
   icon: BrainCircuit,
   color: 'text-indigo-400',
   category: 'ai',
   configSchema: {
-    title: 'Agente',
+    title: 'Asistente',
     fields: {
-      agentId: { type: 'agent', label: 'Agente' },
+      agentId: { type: 'agent', label: 'Asistente' },
       input: {
         type: 'string',
         label: 'Tarea / entrada (opcional · admite {{variables}})',
@@ -148,12 +148,12 @@ registerNodeType({
 
 registerNodeType({
   kind: 'llm',
-  label: 'LLM',
+  label: 'Redactar con IA',
   icon: Sparkles,
   color: 'text-amber-300',
   category: 'ai',
   configSchema: {
-    title: 'LLM (inline)',
+    title: 'Redactar con IA',
     fields: {
       model: {
         type: 'enum',
@@ -196,7 +196,7 @@ registerNodeType({
 
 registerNodeType({
   kind: 'human',
-  label: 'Humano',
+  label: 'Aprobación',
   icon: UserCheck,
   color: 'text-orange-400',
   category: 'control',
@@ -217,16 +217,16 @@ registerNodeType({
 
 registerNodeType({
   kind: 'router',
-  label: 'Router (coordinador)',
+  label: 'Repartir',
   icon: Split,
   color: 'text-teal-400',
   category: 'control',
   configSchema: {
-    title: 'Router — el coordinador elige el agente',
+    title: 'Repartir entre asistentes',
     fields: {
       // El coordinador cuyo modelo decide a qué agente(s) conectados enrutar. Conecta este nodo a
       // varios nodos Agente: al ejecutar, solo corren los que el coordinador elija.
-      agentId: { type: 'agent', label: 'Coordinador (decide)' },
+      agentId: { type: 'agent', label: 'Jefe de equipo (decide)' },
       input: {
         type: 'string',
         label: 'Tarea a repartir (opcional · admite {{variables}})',
@@ -241,12 +241,12 @@ registerNodeType({
 
 registerNodeType({
   kind: 'connector',
-  label: 'Conector',
+  label: 'Enviar a una app',
   icon: Plug,
   color: 'text-fuchsia-400',
   category: 'io',
   configSchema: {
-    title: 'Conector (dispatch autenticado)',
+    title: 'Enviar a una app conectada',
     fields: {
       connectorId: { type: 'connector', label: 'Conector' },
       method: { type: 'enum', label: 'Método', options: ['GET', 'POST', 'PUT', 'DELETE'], default: 'GET' },

@@ -4,6 +4,7 @@ import type { AfNodeData } from '../graph';
 import { getNodeType } from '../editor/node-types';
 import { useAgents } from '../lib/hooks';
 import { agentGradient, agentInitial } from '../lib/agent-avatar';
+import { useT } from '../i18n';
 
 const STATUS_RING: Record<string, string> = {
   running: 'ring-2 ring-primary shadow-[0_0_18px_rgb(var(--primary)/0.35)]',
@@ -16,6 +17,7 @@ const STATUS_RING: Record<string, string> = {
 const HANDLE_CLASS = '!h-2.5 !w-2.5 !border-2 !border-border !bg-elevated';
 
 export function AfNode({ data, selected }: NodeProps<AfNodeData>) {
+  const t = useT();
   const def = getNodeType(data.kind);
   const Icon = def?.icon ?? Square;
   const statusRing = data.status ? (STATUS_RING[data.status] ?? '') : '';
@@ -52,7 +54,7 @@ export function AfNode({ data, selected }: NodeProps<AfNodeData>) {
           <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border bg-elevated ${def?.color ?? 'text-txt-primary'}`}>
             <Icon size={15} strokeWidth={2} />
           </span>
-          <span className="truncate font-medium text-txt-primary">{def?.label ?? data.kind}</span>
+          <span className="truncate font-medium text-txt-primary">{def?.label ? t(def.label) : data.kind}</span>
         </div>
       )}
       <Handle type="source" position={Position.Right} className={HANDLE_CLASS} />

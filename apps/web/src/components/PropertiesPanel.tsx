@@ -33,7 +33,7 @@ export function PropertiesPanel() {
           <Icon size={17} strokeWidth={2} />
         </div>
         <div>
-          <div className={`text-xs font-semibold ${def.color}`}>{def.label}</div>
+          <div className={`text-xs font-semibold ${def.color}`}>{t(def.label)}</div>
           <div className="font-mono text-[10px] text-txt-disabled">{node.id}</div>
         </div>
       </div>

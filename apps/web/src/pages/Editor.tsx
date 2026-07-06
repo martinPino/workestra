@@ -259,21 +259,21 @@ export function Editor() {
             {/* En producción se ocultan los bloques `advanced` (p. ej. HTTP crudo); en dev se ven todos. */}
             {listNodeTypes()
               .filter((nt) => import.meta.env.DEV || !nt.advanced)
-              .map((t) => {
-              const Icon = t.icon;
+              .map((nt) => {
+              const Icon = nt.icon;
               return (
                 <button
-                  key={t.kind}
+                  key={nt.kind}
                   onClick={() => {
-                    addNode(t.kind);
+                    addNode(nt.kind);
                     setPaletteOpen(false);
                   }}
                   className="group flex items-center gap-2.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-left text-xs text-txt-primary transition-all hover:border-border-strong hover:bg-elevated"
                 >
-                  <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-elevated transition-transform group-hover:scale-105 ${t.color}`}>
+                  <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-elevated transition-transform group-hover:scale-105 ${nt.color}`}>
                     <Icon size={14} strokeWidth={2} />
                   </span>
-                  <span className="font-medium">{t.label}</span>
+                  <span className="font-medium">{t(nt.label)}</span>
                 </button>
               );
             })}

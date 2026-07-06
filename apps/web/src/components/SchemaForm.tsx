@@ -135,7 +135,7 @@ export function SchemaForm({ schema, value, onChange }: Props) {
       {entries.map(([key, field]) => (
         <div key={key} className="flex flex-col gap-3">
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-medium text-txt-secondary">{field.label}</span>
+            <span className="text-[11px] font-medium text-txt-secondary">{t(field.label)}</span>
             <Field field={field} value={value[key]} onChange={(v) => set(key, v)} />
           </label>
         </div>
