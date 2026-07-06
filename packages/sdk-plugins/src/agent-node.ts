@@ -43,11 +43,10 @@ export class AgentNodeExecutor implements INodeExecutor {
     // si no (o no hay id), se usa un agente efímero inline — nunca un agente de otro tenant.
     const agent: Agent = (agentId ? await this.agents.getInWorkspace(agentId, ctx.workspaceId) : null) ?? inlineAgent(ctx);
 
-    // Entrada del agente (M12): si el nodo define `input`, se interpola contra el contexto y se pasa
-    // como tarea (variables.task, que el runtime lee). Permite "responde a esto: {{connector:c.body}}".
-    let context = ctx.context;
+    // Entrada del agente (M12): si el nodo define `input`, se interpola y se pasa como tarea
+    // (variables.task, que el runtime lee) SOLO para esta invocación. Permite "responde a: {{...}}".
     const input = ctx.config.input != null ? interpolate(String(ctx.config.input), ctx.context) : '';
-    if (input) context = { ...ctx.context, variables: { ...ctx.context.variables, task: input } };
+    const context = input ? { ...ctx.context, variables: { ...ctx.context.variables, task: input } } : ctx.context;
 
     // El Orchestrator es "un agente cuyo output es un Plan": mismo nodo, comportamiento por flag.
     const result =
@@ -55,8 +54,21 @@ export class AgentNodeExecutor implements INodeExecutor {
         ? await this.orchestrator.run(agent, context, ctx.emit, ctx.workspaceId)
         : await this.runtime.invoke(agent, context);
 
+    // Saneamiento del contexto de salida (fixes revisión M13):
+    // 1) El `task` derivado del `input` de ESTE nodo NO debe filtrarse aguas abajo: se restaura el
+    //    task del contexto ENTRANTE (si no, un nodo Agente posterior sin `input` heredaría esta tarea
+    //    en vez de caer a ticket.title). No hace nada si el nodo no tenía input.
+    // 2) Alias ÚNICO de la salida por `nodeKey` (`agent:<nodeKey>`), además del alias por nombre, para
+    //    que dos agentes con el MISMO nombre (p. ej. dos nodos LLM) no colisionen ni pierdan datos.
+    const outVars = { ...(result.context.variables as Record<string, unknown>) };
+    const incoming = ctx.context.variables as Record<string, unknown>;
+    if ('task' in incoming) outVars.task = incoming.task;
+    else delete outVars.task;
+    const byName = outVars[`agent:${agent.name}`];
+    if (byName !== undefined) outVars[`agent:${ctx.nodeKey}`] = byName;
+
     return {
-      context: result.context,
+      context: { ...result.context, variables: outVars },
       control: { kind: 'continue' },
       usage: { tokens: result.tokens, cost: result.cost },
     };
