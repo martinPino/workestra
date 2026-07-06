@@ -9,5 +9,6 @@ import { RbacModule } from '../rbac/rbac.module';
   imports: [ExecutionModule, AuthModule, RbacModule],
   controllers: [WebhooksController, WebhookAdminController, HooksController],
   providers: [WebhooksService],
+  exports: [WebhooksService], // TriggersModule (M19) reutiliza la creación de webhooks internos.
 })
 export class WebhooksModule {}

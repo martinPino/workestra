@@ -13,6 +13,7 @@ import { AgentsModule } from './agents/agents.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { SchedulesModule } from './schedules/schedules.module';
 import { ConnectorsModule } from './connectors/connectors.module';
+import { TriggersModule } from './triggers/triggers.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { ConnectorsModule } from './connectors/connectors.module';
     WebhooksModule,
     SchedulesModule,
     ConnectorsModule,
+    TriggersModule,
   ],
   controllers: [HealthController],
   providers: [

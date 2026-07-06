@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   jiraAccessibleResources,
+  listJiraProjects,
   registerJiraWebhook,
   deleteJiraWebhooks,
   refreshJiraWebhooks,
@@ -28,6 +29,15 @@ describe('jira-webhooks', () => {
     const sites = await jiraAccessibleResources('tok', fetch);
     expect(sites).toEqual([{ id: 'cloud-123', url: 'https://acme.atlassian.net', name: 'Acme' }]);
     expect(calls[0].url).toBe('https://api.atlassian.com/oauth/token/accessible-resources');
+  });
+
+  it('lista proyectos del sitio (para el desplegable del picker)', async () => {
+    const { fetch, calls } = stubFetch(() => ({
+      json: { values: [{ key: 'KAN', name: 'Kanban', extra: 1 }, { key: 'OPS', name: 'Ops' }] },
+    }));
+    const projects = await listJiraProjects('tok', 'cloud-123', fetch);
+    expect(projects).toEqual([{ key: 'KAN', name: 'Kanban' }, { key: 'OPS', name: 'Ops' }]);
+    expect(calls[0].url).toBe('https://api.atlassian.com/ex/jira/cloud-123/rest/api/3/project/search');
   });
 
   it('registra un webhook y devuelve el id creado, con el body correcto', async () => {

@@ -15,3 +15,4 @@ export * from './adapters/secret-store';
 export * from './adapters/webhook-repo';
 export * from './adapters/schedule-repo';
 export * from './adapters/connector-repo';
+export * from './adapters/trigger-binding-repo';

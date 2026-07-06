@@ -12,6 +12,7 @@ import type {
   IWebhookRepository,
   IScheduleRepository,
   IConnectorRepository,
+  ITriggerBindingRepository,
 } from '@core/engine';
 import type { MemoryEvent } from '@core/contracts';
 import IORedis from 'ioredis';
@@ -30,6 +31,7 @@ import {
   InMemoryWebhookRepository,
   InMemoryScheduleRepository,
   InMemoryConnectorRepository,
+  InMemoryTriggerBindingRepository,
   RedisContextStore,
   PrismaWorkflowRepository,
   PrismaNodeRunRepository,
@@ -41,6 +43,7 @@ import {
   PrismaWebhookRepository,
   PrismaScheduleRepository,
   PrismaConnectorRepository,
+  PrismaTriggerBindingRepository,
 } from '@core/infra';
 
 export const PERSISTENCE = Symbol('PERSISTENCE');
@@ -64,6 +67,8 @@ export interface PersistenceBundle {
   schedules: IScheduleRepository;
   /** Conectores (M11): integraciones OAuth para dispatch saliente autenticado. */
   connectors: IConnectorRepository;
+  /** Bindings de disparador (M19): enlace receta↔workflow para triggers sin código (p. ej. Jira). */
+  triggerBindings: ITriggerBindingRepository;
   prisma?: PrismaClient;
 }
 
@@ -158,6 +163,7 @@ async function buildPersistence(): Promise<PersistenceBundle> {
       webhooks: new PrismaWebhookRepository(prisma),
       schedules: new PrismaScheduleRepository(prisma),
       connectors: new PrismaConnectorRepository(prisma),
+      triggerBindings: new PrismaTriggerBindingRepository(prisma),
     };
   }
   return {
@@ -174,6 +180,7 @@ async function buildPersistence(): Promise<PersistenceBundle> {
     webhooks: new InMemoryWebhookRepository(),
     schedules: new InMemoryScheduleRepository(),
     connectors: new InMemoryConnectorRepository(),
+    triggerBindings: new InMemoryTriggerBindingRepository(),
   };
 }
 

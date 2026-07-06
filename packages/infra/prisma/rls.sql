@@ -30,7 +30,7 @@ DO $$
 DECLARE t text;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
-    'Workflow','Agent','Execution','Webhook','ScheduledTrigger','Secret','Tool','Connector','Memory','Prompt','Plugin'
+    'Workflow','Agent','Execution','Webhook','ScheduledTrigger','TriggerBinding','Secret','Tool','Connector','Memory','Prompt','Plugin'
   ] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', t);
     EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY;', t);

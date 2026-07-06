@@ -292,6 +292,48 @@ export interface IConnectorRepository {
   delete(id: string): Promise<ConnectorRecord | null>;
 }
 
+// --------- Puerto de bindings de disparador (triggers sin código, M19) ---------
+
+export interface TriggerBindingRecord {
+  id: string;
+  workspaceId: string;
+  workflowId: string;
+  /** Receta del catálogo, p. ej. 'jira.issue_created'. */
+  eventId: string;
+  /** Conector OAuth usado para registrar el webhook en el proveedor. */
+  connectorId: string;
+  /** Webhook interno de ingreso (`/hooks/<webhookId>`) que arranca la ejecución. */
+  webhookId: string;
+  /** Id(s) del webhook creado EN el proveedor (CSV), para poder borrarlo/renovarlo. */
+  remoteId: string | null;
+  /** Parámetros de la receta: { projectKey, cloudId, … }. */
+  params: Record<string, unknown>;
+  active: boolean;
+  createdAt: string;
+}
+
+/**
+ * Registro durable del enlace disparador↔workflow (M19). Cuando el usuario elige «Cuando se crea un
+ * ticket de Jira», guardamos aquí el webhook interno + el id del webhook creado en el proveedor.
+ */
+export interface ITriggerBindingRepository {
+  create(input: {
+    workspaceId: string;
+    workflowId: string;
+    eventId: string;
+    connectorId: string;
+    webhookId: string;
+    remoteId: string | null;
+    params: Record<string, unknown>;
+  }): Promise<TriggerBindingRecord>;
+  get(id: string): Promise<TriggerBindingRecord | null>;
+  listByWorkflow(workflowId: string): Promise<TriggerBindingRecord[]>;
+  /** Todos los bindings activos (para el job que renueva los webhooks antes de caducar). */
+  listActive(): Promise<TriggerBindingRecord[]>;
+  setActive(id: string, active: boolean): Promise<void>;
+  delete(id: string): Promise<void>;
+}
+
 // --------- Puerto de secretos (credenciales cifradas en reposo, M7) ---------
 
 /**

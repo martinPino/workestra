@@ -55,6 +55,25 @@ export async function jiraAccessibleResources(token: string, fetchFn: JiraFetch)
   });
 }
 
+export interface JiraProject {
+  key: string;
+  name: string;
+}
+
+/** Proyectos del sitio Jira (para poblar el desplegable del picker; el jqlFilter usa `project = <key>`). */
+export async function listJiraProjects(token: string, cloudId: string, fetchFn: JiraFetch): Promise<JiraProject[]> {
+  const res = await fetchFn(`${jiraApi(cloudId)}/project/search`, {
+    headers: { authorization: `Bearer ${token}`, accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Jira project search: HTTP ${res.status}`);
+  const json = asRecord(await res.json());
+  const values = Array.isArray(json.values) ? json.values : [];
+  return values.map((v) => {
+    const r = asRecord(v);
+    return { key: String(r.key ?? ''), name: String(r.name ?? '') };
+  });
+}
+
 export interface RegisterWebhookInput {
   /** Nuestra URL de ingreso, YA con `?token=<secret>` (el secreto va en la URL, no en cabecera). */
   url: string;

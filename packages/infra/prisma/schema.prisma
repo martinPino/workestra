@@ -87,6 +87,7 @@ model Workflow {
   executions       Execution[]
   webhooks         Webhook[]
   schedules        ScheduledTrigger[]
+  triggerBindings  TriggerBinding[]
 
   @@index([workspaceId])
 }
@@ -334,6 +335,26 @@ model Webhook {
   active          Boolean   @default(true)
 
   @@index([workspaceId])
+}
+
+// Enlace disparador ↔ workflow para triggers SIN CÓDIGO (M19): el usuario elige «Cuando se crea un
+// ticket de Jira» y AgentFlow registra el webhook EN Jira por él. Guarda el webhook interno de ingreso
+// (`webhookId`) y el id del webhook creado en el proveedor (`remoteId`, CSV) para poder borrarlo/renovarlo.
+model TriggerBinding {
+  id          String   @id @default(cuid())
+  workspaceId String
+  workflowId  String
+  workflow    Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  eventId     String // receta del catálogo, p. ej. 'jira.issue_created'
+  connectorId String // conector OAuth usado para registrar el webhook en el proveedor
+  webhookId   String // webhook interno (/hooks/<webhookId>) que arranca la ejecución
+  remoteId    String? // id(s) del webhook creado EN el proveedor (CSV), para borrar/renovar
+  params      Json // { projectKey, cloudId, … }
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@index([workspaceId])
+  @@index([workflowId])
 }
 
 model Memory {
