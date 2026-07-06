@@ -27,6 +27,7 @@ import { SubtaskTree } from '../components/SubtaskTree';
 import { docToReactFlow, docToWorkflowGraph, workflowGraphToDoc, STARTER_DOC } from '../graph';
 import { listNodeTypes } from '../editor/node-types';
 import { useEditorStore } from '../editor/store';
+import { statusLabel } from '../lib/labels';
 import { Button, IconButton, Badge, Dot } from '../ui';
 import { useT } from '../i18n';
 
@@ -153,7 +154,7 @@ export function Editor() {
       await api.saveGraph(workflowId, docToWorkflowGraph(s().history.doc));
       s().setError(t('Guardado ✓'));
     } catch {
-      s().setError(t('Error al guardar (¿ciclo?)'));
+      s().setError(t('No se pudo guardar. Revisa que el flujo no tenga pasos en bucle.'));
     }
   };
 
@@ -207,7 +208,7 @@ export function Editor() {
           <span className="hidden max-w-[160px] truncate text-sm font-medium text-txt-primary sm:inline">{workflowName}</span>
           {publishedVersion != null && <Badge tone="primary">v{publishedVersion}</Badge>}
           <Badge tone={STATUS_TONE[execStatus] ?? 'default'}>
-            {running ? <Loader2 size={11} className="animate-spin" /> : <Dot tone={STATUS_TONE[execStatus] ?? 'default'} />} {execStatus}
+            {running ? <Loader2 size={11} className="animate-spin" /> : <Dot tone={STATUS_TONE[execStatus] ?? 'default'} />} {t(statusLabel(execStatus))}
           </Badge>
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
@@ -255,7 +256,10 @@ export function Editor() {
             </IconButton>
           </div>
           <div className="flex flex-col gap-1.5">
-            {listNodeTypes().map((t) => {
+            {/* En producción se ocultan los bloques `advanced` (p. ej. HTTP crudo); en dev se ven todos. */}
+            {listNodeTypes()
+              .filter((nt) => import.meta.env.DEV || !nt.advanced)
+              .map((t) => {
               const Icon = t.icon;
               return (
                 <button
@@ -275,7 +279,7 @@ export function Editor() {
             })}
           </div>
           <p className="mt-4 text-[10px] leading-relaxed text-txt-disabled">
-            {t('La paleta se genera desde el registro. Atajos: ⌘Z, ⌘C/⌘V, Supr.')}
+            {t('Pulsa un bloque para añadirlo al flujo. Atajos: deshacer ⌘Z, copiar ⌘C/⌘V, borrar Supr.')}
           </p>
         </aside>
 

@@ -5,8 +5,8 @@ import { useUI, type Lang } from './ui-store';
 import { IconButton } from '../ui';
 import { useT } from '../i18n';
 
+/** Devuelve la etiqueta de nav (en español, clave i18n) de la ruta actual; se traduce con t() al render. */
 function titleFor(pathname: string): string {
-  if (pathname === '/') return 'Dashboard';
   const seg = '/' + pathname.split('/')[1];
   return NAV.find((n) => n.to === seg)?.label ?? 'AgentFlow';
 }
@@ -50,7 +50,7 @@ export function Topbar() {
         </IconButton>
         <span className="hidden text-txt-secondary sm:inline">AgentFlow</span>
         <span className="hidden text-txt-disabled sm:inline">/</span>
-        <span className="truncate font-medium text-txt-primary">{titleFor(pathname)}</span>
+        <span className="truncate font-medium text-txt-primary">{t(titleFor(pathname))}</span>
       </div>
 
       <div className="flex items-center gap-1.5">

@@ -8,18 +8,20 @@ import { Card, Badge, Dot, PageHeader, Tabs, Button, Input, EmptyState } from '.
 import { useExecutions, useReviews } from '../lib/hooks';
 import { api, type ExecutionRow, type ReviewDto } from '../lib/api';
 import { useAuth, canApprove } from '../lib/auth';
+import { statusLabel, triggerLabel } from '../lib/labels';
 import { useT } from '../i18n';
 
 type Tone = 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'accent';
 
-const STATUS: Record<string, { tone: Tone; icon: React.ReactNode; label: string }> = {
-  SUCCEEDED: { tone: 'success', icon: <CircleCheck size={13} />, label: 'succeeded' },
-  FAILED: { tone: 'danger', icon: <CircleX size={13} />, label: 'failed' },
-  RUNNING: { tone: 'primary', icon: <Loader2 size={13} className="animate-spin" />, label: 'running' },
-  QUEUED: { tone: 'default', icon: <Clock size={13} />, label: 'queued' },
-  WAITING_HUMAN: { tone: 'warning', icon: <UserCheck size={13} />, label: 'waiting human' },
-  PAUSED: { tone: 'warning', icon: <Clock size={13} />, label: 'paused' },
-  CANCELLED: { tone: 'default', icon: <CircleX size={13} />, label: 'cancelled' },
+// Solo tono + icono: la etiqueta legible sale de statusLabel() (mismo texto en tabla, detalle y editor).
+const STATUS: Record<string, { tone: Tone; icon: React.ReactNode }> = {
+  SUCCEEDED: { tone: 'success', icon: <CircleCheck size={13} /> },
+  FAILED: { tone: 'danger', icon: <CircleX size={13} /> },
+  RUNNING: { tone: 'primary', icon: <Loader2 size={13} className="animate-spin" /> },
+  QUEUED: { tone: 'default', icon: <Clock size={13} /> },
+  WAITING_HUMAN: { tone: 'warning', icon: <UserCheck size={13} /> },
+  PAUSED: { tone: 'warning', icon: <Clock size={13} /> },
+  CANCELLED: { tone: 'default', icon: <CircleX size={13} /> },
 };
 
 const fmtCost = (c: number) => (c === 0 ? '—' : `$${c.toFixed(c < 0.01 ? 4 : 3)}`);
@@ -90,6 +92,7 @@ export function ReviewActions({ executionId }: { executionId: string }) {
 }
 
 function ExecRow({ e, i }: { e: ExecutionRow; i: number }) {
+  const t = useT();
   const s = STATUS[e.status] ?? STATUS.QUEUED;
   const waiting = e.status === 'WAITING_HUMAN';
   return (
@@ -97,10 +100,10 @@ function ExecRow({ e, i }: { e: ExecutionRow; i: number }) {
       <div className={`grid ${GRID} items-center gap-4 text-sm`}>
         <Link to={`/executions/${e.id}`} className="group flex min-w-0 items-center gap-2">
           <span className="font-mono text-[11px] text-txt-disabled group-hover:text-primary">{e.id.slice(0, 12)}</span>
-          <span className="truncate text-txt-secondary group-hover:text-txt-primary group-hover:underline">{e.triggerType}</span>
+          <span className="truncate text-txt-secondary group-hover:text-txt-primary group-hover:underline">{t(triggerLabel(e.triggerType))}</span>
         </Link>
         <Badge tone={s.tone}>
-          {s.icon} {s.label}
+          {s.icon} {t(statusLabel(e.status))}
         </Badge>
         <span className="whitespace-nowrap text-xs text-txt-secondary">{fmtTime(e.createdAt)}</span>
         <span className="text-txt-secondary">{e.tokensUsed.toLocaleString()}</span>

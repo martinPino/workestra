@@ -104,7 +104,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   connect: (source, target, sourceHandle) => {
     const doc = get().history.doc;
     if (wouldCreateCycle(doc.edges, source, target)) {
-      get().setError('Conexión rechazada: crearía un ciclo (el grafo debe ser un DAG).');
+      get().setError('No se puede conectar: el flujo debe avanzar en una sola dirección (sin bucles).');
       return false;
     }
     if (doc.edges.some((e) => e.source === source && e.target === target)) return false;

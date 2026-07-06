@@ -25,6 +25,7 @@ import { AfNode } from '../nodes/AfNode';
 import { CommentNode } from '../nodes/CommentNode';
 import { Badge, IconButton, EmptyState } from '../ui';
 import { ReviewActions } from './Executions';
+import { statusLabel } from '../lib/labels';
 import { cn } from '../lib/cn';
 import { useT } from '../i18n';
 
@@ -190,7 +191,7 @@ export function ExecutionDetail() {
             <ArrowLeft size={14} /> {t('Ejecuciones')}
           </Link>
           <span className="font-mono text-[11px] text-txt-disabled">{data.executionId}</span>
-          <Badge tone={STATUS_TONE[shownStatus] ?? 'default'}>{shownStatus}</Badge>
+          <Badge tone={STATUS_TONE[shownStatus] ?? 'default'}>{t(statusLabel(shownStatus))}</Badge>
           {!live && <Badge tone="accent">replay · {position}/{events.length}</Badge>}
         </div>
         <div className="flex items-center gap-3 text-xs text-txt-secondary">

@@ -374,7 +374,8 @@ function ConnectorsManager() {
         <>
           {err && <p className="mb-2 text-xs text-danger">{err}</p>}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {(providers ?? []).map((p, i) => {
+            {/* «Dev (mock)» es un proveedor de pruebas: se oculta al usuario final en producción (M16). */}
+            {(providers ?? []).filter((p) => import.meta.env.DEV || p.provider !== 'dev').map((p, i) => {
               const c = byProvider.get(p.provider);
               const connected = c?.status === 'connected';
               return (
@@ -416,9 +417,12 @@ function ConnectorsManager() {
               );
             })}
           </div>
-          <p className="mt-3 flex items-center gap-1.5 text-xs text-txt-disabled">
-            <Dot tone="default" /> {t('«Dev» funciona sin configurar (OAuth simulado). Slack/Jira/GitHub se activan al fijar sus')} <span className="font-mono">*_CLIENT_ID/SECRET</span> {t('en el servidor y registrar la redirect URI')} <span className="font-mono">/connectors/callback</span>.
-          </p>
+          {/* Nota para desarrolladores (config de servidor): oculta al usuario final en producción (M16). */}
+          {import.meta.env.DEV && (
+            <p className="mt-3 flex items-center gap-1.5 text-xs text-txt-disabled">
+              <Dot tone="default" /> {t('«Dev» funciona sin configurar (OAuth simulado). Slack/Jira/GitHub se activan al fijar sus')} <span className="font-mono">*_CLIENT_ID/SECRET</span> {t('en el servidor y registrar la redirect URI')} <span className="font-mono">/connectors/callback</span>.
+            </p>
+          )}
         </>
       )}
     </div>

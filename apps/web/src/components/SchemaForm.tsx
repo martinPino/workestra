@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { NodeConfigSchema, FieldSchema } from '../editor/node-types';
 import { CONNECTOR_ACTIONS } from '../editor/connector-actions';
 import { useConnectors, useAgents } from '../lib/hooks';
@@ -63,6 +64,54 @@ function ActionTemplatePicker({
         ))}
       </select>
     </label>
+  );
+}
+
+/** Unidades de tiempo humanas → milisegundos. El valor guardado SIEMPRE es ms (el motor no cambia). */
+const DURATION_UNITS: { key: string; label: string; ms: number }[] = [
+  { key: 'ms', label: 'ms', ms: 1 },
+  { key: 's', label: 'segundos', ms: 1_000 },
+  { key: 'm', label: 'minutos', ms: 60_000 },
+  { key: 'h', label: 'horas', ms: 3_600_000 },
+  { key: 'd', label: 'días', ms: 86_400_000 },
+];
+
+/** Elige la mayor unidad en la que `ms` se expresa como entero exacto (p. ej. 60000 → «1 minuto»). */
+function bestUnit(ms: number): (typeof DURATION_UNITS)[number] {
+  if (!ms) return DURATION_UNITS[1]; // 0 → segundos por defecto (evita mostrar «0 ms»)
+  for (let i = DURATION_UNITS.length - 1; i >= 1; i--) {
+    if (ms % DURATION_UNITS[i].ms === 0) return DURATION_UNITS[i];
+  }
+  return DURATION_UNITS[0];
+}
+
+/**
+ * Campo de duración: número + selector de unidad para quien no piensa en milisegundos. Guarda ms.
+ * Cambiar de unidad NO altera la duración real: solo re-expresa el mismo valor (60000 ms ↔ 1 min).
+ */
+function DurationField({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) {
+  const t = useT();
+  const ms = Number(value ?? 0);
+  const [unitKey, setUnitKey] = useState(() => bestUnit(ms).key);
+  const unit = DURATION_UNITS.find((u) => u.key === unitKey) ?? DURATION_UNITS[1];
+  const amount = ms / unit.ms;
+  return (
+    <div className="flex gap-2">
+      <input
+        type="number"
+        min={0}
+        value={Number.isFinite(amount) ? amount : 0}
+        onChange={(e) => onChange(e.target.value === '' ? 0 : Math.round(Number(e.target.value) * unit.ms))}
+        className={`${inputBase} w-full`}
+      />
+      <select value={unitKey} onChange={(e) => setUnitKey(e.target.value)} className={inputBase}>
+        {DURATION_UNITS.map((u) => (
+          <option key={u.key} value={u.key}>
+            {t(u.label)}
+          </option>
+        ))}
+      </select>
+    </div>
   );
 }
 
@@ -146,6 +195,9 @@ function Field({ field, value, onChange }: { field: FieldSchema; value: unknown;
   }
   if (field.type === 'agent') {
     return <AgentSelect value={value} onChange={onChange} />;
+  }
+  if (field.type === 'duration') {
+    return <DurationField value={value} onChange={onChange} />;
   }
   if (field.type === 'boolean') {
     return <input type="checkbox" checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 accent-[rgb(var(--primary))]" />;

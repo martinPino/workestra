@@ -50,7 +50,7 @@ export function CommandPalette() {
   const actions: Action[] = useMemo(() => {
     const nav: Action[] = NAV.map((n) => ({
       id: `nav-${n.to}`,
-      label: `${t('Ir a')} ${n.label}`,
+      label: `${t('Ir a')} ${t(n.label)}`,
       hint: t('Navegación'),
       icon: <n.icon size={16} />,
       run: () => navigate(n.to),

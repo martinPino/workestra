@@ -16,13 +16,15 @@ export interface NavItem {
   icon: LucideIcon;
 }
 
+// Etiquetas orientadas a TAREA, no a jerga técnica (M16). Están en español (clave i18n): los sitios de
+// render (Sidebar, Topbar, CommandPalette) las envuelven con t() para traducir al inglés.
 export const NAV: NavItem[] = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/workflows', label: 'Workflows', icon: Workflow },
-  { to: '/agents', label: 'Agents', icon: Bot },
-  { to: '/executions', label: 'Executions', icon: Activity },
-  { to: '/marketplace', label: 'Marketplace', icon: Store },
-  { to: '/tools', label: 'Tools', icon: Wrench },
-  { to: '/integrations', label: 'Integrations', icon: Plug },
-  { to: '/settings', label: 'Settings', icon: Settings },
+  { to: '/', label: 'Inicio', icon: LayoutDashboard },
+  { to: '/workflows', label: 'Automatizaciones', icon: Workflow },
+  { to: '/agents', label: 'Asistentes', icon: Bot },
+  { to: '/executions', label: 'Historial', icon: Activity },
+  { to: '/marketplace', label: 'Plantillas', icon: Store },
+  { to: '/tools', label: 'Acciones', icon: Wrench },
+  { to: '/integrations', label: 'Conexiones', icon: Plug },
+  { to: '/settings', label: 'Ajustes', icon: Settings },
 ];

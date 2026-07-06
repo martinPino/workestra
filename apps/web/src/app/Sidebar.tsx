@@ -92,7 +92,7 @@ export function Sidebar() {
                     />
                   )}
                   <item.icon size={18} className={cn('relative shrink-0', isActive && 'text-primary')} />
-                  {!collapsedEff && <span className="relative">{item.label}</span>}
+                  {!collapsedEff && <span className="relative">{t(item.label)}</span>}
                 </>
               )}
             </NavLink>

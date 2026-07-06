@@ -4,7 +4,8 @@ import { Zap, Wrench, GitBranch, Globe, BrainCircuit, Sparkles, Timer, UserCheck
 /** Subconjunto de JSON Schema que entiende el NodePropertiesPanel. */
 export interface FieldSchema {
   // `connector`/`agent`: desplegables poblados con los conectores/agentes del workspace (guarda su id).
-  type: 'string' | 'number' | 'boolean' | 'enum' | 'connector' | 'agent';
+  // `duration`: número + unidad (seg/min/horas/días) para gente que no piensa en milisegundos; guarda ms.
+  type: 'string' | 'number' | 'boolean' | 'enum' | 'connector' | 'agent' | 'duration';
   label: string;
   default?: unknown;
   placeholder?: string;
@@ -26,6 +27,9 @@ export interface NodeTypeDef {
   color: string; // clase Tailwind del acento
   category: 'trigger' | 'logic' | 'io' | 'ai' | 'control';
   configSchema: NodeConfigSchema;
+  // `advanced`: bloque para desarrolladores (p. ej. HTTP crudo). Se oculta de la paleta en producción;
+  // sigue registrado para que los flujos que ya lo usan se rendericen. M24 añadirá un toggle "avanzado".
+  advanced?: boolean;
 }
 
 /**
@@ -112,6 +116,7 @@ registerNodeType({
   icon: Globe,
   color: 'text-emerald-400',
   category: 'io',
+  advanced: true, // bloque técnico: fuera de la paleta para el usuario no-dev (M16)
   configSchema: {
     title: 'Petición HTTP',
     fields: {
@@ -185,7 +190,7 @@ registerNodeType({
   category: 'control',
   configSchema: {
     title: 'Espera',
-    fields: { ms: { type: 'number', label: 'Milisegundos', default: 500 } },
+    fields: { ms: { type: 'duration', label: 'Duración', default: 500 } },
   },
 });
 
@@ -205,7 +210,7 @@ registerNodeType({
         multiline: true,
         default: 'Aprobación humana requerida',
       },
-      ttlMs: { type: 'number', label: 'Caducidad (ms · 0 = sin límite)', default: 0 },
+      ttlMs: { type: 'duration', label: 'Caducidad (0 = sin límite)', default: 0 },
     },
   },
 });
