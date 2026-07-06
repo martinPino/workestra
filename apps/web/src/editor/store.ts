@@ -24,6 +24,7 @@ import {
   addComment,
   updateComment,
   removeComment,
+  replaceGraph as replaceGraphCmd,
   type Move,
 } from './commands';
 import { wouldCreateCycle } from './cycle';
@@ -49,6 +50,8 @@ interface EditorState {
 
   loadDoc(doc: GraphDoc, meta: { id: string; name: string }): void;
   dispatchCmd(cmd: Command): void;
+  /** Reemplaza nodos+aristas (edición de IA) conservando comentarios y de forma REVERSIBLE (⌘Z). */
+  replaceGraph(nodes: EditorNode[], edges: EditorEdge[]): void;
   undo(): void;
   redo(): void;
   setSelection(nodes: string[], edges: string[]): void;
@@ -90,6 +93,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ ...withFlags(createHistory(doc)), workflowId: meta.id, workflowName: meta.name, selection: [], selectedEdges: [] }),
 
   dispatchCmd: (cmd) => set(withFlags(busDispatch(get().history, cmd))),
+  replaceGraph: (nodes, edges) => get().dispatchCmd(replaceGraphCmd(get().history.doc, nodes, edges)),
   undo: () => set(withFlags(busUndo(get().history))),
   redo: () => set(withFlags(busRedo(get().history))),
 

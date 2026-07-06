@@ -13,6 +13,7 @@ import {
   addComment,
   updateComment,
   removeComment,
+  replaceGraph,
 } from './commands';
 import { createHistory, dispatch, undo, redo } from './command-bus';
 
@@ -82,6 +83,25 @@ describe('CommandBus — apply∘invert = identidad', () => {
       const back = cmd.undo(cmd.redo(doc));
       expect(normalizeDoc(back)).toEqual(normalizeDoc(doc));
     }
+  });
+
+  it('replaceGraph (edición de IA) conserva las notas y es reversible', () => {
+    const doc: GraphDoc = {
+      nodes: [{ id: 'a', kind: 'trigger', position: { x: 0, y: 0 }, config: {} }],
+      edges: [],
+      comments: [{ id: 'c0', text: 'mi nota', position: { x: 5, y: 5 } }],
+    };
+    const newNodes: EditorNode[] = [
+      { id: 'a', kind: 'trigger', position: { x: 0, y: 0 }, config: {} },
+      { id: 'b', kind: 'end', position: { x: 200, y: 0 }, config: {} },
+    ];
+    const newEdges = [{ id: 'e', source: 'a', target: 'b', sourceHandle: null }];
+    const cmd = replaceGraph(doc, newNodes, newEdges);
+    const after = cmd.redo(doc);
+    expect(after.nodes.map((n) => n.id)).toEqual(['a', 'b']);
+    expect(after.edges).toEqual(newEdges);
+    expect(after.comments).toEqual(doc.comments); // NO borra las notas del usuario
+    expect(normalizeDoc(cmd.undo(after))).toEqual(normalizeDoc(doc)); // reversible con ⌘Z
   });
 
   it('una secuencia de comandos se deshace por completo hasta el estado inicial', () => {

@@ -19,6 +19,21 @@ export function addNode(node: EditorNode): Command {
   };
 }
 
+/**
+ * Reemplaza TODO el grafo (nodos + aristas) — p. ej. una reescritura del chat de IA (M30). Conserva los
+ * comentarios/notas (spread `...d`) y es REVERSIBLE con ⌘Z (guarda el grafo previo para invertir), en vez de
+ * `loadDoc` que borra las notas y resetea el historial.
+ */
+export function replaceGraph(doc: GraphDoc, nodes: EditorNode[], edges: EditorEdge[]): Command {
+  const prevNodes = doc.nodes;
+  const prevEdges = doc.edges;
+  return {
+    label: 'Rehacer flujo con IA',
+    redo: (d) => ({ ...d, nodes, edges }),
+    undo: (d) => ({ ...d, nodes: prevNodes, edges: prevEdges }),
+  };
+}
+
 export function removeNodes(doc: GraphDoc, ids: string[]): Command {
   const set = new Set(ids);
   const nodes = doc.nodes.filter((n) => set.has(n.id));

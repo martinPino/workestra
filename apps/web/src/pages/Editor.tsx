@@ -305,7 +305,15 @@ export function Editor() {
           <Button size="sm" variant="subtle" onClick={() => s().addCommentAt({ x: 260, y: 120 })}>
             <StickyNote size={14} /> {t('Nota')}
           </Button>
-          <Button size="sm" variant={aiChatOpen ? 'primary' : 'subtle'} onClick={() => setAiChatOpen((v) => !v)}>
+          <Button
+            size="sm"
+            variant={aiChatOpen ? 'primary' : 'subtle'}
+            onClick={() => {
+              const next = !aiChatOpen;
+              setAiChatOpen(next);
+              if (next) setInspectorOpen(false); // panel derecho único: evita el solape (sobre todo en móvil)
+            }}
+          >
             <Sparkles size={14} /> {t('IA')}
           </Button>
           <div className="mx-1 h-4 w-px bg-border" />
@@ -390,6 +398,7 @@ export function Editor() {
               if (node.type === 'af') {
                 s().setSelection([node.id], []);
                 setInspectorOpen(true);
+                setAiChatOpen(false); // panel derecho único
               }
             }}
             onPaneClick={() => s().setSelection([], [])}
@@ -427,7 +436,13 @@ export function Editor() {
           </aside>
         ) : (
           <aside className="flex w-11 shrink-0 flex-col items-center border-l border-border bg-surface py-2">
-            <IconButton aria-label={t('Mostrar inspector')} onClick={() => setInspectorOpen(true)}>
+            <IconButton
+              aria-label={t('Mostrar inspector')}
+              onClick={() => {
+                setInspectorOpen(true);
+                setAiChatOpen(false);
+              }}
+            >
               <PanelRightOpen size={16} />
             </IconButton>
           </aside>

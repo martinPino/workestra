@@ -131,7 +131,14 @@ export class WorkflowsService {
         attempt === 0
           ? base
           : [...base, { role: 'user' as const, content: `El JSON anterior no fue válido (${lastErr}). Devuelve SOLO el JSON corregido, sin texto.` }];
-      const res = await this.llm.chat({ model, messages });
+      let res;
+      try {
+        res = await this.llm.chat({ model, messages });
+      } catch (e) {
+        // El LLM puede fallar (límite de peticiones, contexto, red). NO debe reventar con 500: reintenta.
+        lastErr = `error del modelo: ${e instanceof Error ? e.message : String(e)}`;
+        continue;
+      }
       const jsonStr = extractJsonObject(res.content ?? '');
       if (!jsonStr) {
         lastErr = 'no se encontró JSON en la respuesta';
@@ -153,6 +160,12 @@ export class WorkflowsService {
       const dag = validateDag(g.data);
       if (!dag.valid) {
         lastErr = `no es un DAG válido: ${dag.errors.join('; ')}`;
+        continue;
+      }
+      // Un grafo vacío/sin inicio es válido para el schema+DAG, pero NO es un flujo: reintenta en vez de
+      // devolverlo (si no, en la edición sobrescribiría y destruiría el flujo del usuario).
+      if (!g.data.nodes.some((n) => n.type === 'trigger')) {
+        lastErr = 'el flujo debe tener un nodo de inicio (trigger)';
         continue;
       }
       const name = typeof obj.name === 'string' && obj.name.trim() ? obj.name.trim().slice(0, 80) : 'Automatización con IA';

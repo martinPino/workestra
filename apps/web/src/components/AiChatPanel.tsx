@@ -34,11 +34,15 @@ export function AiChatPanel({ onClose }: { onClose: () => void }) {
       // El grafo ES el estado: mandamos el actual + la instrucción, sin arrastrar historial de chat.
       const current = docToWorkflowGraph(useEditorStore.getState().history.doc);
       const { graph } = await api.editWorkflowGraph(current, instruction);
-      const s = useEditorStore.getState();
-      s.loadDoc(workflowGraphToDoc(graph), { id: s.workflowId ?? 'local', name: s.workflowName ?? '' });
-      setMessages((m) => [...m, { role: 'ai', text: t('Listo, actualicé el flujo. ¿Algo más?') }]);
-    } catch {
-      setMessages((m) => [...m, { role: 'ai', text: t('No pude aplicar ese cambio. Prueba a decirlo de otra forma.') }]);
+      const newDoc = workflowGraphToDoc(graph);
+      // replaceGraph (no loadDoc): conserva las notas del usuario y es REVERSIBLE con ⌘Z.
+      useEditorStore.getState().replaceGraph(newDoc.nodes, newDoc.edges);
+      setMessages((m) => [...m, { role: 'ai', text: t('Listo, actualicé el flujo. Pulsa ⌘Z para deshacer.') }]);
+    } catch (e) {
+      // Muestra el motivo real del backend (p. ej. «descripción demasiado larga») en vez de un genérico.
+      const detail = e instanceof Error ? (e.message.match(/^HTTP \d+:\s*(.+)/)?.[1] ?? '') : '';
+      setMessages((m) => [...m, { role: 'ai', text: detail ? `${t('No pude aplicar ese cambio.')} ${detail}` : t('No pude aplicar ese cambio. Prueba a decirlo de otra forma.') }]);
+      setInput(instruction); // no perder el texto si falló
     } finally {
       setBusy(false);
     }
@@ -60,7 +64,7 @@ export function AiChatPanel({ onClose }: { onClose: () => void }) {
         </IconButton>
       </div>
 
-      <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-3">
+      <div ref={scrollRef} aria-live="polite" className="flex-1 space-y-3 overflow-y-auto p-3">
         {messages.map((m, i) => (
           <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
             <div

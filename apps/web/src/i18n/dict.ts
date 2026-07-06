@@ -208,6 +208,8 @@ export const EN: Record<string, string> = {
   IA: 'AI',
   'Dime qué quieres cambiar en el flujo y lo hago. Ej.: «añade un aviso a Slack al final».': 'Tell me what to change in the flow and I’ll do it. E.g.: “add a Slack alert at the end”.',
   'Listo, actualicé el flujo. ¿Algo más?': 'Done, I updated the flow. Anything else?',
+  'Listo, actualicé el flujo. Pulsa ⌘Z para deshacer.': 'Done, I updated the flow. Press ⌘Z to undo.',
+  'No pude aplicar ese cambio.': "I couldn't apply that change.",
   'No pude aplicar ese cambio. Prueba a decirlo de otra forma.': "I couldn't apply that change. Try rephrasing it.",
   'Añade un aviso a Slack al final': 'Add a Slack alert at the end',
   'Cambia el disparador a cada mañana': 'Change the trigger to every morning',
