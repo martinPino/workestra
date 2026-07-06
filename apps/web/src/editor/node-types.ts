@@ -120,8 +120,23 @@ registerNodeType({
   configSchema: {
     title: 'Petición HTTP',
     fields: {
-      method: { type: 'enum', label: 'Método', options: ['GET', 'POST', 'PUT', 'DELETE'], default: 'GET' },
-      url: { type: 'string', label: 'URL', placeholder: 'https://api.example.com/…' },
+      method: { type: 'enum', label: 'Método', options: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], default: 'GET' },
+      url: { type: 'string', label: 'URL', placeholder: 'https://api.example.com/… (admite {{variables}})' },
+      // Cabeceras y cuerpo admiten {{...}} para usar la salida de otros nodos y para meter tu API key.
+      headers: {
+        type: 'string',
+        label: 'Cabeceras (JSON, opcional · admite {{variables}})',
+        placeholder: '{"Authorization":"Bearer TU_API_KEY"}',
+        multiline: true,
+        format: 'json',
+      },
+      body: {
+        type: 'string',
+        label: 'Cuerpo (JSON, opcional · admite {{variables}})',
+        placeholder: '{"model":"gpt-4.1-mini","messages":[{"role":"user","content":"{{http:noticias.json.articles.0.title}}"}]}',
+        multiline: true,
+        format: 'json',
+      },
     },
   },
 });

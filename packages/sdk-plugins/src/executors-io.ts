@@ -1,9 +1,39 @@
 import type { INodeExecutor, NodeExecutionContext, NodeResult, NodeType, ExecutionContext } from '@core/contracts';
+import { interpolate } from './interpolate';
 
 /**
  * Primeros executors REALES como plugins (Strategy): Condición y HTTP.
  * Se registran en el NodeExecutorRegistry sin tocar el runner (Open/Closed).
  */
+
+/** Parsea la respuesta a JSON para exponerla a nodos posteriores (`{{http:nodo.json.…}}`), solo si es
+ *  pequeña (≤64 KB, no infla el contexto persistido) y es JSON válido. `undefined` en caso contrario. */
+export function safeHttpJson(text: string): unknown {
+  if (text.length > 64_000) return undefined;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Parsea el campo `headers` (objeto JSON, ya interpolado) a un mapa string→string apto para fetch.
+ *  Tolera vacío/no-objeto devolviendo `{}` — nunca lanza, para no tumbar el nodo por un JSON mal escrito. */
+export function parseHeaders(raw: string): Record<string, string> {
+  const s = raw.trim();
+  if (!s) return {};
+  try {
+    const obj = JSON.parse(s) as Record<string, unknown>;
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return {};
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (v != null) out[k] = typeof v === 'string' ? v : String(v);
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
 
 function getPath(root: Record<string, unknown>, path: string): unknown {
   return path.split('.').reduce<unknown>((o, k) => (o == null ? undefined : (o as Record<string, unknown>)[k]), root);
@@ -71,23 +101,41 @@ export class ConditionNodeExecutor implements INodeExecutor {
 
 export class HttpNodeExecutor implements INodeExecutor {
   readonly type: NodeType = 'api';
-  constructor(private readonly timeoutMs = 10_000) {}
+  // 30 s por defecto: las APIs externas (generación de imágenes, LLMs) tardan más que un webhook interno.
+  constructor(private readonly timeoutMs = 30_000) {}
 
   async execute(ctx: NodeExecutionContext): Promise<NodeResult> {
-    const url = String(ctx.config.url ?? '');
-    const method = String(ctx.config.method ?? 'GET');
-    if (!url) return { context: ctx.context, control: { kind: 'continue' } };
+    // URL, cabeceras y cuerpo admiten {{variables}}: así el nodo puede usar la salida de pasos previos
+    // (p. ej. la API key de una cabecera, o `{{http:noticias.json.articles.0.title}}` en el cuerpo).
+    const url = interpolate(String(ctx.config.url ?? ''), ctx.context);
+    const method = String(ctx.config.method ?? 'GET').toUpperCase();
+
+    const store = (result: Record<string, unknown>): NodeResult => ({
+      context: { ...ctx.context, variables: { ...ctx.context.variables, [`http:${ctx.nodeKey}`]: result } },
+      control: { kind: 'continue' },
+    });
+    if (!url) return store({ error: 'http: falta la URL en la config del nodo.' });
+
+    const headers = parseHeaders(interpolate(String(ctx.config.headers ?? ''), ctx.context, true));
+    let body: string | undefined;
+    if (method !== 'GET' && method !== 'HEAD' && ctx.config.body != null) {
+      const raw = ctx.config.body;
+      const bodyStr = typeof raw === 'string' ? raw : JSON.stringify(raw);
+      if (bodyStr.trim()) {
+        body = interpolate(bodyStr, ctx.context, true); // jsonSafe: escapa strings incrustados
+        if (!('content-type' in headers) && !('Content-Type' in headers)) headers['content-type'] = 'application/json';
+      }
+    }
 
     const signal = AbortSignal.any([ctx.signal, AbortSignal.timeout(this.timeoutMs)]);
-    let result: Record<string, unknown>;
     try {
-      const res = await fetch(url, { method, signal });
-      const bodyPreview = (await res.text()).slice(0, 500);
-      result = { status: res.status, ok: res.ok, bodyPreview };
+      const res = await fetch(url, { method, headers, body, signal });
+      const text = await res.text();
+      const bodyPreview = text.slice(0, 4000);
+      const json = safeHttpJson(text); // respuesta parseada para {{http:nodo.json.…}}
+      return store({ status: res.status, ok: res.ok, bodyPreview, json });
     } catch (e) {
-      result = { error: e instanceof Error ? e.message : String(e) };
+      return store({ error: e instanceof Error ? e.message : String(e) });
     }
-    const variables = { ...ctx.context.variables, [`http:${ctx.nodeKey}`]: result };
-    return { context: { ...ctx.context, variables }, control: { kind: 'continue' } };
   }
 }

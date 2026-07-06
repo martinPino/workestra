@@ -215,6 +215,17 @@ export const EN: Record<string, string> = {
   'Cambia el disparador a cada mañana': 'Change the trigger to every morning',
   'Añade un paso que resuma con IA': 'Add a step that summarizes with AI',
   'Actualizando el flujo…': 'Updating the flow…',
+  // --- M31 · «Pensando» por pasos + nodo HTTP en la IA ---
+  Pensando: 'Thinking',
+  'Analizando tu petición': 'Analyzing your request',
+  'Eligiendo los nodos adecuados': 'Choosing the right nodes',
+  'Conectando los pasos': 'Connecting the steps',
+  'Validando el flujo': 'Validating the flow',
+  'Voy a construir este flujo paso a paso: analizo lo que pides y elijo los nodos adecuados.':
+    "I'll build this flow step by step: I analyze what you ask and pick the right nodes.",
+  'Voy a aplicar tu cambio: analizo el flujo y ajusto los nodos.':
+    "I'll apply your change: I analyze the flow and adjust the nodes.",
+  'La IA no pudo montar el flujo.': "The AI couldn't build the flow.",
   'Escribe un cambio…': 'Type a change…',
   'Instrucción para la IA': 'Instruction for the AI',
   'Enviar': 'Send',

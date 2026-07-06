@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Sparkles, X, ArrowUp, Loader2 } from 'lucide-react';
+import { Sparkles, X, ArrowUp } from 'lucide-react';
 import { IconButton } from '../ui';
 import { useEditorStore } from '../editor/store';
 import { docToWorkflowGraph, workflowGraphToDoc } from '../graph';
+import { ThinkingSteps } from './ThinkingSteps';
 import { api } from '../lib/api';
 import { useT } from '../i18n';
 
@@ -79,8 +80,13 @@ export function AiChatPanel({ onClose }: { onClose: () => void }) {
           </div>
         ))}
         {busy && (
-          <div className="flex items-center gap-2 px-1 text-[11px] text-txt-disabled">
-            <Loader2 size={12} className="animate-spin" /> {t('Actualizando el flujo…')}
+          <div className="flex justify-start">
+            <div className="w-full max-w-[92%] space-y-2">
+              <p className="px-1 text-[11px] leading-relaxed text-txt-secondary">
+                {t('Voy a aplicar tu cambio: analizo el flujo y ajusto los nodos.')}
+              </p>
+              <ThinkingSteps />
+            </div>
           </div>
         )}
         {messages.length <= 1 && !busy && (

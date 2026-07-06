@@ -9,6 +9,7 @@ import { useWorkflows } from '../lib/hooks';
 import { api, type WorkflowDto } from '../lib/api';
 import { STARTER_DOC, docToWorkflowGraph } from '../graph';
 import { WORKFLOW_TEMPLATES, type WorkflowTemplate } from '../editor/templates';
+import { ThinkingSteps } from '../components/ThinkingSteps';
 import { useT } from '../i18n';
 
 /** Estado del diálogo «ponle nombre antes de crear». `template` null = empezar en blanco. */
@@ -86,8 +87,10 @@ export function Workflows() {
       const wf = await api.createWorkflow(name, graph);
       await qc.invalidateQueries({ queryKey: ['workflows'] });
       navigate(`/workflows/${wf.id}?ai=1`); // abre el chat de IA para seguir puliendo (M30)
-    } catch {
-      setAiErr(t('La IA no pudo montar el flujo. Reformula la descripción o inténtalo de nuevo.'));
+    } catch (e) {
+      // Muestra el motivo real del backend (p. ej. «el flujo debe tener un nodo de inicio») si lo hay.
+      const detail = e instanceof Error ? (e.message.match(/^HTTP \d+:\s*(.+)/)?.[1] ?? '') : '';
+      setAiErr(detail ? `${t('La IA no pudo montar el flujo.')} ${detail}` : t('La IA no pudo montar el flujo. Reformula la descripción o inténtalo de nuevo.'));
       setAiBusy(false);
     }
   };
@@ -263,42 +266,60 @@ function AiDialog({
           <X size={16} />
         </IconButton>
       </div>
-      <div className="mt-4">
-        <Textarea
-          autoFocus
-          rows={4}
-          value={prompt}
-          onChange={(e) => onPrompt(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-              e.preventDefault();
-              onSubmit();
-            }
-          }}
-          placeholder={t('Ej.: cuando reciba un correo, resúmelo y mándalo a Slack #general.')}
-          aria-label={t('Descripción de la automatización')}
-        />
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {examples.map((ex) => (
-            <button
-              key={ex}
-              onClick={() => onPrompt(ex)}
-              className="rounded-md border border-border bg-elevated px-2 py-1 text-[11px] text-txt-secondary hover:text-txt-primary"
-            >
-              {ex}
-            </button>
-          ))}
+
+      {busy ? (
+        // Mientras la IA monta el flujo: mostramos tu petición + el «razonamiento» por pasos (M31).
+        <div className="mt-4 space-y-3">
+          <div className="flex justify-end">
+            <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-primary/15 px-3 py-2 text-xs leading-relaxed text-txt-primary">
+              {prompt}
+            </div>
+          </div>
+          <p className="text-xs leading-relaxed text-txt-secondary">
+            {t('Voy a construir este flujo paso a paso: analizo lo que pides y elijo los nodos adecuados.')}
+          </p>
+          <ThinkingSteps />
         </div>
-        {err && <p className="mt-2 text-xs text-danger">{err}</p>}
-      </div>
-      <div className="mt-5 flex items-center justify-end gap-2">
-        <Button variant="ghost" onClick={onClose} disabled={busy}>
-          {t('Cancelar')}
-        </Button>
-        <Button variant="primary" onClick={onSubmit} disabled={busy || !prompt.trim()}>
-          <Sparkles size={14} /> {busy ? t('Montando el flujo…') : t('Construir con IA')}
-        </Button>
-      </div>
+      ) : (
+        <>
+          <div className="mt-4">
+            <Textarea
+              autoFocus
+              rows={4}
+              value={prompt}
+              onChange={(e) => onPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  onSubmit();
+                }
+              }}
+              placeholder={t('Ej.: cuando reciba un correo, resúmelo y mándalo a Slack #general.')}
+              aria-label={t('Descripción de la automatización')}
+            />
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {examples.map((ex) => (
+                <button
+                  key={ex}
+                  onClick={() => onPrompt(ex)}
+                  className="rounded-md border border-border bg-elevated px-2 py-1 text-[11px] text-txt-secondary hover:text-txt-primary"
+                >
+                  {ex}
+                </button>
+              ))}
+            </div>
+            {err && <p className="mt-2 text-xs text-danger">{err}</p>}
+          </div>
+          <div className="mt-5 flex items-center justify-end gap-2">
+            <Button variant="ghost" onClick={onClose} disabled={busy}>
+              {t('Cancelar')}
+            </Button>
+            <Button variant="primary" onClick={onSubmit} disabled={busy || !prompt.trim()}>
+              <Sparkles size={14} /> {t('Construir con IA')}
+            </Button>
+          </div>
+        </>
+      )}
     </Modal>
   );
 }
