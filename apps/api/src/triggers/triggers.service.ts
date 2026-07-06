@@ -13,8 +13,12 @@ import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.
 import { assertInWorkspace } from '../tenant/tenant.util';
 import { WebhooksService } from '../webhooks/webhooks.service';
 
-/** Adaptador del fetch global de Node al tipo mínimo `JiraFetch` de los helpers. */
-const jiraFetch: JiraFetch = (url, init) => fetch(url, init);
+/**
+ * Adaptador del fetch global de Node al tipo mínimo `JiraFetch` de los helpers. Acota cada llamada con
+ * un timeout de 10s (como connector-node/executors-io): un endpoint de Jira colgado no debe bloquear la
+ * petición del usuario indefinidamente.
+ */
+const jiraFetch: JiraFetch = (url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(10_000) });
 
 /**
  * Triggers sin código (M19): materializa una RECETA («Cuando se crea un ticket de Jira») en un webhook
@@ -114,16 +118,24 @@ export class TriggersService {
       throw new BadRequestException(`No se pudo registrar el disparador en Jira: ${msg}`);
     }
 
-    // 3) Persistir el binding.
-    return this.p.triggerBindings.create({
-      workspaceId,
-      workflowId,
-      eventId: input.eventId,
-      connectorId: input.connectorId,
-      webhookId: wh.id,
-      remoteId: remoteIds.join(','),
-      params: { projectKey, cloudId },
-    });
+    // 3) Persistir el binding. Si la escritura falla (error transitorio de DB, timeout del pool…), COMPENSA
+    //    borrando lo ya creado: el webhook EN Jira y el interno. Sin binding no habría forma de localizar el
+    //    `remoteId` para desregistrarlo → quedaría un webhook huérfano disparando ejecuciones para siempre.
+    try {
+      return await this.p.triggerBindings.create({
+        workspaceId,
+        workflowId,
+        eventId: input.eventId,
+        connectorId: input.connectorId,
+        webhookId: wh.id,
+        remoteId: remoteIds.join(','),
+        params: { projectKey, cloudId },
+      });
+    } catch (e) {
+      await deleteJiraWebhooks(token, cloudId, remoteIds, jiraFetch).catch(() => undefined);
+      await this.webhooks.delete(wh.id, workspaceId).catch(() => undefined);
+      throw e;
+    }
   }
 
   /** Borra la receta: desregistra en Jira (best-effort) + borra el webhook interno + el binding. */
