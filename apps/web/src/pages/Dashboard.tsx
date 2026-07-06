@@ -1,185 +1,146 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Workflow, Bot, Activity, DollarSign, Cpu, CircleCheck, TriangleAlert, ArrowUpRight, Plus } from 'lucide-react';
+import { Workflow, Bot, CircleCheck, UserCheck, ArrowUpRight, Plus, Inbox, Loader2 } from 'lucide-react';
 import { Page } from '../app/AppShell';
 import { Card, Stat, Badge, Dot, Button, PageHeader, Skeleton } from '../ui';
-import { useAgents, useWorkflows, useHealth } from '../lib/hooks';
+import { useAgents, useWorkflows, useExecutions, useHealth } from '../lib/hooks';
+import { statusLabel } from '../lib/labels';
 import { useT } from '../i18n';
 
-const MODEL_USAGE = [
-  { model: 'claude-opus-4-8', pct: 46, tone: 'bg-primary' },
-  { model: 'claude-sonnet-5', pct: 32, tone: 'bg-accent' },
-  { model: 'mock-1', pct: 15, tone: 'bg-secondary' },
-  { model: 'gpt-5', pct: 7, tone: 'bg-warning' },
-];
+const fmtTime = (iso?: string | null): string =>
+  iso ? new Date(iso).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
 
-const ACTIVITY = [
-  { t: 'hace 12s', text: 'Orchestrator planificó 2 subtareas', tone: 'primary' as const },
-  { t: 'hace 34s', text: 'QA Agent completó una ejecución', tone: 'success' as const },
-  { t: 'hace 1m', text: 'Backend Agent invocó la tool http', tone: 'accent' as const },
-  { t: 'hace 3m', text: 'Workflow "Bug crítico" desplegado', tone: 'primary' as const },
-  { t: 'hace 6m', text: 'Tool no autorizada rechazada por RBAC', tone: 'warning' as const },
-];
-
-const SPARK = [8, 12, 9, 16, 14, 22, 18, 26, 21, 30, 24, 34];
+/** Frase de resultado por estado, para la actividad reciente (sin jerga de motor). */
+const ACTIVITY_PHRASE: Record<string, string> = {
+  SUCCEEDED: 'Una automatización se completó',
+  FAILED: 'Una automatización tuvo un error',
+  WAITING_HUMAN: 'Una automatización necesita tu aprobación',
+  RUNNING: 'Una automatización está en curso',
+  QUEUED: 'Una automatización está en cola',
+  PAUSED: 'Una automatización está en pausa',
+  CANCELLED: 'Una automatización se canceló',
+};
+type Tone = 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'accent';
+const STATUS_TONE: Record<string, Tone> = {
+  SUCCEEDED: 'success',
+  FAILED: 'danger',
+  WAITING_HUMAN: 'warning',
+  RUNNING: 'primary',
+  QUEUED: 'default',
+};
 
 export function Dashboard() {
   const t = useT();
   const navigate = useNavigate();
   const agents = useAgents();
   const workflows = useWorkflows();
+  const executions = useExecutions();
+  const waiting = useExecutions('WAITING_HUMAN');
   const health = useHealth();
 
   const online = health.isSuccess && health.data?.status === 'ok';
+  const execs = executions.data?.executions ?? [];
+  const waitingCount = waiting.data?.executions.length ?? 0;
+  const doneCount = execs.filter((e) => e.status === 'SUCCEEDED').length;
 
   return (
     <Page className="space-y-6">
       <PageHeader
-        title="Dashboard"
-        subtitle={t("Estado del sistema, agentes y ejecuciones en tiempo real.")}
+        title={t('Inicio')}
+        subtitle={t('Tus automatizaciones, de un vistazo.')}
         actions={
-          <Button variant="primary" onClick={() => navigate('/workflows?new=1')}>
-            <Plus size={15} /> {t("Nuevo workflow")}
+          <Button variant="primary" onClick={() => navigate('/workflows')}>
+            <Plus size={15} /> {t('Nueva automatización')}
           </Button>
         }
       />
 
-      {/* Stats */}
+      {/* Resultados de negocio (datos reales) */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat
-          label="Workflows"
-          value={workflows.isLoading ? <Skeleton className="h-7 w-10" /> : (workflows.data?.length ?? 0)}
-          delta={t("+2 esta semana")}
-          icon={<Workflow size={18} />}
-          tone="primary"
-        />
-        <Stat
-          label={t("Agentes")}
-          value={agents.isLoading ? <Skeleton className="h-7 w-10" /> : (agents.data?.length ?? 0)}
-          delta={t("1 orchestrator activo")}
-          icon={<Bot size={18} />}
-          tone="accent"
-        />
-        <Stat label={t("Ejecuciones (24h)")} value="128" delta={t("+18% vs. ayer")} icon={<Activity size={18} />} tone="success" />
-        <Stat label={t("Coste estimado (mes)")} value="$42.10" delta="1.2M tokens" icon={<DollarSign size={18} />} tone="warning" />
+        <button onClick={() => navigate('/workflows')} className="text-left">
+          <Stat label={t('Automatizaciones')} value={workflows.isLoading ? <Skeleton className="h-7 w-10" /> : (workflows.data?.length ?? 0)} icon={<Workflow size={18} />} tone="primary" />
+        </button>
+        <button onClick={() => navigate('/agents')} className="text-left">
+          <Stat label={t('Asistentes')} value={agents.isLoading ? <Skeleton className="h-7 w-10" /> : (agents.data?.length ?? 0)} icon={<Bot size={18} />} tone="accent" />
+        </button>
+        <button onClick={() => navigate('/executions')} className="text-left">
+          <Stat label={t('Tareas completadas')} value={executions.isLoading ? <Skeleton className="h-7 w-10" /> : doneCount} icon={<CircleCheck size={18} />} tone="success" />
+        </button>
+        <button onClick={() => navigate('/executions')} className="text-left">
+          <Stat label={t('Necesitan tu revisión')} value={waiting.isLoading ? <Skeleton className="h-7 w-10" /> : waitingCount} icon={<UserCheck size={18} />} tone="warning" />
+        </button>
       </div>
 
+      {/* CTA de revisiones pendientes */}
+      {waitingCount > 0 && (
+        <Card hover className="flex cursor-pointer items-center gap-3 border-warning/30 bg-warning/[0.06] p-4" onClick={() => navigate('/executions')}>
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-warning/15 text-warning">
+            <UserCheck size={18} />
+          </div>
+          <div className="flex-1">
+            <div className="text-sm font-semibold text-txt-primary">
+              {waitingCount} {waitingCount === 1 ? t('tarea espera tu aprobación') : t('tareas esperan tu aprobación')}
+            </div>
+            <div className="text-xs text-txt-secondary">{t('Ábrelas para aprobar o rechazar.')}</div>
+          </div>
+          <ArrowUpRight size={16} className="text-warning" />
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Actividad en tiempo real */}
+        {/* Actividad reciente (real) */}
         <Card className="lg:col-span-2">
           <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold text-txt-primary">{t("Actividad en tiempo real")}</h2>
-              <Badge tone="success">
-                <Dot tone="success" pulse /> {t("en vivo")}
-              </Badge>
-            </div>
+            <h2 className="text-sm font-semibold text-txt-primary">{t('Actividad reciente')}</h2>
             <button className="flex items-center gap-1 text-xs text-txt-secondary hover:text-txt-primary" onClick={() => navigate('/executions')}>
-              {t("Ver todo")} <ArrowUpRight size={13} />
+              {t('Ver historial')} <ArrowUpRight size={13} />
             </button>
           </div>
-          <div className="divide-y divide-border">
-            {ACTIVITY.map((a, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, x: -6 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.05 }}
-                className="flex items-center gap-3 px-5 py-3"
-              >
-                <Dot tone={a.tone} />
-                <span className="flex-1 text-sm text-txt-primary">{t(a.text)}</span>
-                <span className="text-xs text-txt-disabled">{t(a.t)}</span>
-              </motion.div>
-            ))}
-          </div>
-        </Card>
-
-        {/* Estado del sistema */}
-        <Card>
-          <div className="border-b border-border px-5 py-3.5">
-            <h2 className="text-sm font-semibold text-txt-primary">{t("Estado del sistema")}</h2>
-          </div>
-          <div className="space-y-3 p-5">
-            <SystemRow label="API" ok={online} value={online ? t('operativa') : 'offline'} />
-            <SystemRow label={t("Motor de ejecución")} ok value="inline" />
-            <SystemRow label={t("Cola (BullMQ)")} ok value={t("0 pendientes")} />
-            <SystemRow label={t("Errores (24h)")} ok={false} warn value="3" />
-          </div>
-          <div className="border-t border-border px-5 py-4">
-            <div className="mb-2 flex items-center justify-between text-xs">
-              <span className="text-txt-secondary">Throughput</span>
-              <span className="font-medium text-txt-primary">{t("34 ejec/h")}</span>
+          {executions.isLoading ? (
+            <div className="px-5 py-10 text-center text-txt-secondary">
+              <Loader2 size={16} className="mx-auto animate-spin" />
             </div>
-            <div className="flex h-12 items-end gap-1">
-              {SPARK.map((v, i) => (
-                <div key={i} className="flex-1 rounded-sm bg-gradient-to-t from-primary/30 to-primary" style={{ height: `${(v / 34) * 100}%` }} />
+          ) : execs.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 px-5 py-12 text-center">
+              <Inbox size={22} className="text-txt-disabled" />
+              <p className="text-sm text-txt-secondary">{t('Aún no hay actividad. Activa una automatización para empezar.')}</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {execs.slice(0, 8).map((e, i) => (
+                <motion.div key={e.id} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04 }} className="flex items-center gap-3 px-5 py-3">
+                  <Dot tone={STATUS_TONE[e.status] ?? 'default'} />
+                  <span className="flex-1 text-sm text-txt-primary">{t(ACTIVITY_PHRASE[e.status] ?? statusLabel(e.status))}</span>
+                  <span className="text-xs text-txt-disabled">{fmtTime(e.createdAt)}</span>
+                </motion.div>
               ))}
             </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Uso de modelos */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <div className="flex items-center gap-2 border-b border-border px-5 py-3.5">
-            <Cpu size={16} className="text-txt-secondary" />
-            <h2 className="text-sm font-semibold text-txt-primary">{t("Uso de modelos")}</h2>
-          </div>
-          <div className="space-y-4 p-5">
-            {MODEL_USAGE.map((m) => (
-              <div key={m.model}>
-                <div className="mb-1.5 flex items-center justify-between text-xs">
-                  <span className="font-mono text-txt-primary">{m.model}</span>
-                  <span className="text-txt-secondary">{m.pct}%</span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-elevated">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${m.pct}%` }}
-                    transition={{ duration: 0.6, ease: 'easeOut' }}
-                    className={`h-full rounded-full ${m.tone}`}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+          )}
         </Card>
 
-        <Card className="flex flex-col">
+        {/* Estado (simple, real) */}
+        <Card>
           <div className="border-b border-border px-5 py-3.5">
-            <h2 className="text-sm font-semibold text-txt-primary">{t("Salud")}</h2>
+            <h2 className="text-sm font-semibold text-txt-primary">{t('Estado')}</h2>
           </div>
-          <div className="grid flex-1 grid-cols-2 gap-px overflow-hidden bg-border">
-            <HealthTile icon={<CircleCheck size={18} className="text-success" />} label={t("Éxito")} value="97.6%" />
-            <HealthTile icon={<TriangleAlert size={18} className="text-warning" />} label={t("Fallos")} value="2.4%" />
-            <HealthTile icon={<Activity size={18} className="text-primary" />} label={t("Latencia p50")} value="640ms" />
-            <HealthTile icon={<Cpu size={18} className="text-accent" />} label={t("Tokens/ejec")} value="1.4k" />
+          <div className="space-y-3 p-5">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-txt-secondary">{t('Conexión con la IA')}</span>
+              <Badge tone={online ? 'success' : 'danger'}>
+                <Dot tone={online ? 'success' : 'danger'} /> {online ? t('Conectado') : t('Desconectado')}
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-txt-secondary">{t('Tareas completadas')}</span>
+              <span className="text-sm font-medium text-txt-primary">{doneCount}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-txt-secondary">{t('Pendientes de revisión')}</span>
+              <span className="text-sm font-medium text-txt-primary">{waitingCount}</span>
+            </div>
           </div>
         </Card>
       </div>
     </Page>
-  );
-}
-
-function SystemRow({ label, value, ok, warn }: { label: string; value: string; ok: boolean; warn?: boolean }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-sm text-txt-secondary">{label}</span>
-      <Badge tone={warn ? 'warning' : ok ? 'success' : 'danger'}>
-        <Dot tone={warn ? 'warning' : ok ? 'success' : 'danger'} /> {value}
-      </Badge>
-    </div>
-  );
-}
-
-function HealthTile({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <div className="flex flex-col justify-center gap-1 bg-card p-4">
-      {icon}
-      <div className="mt-1 text-lg font-semibold text-txt-primary">{value}</div>
-      <div className="text-[11px] text-txt-secondary">{label}</div>
-    </div>
   );
 }
