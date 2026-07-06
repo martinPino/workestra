@@ -103,6 +103,58 @@ export const CONNECTOR_ACTIONS: Record<string, ConnectorAction[]> = {
       build: (p) => ({ method: 'POST', path: `/repos/${p.owner}/${p.repo}/issues`, body: JSON.stringify({ title: p.title, body: p.body }) }),
     },
   ],
+  'google-sheets': [
+    {
+      id: 'append-row',
+      label: 'Añadir una fila',
+      fields: [
+        { key: 'spreadsheetId', label: 'ID de la hoja de cálculo', placeholder: '1AbC…  (está en la URL de la hoja)' },
+        { key: 'range', label: 'Pestaña y celda', placeholder: 'Hoja 1!A1', default: 'A1' },
+        { key: 'values', label: 'Valores de la fila (separa columnas con | )', placeholder: '{{ticket.key}} | {{ticket.summary}} | nuevo', multiline: true },
+      ],
+      build: (p) => ({
+        method: 'POST',
+        path: `/spreadsheets/${p.spreadsheetId}/values/${encodeURIComponent(p.range || 'A1')}:append?valueInputOption=USER_ENTERED`,
+        // Se separa por columnas en el editor; cada celda conserva sus {{datos}} y se interpola al ejecutar.
+        body: JSON.stringify({ values: [(p.values ?? '').split('|').map((s) => s.trim())] }),
+      }),
+    },
+  ],
+  gmail: [
+    {
+      id: 'send-email',
+      label: 'Enviar un correo',
+      fields: [
+        { key: 'to', label: 'Para', placeholder: 'persona@empresa.com' },
+        { key: 'subject', label: 'Asunto', placeholder: 'Ticket {{ticket.key}}' },
+        { key: 'text', label: 'Mensaje', placeholder: 'Escribe el correo…', multiline: true },
+      ],
+      // El executor de Gmail transforma {to,subject,text} al formato RFC822/base64 que exige la API (M28).
+      build: (p) => ({ method: 'POST', path: '/users/me/messages/send', body: JSON.stringify({ to: p.to, subject: p.subject, text: p.text }) }),
+    },
+  ],
+  'google-calendar': [
+    {
+      id: 'create-event',
+      label: 'Crear un evento',
+      fields: [
+        { key: 'summary', label: 'Título', placeholder: 'Reunión de seguimiento', default: '{{ticket.summary}}' },
+        { key: 'start', label: 'Inicio', placeholder: '2026-01-15T09:00:00', default: '2026-01-15T09:00:00' },
+        { key: 'end', label: 'Fin', placeholder: '2026-01-15T10:00:00', default: '2026-01-15T10:00:00' },
+        { key: 'timeZone', label: 'Zona horaria', placeholder: 'Europe/Madrid', default: 'UTC' },
+      ],
+      // Google exige timeZone (o un offset en dateTime); sin ella la API responde 400. Default UTC.
+      build: (p) => ({
+        method: 'POST',
+        path: '/calendars/primary/events',
+        body: JSON.stringify({
+          summary: p.summary,
+          start: { dateTime: p.start, timeZone: p.timeZone || 'UTC' },
+          end: { dateTime: p.end, timeZone: p.timeZone || 'UTC' },
+        }),
+      }),
+    },
+  ],
   dev: [
     { id: 'whoami', label: 'Quién soy (prueba)', fields: [], build: () => ({ method: 'GET', path: '/whoami' }) },
   ],

@@ -44,6 +44,8 @@ export class ConnectorsController {
         requiresConfig: p.requiresConfig,
         // `configured`: listo para conectar (no requiere config, o tiene client id/secret en el server).
         configured: this.svc.isConfigured(p.provider),
+        // Proveedor del que salen las credenciales (varias apps de Google comparten `google`); para el hint.
+        configProvider: p.configProvider ?? p.provider,
       }));
   }
 

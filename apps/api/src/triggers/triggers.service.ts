@@ -8,6 +8,10 @@ import {
   listJiraWebhookIds,
   registerJiraWebhooks,
   deleteJiraWebhooks,
+  parseTokenBlob,
+  serializeTokenBlob,
+  needsRefresh,
+  refreshAccessToken,
   type JiraFetch,
   type JiraProject,
 } from '@core/sdk-plugins';
@@ -53,9 +57,21 @@ export class TriggersService {
     if (connector.status !== 'connected' || !connector.credentialsSecretId) {
       throw new BadRequestException(`El conector «${connector.key}» no está conectado.`);
     }
-    const token = await this.p.secrets.get(workspaceId, connector.credentialsSecretId);
-    if (!token) throw new BadRequestException('Token del conector no disponible (reconéctalo).');
-    return token;
+    const raw = await this.p.secrets.get(workspaceId, connector.credentialsSecretId);
+    if (!raw) throw new BadRequestException('Token del conector no disponible (reconéctalo).');
+    // El secreto es un blob {access, refresh, expiry} (o un string suelto legacy). Renueva si caducó y hay
+    // refresh (Jira usa offline_access), y persiste, para que el registro de webhooks no falle con 401.
+    let blob = parseTokenBlob(raw);
+    if (needsRefresh(blob, Date.now())) {
+      const refreshed = await refreshAccessToken(connector.provider, blob, Date.now(), (u, i) =>
+        fetch(u, { ...(i as RequestInit), signal: AbortSignal.timeout(10_000) }),
+      );
+      if (refreshed) {
+        blob = refreshed;
+        await this.p.secrets.set(workspaceId, connector.credentialsSecretId, serializeTokenBlob(refreshed)).catch(() => undefined);
+      }
+    }
+    return blob.access_token;
   }
 
   /** Resuelve el cloudId: el pasado en params, o el único sitio; si hay varios, exige elegir. */

@@ -2,7 +2,7 @@ import { Injectable, Inject, BadRequestException, NotFoundException } from '@nes
 import { JwtService } from '@nestjs/jwt';
 import { randomBytes } from 'node:crypto';
 import type { ConnectorRecord } from '@core/engine';
-import { getConnectorProvider, providerEnvKeys } from '@core/sdk-plugins';
+import { getConnectorProvider, providerEnvKeys, tokenBlobFromResponse, serializeTokenBlob } from '@core/sdk-plugins';
 import { setCurrentWorkspace } from '@core/infra';
 import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
 import { assertInWorkspace } from '../tenant/tenant.util';
@@ -55,9 +55,15 @@ export class ConnectorsService {
     return process.env.WEB_URL ?? 'http://localhost:5173';
   }
 
+  /** Proveedor del que leer las credenciales OAuth: `configProvider` si lo hay (varias apps de Google
+   *  comparten un único cliente `google`), o el propio proveedor. */
+  private credProvider(provider: string): string {
+    return getConnectorProvider(provider, this.selfBase())?.configProvider ?? provider;
+  }
+
   /** Credenciales del cliente OAuth desde env (para `dev` se usan valores ficticios que el mock ignora). */
   private creds(provider: string): { clientId: string; clientSecret: string } {
-    const { id, secret } = providerEnvKeys(provider);
+    const { id, secret } = providerEnvKeys(this.credProvider(provider));
     return { clientId: process.env[id] ?? 'agentflow-dev', clientSecret: process.env[secret] ?? 'agentflow-dev-secret' };
   }
 
@@ -66,7 +72,7 @@ export class ConnectorsService {
     const prov = getConnectorProvider(provider, this.selfBase());
     if (!prov) return false;
     if (!prov.requiresConfig) return true;
-    const { id, secret } = providerEnvKeys(provider);
+    const { id, secret } = providerEnvKeys(this.credProvider(provider));
     return !!process.env[id] && !!process.env[secret];
   }
 
@@ -87,7 +93,7 @@ export class ConnectorsService {
     const provider = getConnectorProvider((c as ConnectorRecord).provider, this.selfBase());
     if (!provider) throw new BadRequestException('Proveedor desconocido.');
     if (!this.isConfigured(provider.provider)) {
-      const { id, secret } = providerEnvKeys(provider.provider);
+      const { id, secret } = providerEnvKeys(this.credProvider(provider.provider));
       throw new BadRequestException(`El proveedor «${provider.label}» requiere ${id} y ${secret} configurados en el servidor.`);
     }
     const state = this.jwt.sign(
@@ -158,7 +164,9 @@ export class ConnectorsService {
     }
 
     const secretKey = secretKeyFor(cid);
-    await this.p.secrets.set(ws, secretKey, accessToken);
+    // Guardamos el blob completo (access + refresh + expiry) para poder renovar sin re-autenticar (M28).
+    // Si el proveedor no da refresh/expiry (Slack/GitHub), serializeTokenBlob guarda el access suelto (compat).
+    await this.p.secrets.set(ws, secretKey, serializeTokenBlob(tokenBlobFromResponse(tokJson, accessToken, Date.now())));
     await this.p.connectors.setConnected(cid, secretKey);
     return { redirectTo: `${this.webBase()}/integrations?connected=${encodeURIComponent(c.key)}` };
   }

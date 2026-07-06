@@ -23,6 +23,12 @@ export interface ConnectorProvider {
   tokenPath: string;
   /** Parámetros extra en la URL de autorización (p. ej. `audience`/`prompt` de Atlassian). */
   extraAuthorizeParams?: Record<string, string>;
+  /**
+   * De qué proveedor leer las credenciales del cliente OAuth (env `*_CLIENT_ID/SECRET`). Por defecto el
+   * propio. Varias apps del mismo proveedor (Google Sheets/Gmail/Calendar) comparten UN cliente OAuth de
+   * Google, así que apuntan a `google` → una sola pareja `GOOGLE_CLIENT_ID/SECRET`.
+   */
+  configProvider?: string;
 }
 
 /**
@@ -78,6 +84,47 @@ export function connectorProviders(selfBase = 'http://localhost:3001'): Record<s
       requiresConfig: true,
       tokenExchange: 'form',
       tokenPath: 'access_token',
+    },
+    // --- Google (M28): un solo cliente OAuth de Google (`GOOGLE_CLIENT_ID/SECRET`) sirve a las 3 apps vía
+    // `configProvider: 'google'`. `access_type=offline` + `prompt=consent` para obtener refresh token. ---
+    'google-sheets': {
+      provider: 'google-sheets',
+      label: 'Google Sheets',
+      authorizeUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+      tokenUrl: 'https://oauth2.googleapis.com/token',
+      baseUrl: 'https://sheets.googleapis.com/v4',
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+      requiresConfig: true,
+      tokenExchange: 'form',
+      tokenPath: 'access_token',
+      extraAuthorizeParams: { access_type: 'offline', prompt: 'consent' },
+      configProvider: 'google',
+    },
+    gmail: {
+      provider: 'gmail',
+      label: 'Gmail',
+      authorizeUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+      tokenUrl: 'https://oauth2.googleapis.com/token',
+      baseUrl: 'https://gmail.googleapis.com/gmail/v1',
+      scopes: ['https://www.googleapis.com/auth/gmail.send'],
+      requiresConfig: true,
+      tokenExchange: 'form',
+      tokenPath: 'access_token',
+      extraAuthorizeParams: { access_type: 'offline', prompt: 'consent' },
+      configProvider: 'google',
+    },
+    'google-calendar': {
+      provider: 'google-calendar',
+      label: 'Google Calendar',
+      authorizeUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+      tokenUrl: 'https://oauth2.googleapis.com/token',
+      baseUrl: 'https://www.googleapis.com/calendar/v3',
+      scopes: ['https://www.googleapis.com/auth/calendar.events'],
+      requiresConfig: true,
+      tokenExchange: 'form',
+      tokenPath: 'access_token',
+      extraAuthorizeParams: { access_type: 'offline', prompt: 'consent' },
+      configProvider: 'google',
     },
   };
 }

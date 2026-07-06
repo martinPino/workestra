@@ -7,7 +7,7 @@
  * y Jira llevan sus colores de marca. Quien no tenga logo (p. ej. `dev`) usa el icono genérico del que llama.
  */
 
-const WITH_LOGO = new Set(['slack', 'jira', 'github']);
+const WITH_LOGO = new Set(['slack', 'jira', 'github', 'google-sheets', 'gmail', 'google-calendar']);
 
 /** ¿Este proveedor tiene un logo de marca? (si no, el llamante pinta su icono/gradiente genérico). */
 export function hasProviderLogo(provider: string | undefined): boolean {
@@ -44,7 +44,41 @@ function GithubLogo({ size }: { size: number }) {
   );
 }
 
-/** Logo de marca del proveedor (Slack/Jira/GitHub). `null` si no hay: el llamante usa su fallback. */
+function SheetsLogo({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" role="img" aria-label="Google Sheets" xmlns="http://www.w3.org/2000/svg">
+      <path fill="#0F9D58" d="M6 2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" />
+      <path fill="#0C7C46" d="M14 2l6 6h-6z" />
+      <rect x="7.5" y="11" width="9" height="7.5" rx="0.6" fill="#fff" />
+      <path stroke="#0F9D58" strokeWidth="0.9" d="M7.5 13.5h9M7.5 16h9M10.5 11v7.5M13.5 11v7.5" />
+    </svg>
+  );
+}
+
+function GmailLogo({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" role="img" aria-label="Gmail" xmlns="http://www.w3.org/2000/svg">
+      <path fill="#4caf50" d="M45,16.2l-5,2.75l-5,4.75L35,40h7c1.657,0,3-1.343,3-3V16.2z" />
+      <path fill="#1e88e5" d="M3,16.2l3.614,1.71L13,23.7V40H6c-1.657,0-3-1.343-3-3V16.2z" />
+      <polygon fill="#e53935" points="35,11.2 24,19.45 13,11.2 12,17 13,23.7 24,31.95 35,23.7 36,17" />
+      <path fill="#c62828" d="M3,12.298V16.2l10,7.5V11.2L9.876,8.859C9.132,8.301,8.228,8,7.298,8h0C4.924,8,3,9.924,3,12.298z" />
+      <path fill="#fbc02d" d="M45,12.298V16.2l-10,7.5V11.2l3.124-2.341C38.868,8.301,39.772,8,40.702,8h0C43.076,8,45,9.924,45,12.298z" />
+    </svg>
+  );
+}
+
+function CalendarLogo({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" role="img" aria-label="Google Calendar" xmlns="http://www.w3.org/2000/svg">
+      <rect x="4.5" y="5" width="15" height="15" rx="2.5" fill="#fff" stroke="#4285F4" strokeWidth="1.4" />
+      <text x="12" y="16.4" textAnchor="middle" fontFamily="Arial, Helvetica, sans-serif" fontSize="8.5" fontWeight="700" fill="#4285F4">
+        31
+      </text>
+    </svg>
+  );
+}
+
+/** Logo de marca del proveedor. `null` si no hay: el llamante usa su fallback (icono/gradiente genérico). */
 export function ProviderLogo({ provider, size = 18 }: { provider: string | undefined; size?: number }) {
   switch (provider) {
     case 'slack':
@@ -53,6 +87,12 @@ export function ProviderLogo({ provider, size = 18 }: { provider: string | undef
       return <JiraLogo size={size} />;
     case 'github':
       return <GithubLogo size={size} />;
+    case 'google-sheets':
+      return <SheetsLogo size={size} />;
+    case 'gmail':
+      return <GmailLogo size={size} />;
+    case 'google-calendar':
+      return <CalendarLogo size={size} />;
     default:
       return null;
   }

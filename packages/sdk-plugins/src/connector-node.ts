@@ -1,8 +1,33 @@
 import type { INodeExecutor, NodeExecutionContext, NodeResult, NodeType } from '@core/contracts';
 import type { IConnectorRepository, ISecretStore } from '@core/engine';
 import { getConnectorProvider } from './connector-providers';
+import { parseTokenBlob, serializeTokenBlob, needsRefresh, refreshAccessToken } from './oauth-token';
 import { jiraAccessibleResources } from './jira-webhooks';
 import { interpolate } from './interpolate';
+
+/**
+ * Construye el mensaje RFC822 que exige la API de Gmail (`{ raw: base64url(mime) }`). Se llama DESPUÉS de
+ * interpolar, así que destinatario/asunto/cuerpo ya llevan resueltos los `{{datos}}` de pasos previos.
+ * El asunto va como encoded-word UTF-8 y el cuerpo en base64 (correcto con acentos/emoji). Los headers se
+ * sanean de saltos de línea para evitar inyección de cabeceras. Puro y testeable.
+ */
+export function gmailRawMessage(msg: { to?: string; subject?: string; text?: string }): string {
+  const headerSafe = (s: string): string => s.replace(/[\r\n]+/g, ' ').trim();
+  const to = headerSafe(String(msg.to ?? ''));
+  const subjectRaw = String(msg.subject ?? '');
+  // Encoded-word solo si hay asunto: `=?UTF-8?B??=` (encoded-text vacío) es inválido según RFC 2047.
+  const subject = subjectRaw ? `=?UTF-8?B?${Buffer.from(subjectRaw).toString('base64')}?=` : '';
+  const mime = [
+    `To: ${to}`,
+    `Subject: ${subject}`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/plain; charset="UTF-8"',
+    'Content-Transfer-Encoding: base64',
+    '',
+    Buffer.from(String(msg.text ?? '')).toString('base64'),
+  ].join('\r\n');
+  return Buffer.from(mime).toString('base64url');
+}
 
 /**
  * Nodo de CONECTOR (M11): dispatch saliente AUTENTICADO. Resuelve el conector del propio tenant,
@@ -70,8 +95,19 @@ export class ConnectorNodeExecutor implements INodeExecutor {
     const provider = getConnectorProvider(connector.provider, this.selfBase);
     if (!provider) return store({ error: `connector: proveedor desconocido (${connector.provider}).` });
 
-    const token = await this.secrets.get(ctx.workspaceId, connector.credentialsSecretId);
-    if (!token) return store({ error: 'connector: token no disponible (reconecta el conector).' });
+    const rawSecret = await this.secrets.get(ctx.workspaceId, connector.credentialsSecretId);
+    if (!rawSecret) return store({ error: 'connector: token no disponible (reconecta el conector).' });
+    // Renueva el access token si caducó y hay refresh (Google/Atlassian…), y persiste el nuevo: así el
+    // conector no muere al expirar el token (~1 h). Best-effort: si el refresh falla, se prueba con el actual.
+    let blob = parseTokenBlob(rawSecret);
+    if (needsRefresh(blob, Date.now())) {
+      const refreshed = await refreshAccessToken(connector.provider, blob, Date.now(), (u, i) => fetch(u, i as RequestInit));
+      if (refreshed) {
+        blob = refreshed;
+        await this.secrets.set(ctx.workspaceId, connector.credentialsSecretId, serializeTokenBlob(refreshed));
+      }
+    }
+    const token = blob.access_token;
 
     // Las acciones de Jira usan el marcador `{cloudid}` en la ruta; lo resolvemos aquí en runtime (no en el
     // editor), evitando carreras/estado obsoleto en el cliente. El cloudId (uuid de Atlassian) es seguro.
@@ -89,6 +125,18 @@ export class ConnectorNodeExecutor implements INodeExecutor {
       headers['content-type'] = 'application/json';
       const bodyStr = typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody);
       body = interpolate(bodyStr, ctx.context, true); // jsonSafe: escapa strings incrustados
+    }
+
+    // Gmail: la API exige el mensaje RFC822 en base64url dentro de `{ raw }`. La acción guarda un body
+    // `{to,subject,text}`; aquí (ya interpolado, así los {{datos}} funcionan) lo transformamos al formato Gmail.
+    if (connector.provider === 'gmail' && resolvedPath === '/users/me/messages/send') {
+      if (!body) return store({ error: 'connector: falta el contenido del correo de Gmail.' });
+      try {
+        const m = JSON.parse(body) as { to?: string; subject?: string; text?: string };
+        body = JSON.stringify({ raw: gmailRawMessage(m) });
+      } catch {
+        return store({ error: 'connector: no se pudo construir el correo de Gmail.' });
+      }
     }
 
     const signal = AbortSignal.any([ctx.signal, AbortSignal.timeout(this.timeoutMs)]);

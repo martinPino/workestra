@@ -13,6 +13,7 @@ export * from './human-node';
 export * from './connector-node';
 export * from './router-node';
 export * from './connector-providers';
+export * from './oauth-token';
 export * from './jira-webhooks';
 export * from './trigger-events';
 export * from './interpolate';
