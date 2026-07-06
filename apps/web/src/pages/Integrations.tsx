@@ -180,6 +180,43 @@ function humanEvery(ms: number): string {
   return `cada ${ms} ms`;
 }
 
+// --- Programador en lenguaje natural (M18): el usuario elige frecuencia + hora; generamos el cron ---
+type Freq = 'minutes' | 'hourly' | 'daily' | 'weekly' | 'monthly';
+const WEEKDAYS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']; // cron: 0 = domingo
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+/** Traduce las selecciones del picker a un patrón cron de 5 campos (min hora díaMes mes díaSem). */
+function buildCron(freq: Freq, everyN: number, hour: number, minute: number, weekday: number, monthday: number): string {
+  switch (freq) {
+    case 'minutes':
+      return `*/${everyN} * * * *`;
+    case 'hourly':
+      return `${minute} * * * *`;
+    case 'weekly':
+      return `${minute} ${hour} * * ${weekday}`;
+    case 'monthly':
+      return `${minute} ${hour} ${monthday} * *`;
+    case 'daily':
+    default:
+      return `${minute} ${hour} * * *`;
+  }
+}
+
+/** Convierte un cron (el que genera el picker) a texto humano para la lista; si no encaja, muestra el crudo. */
+function humanCron(cron: string): string {
+  const p = cron.trim().split(/\s+/);
+  if (p.length !== 5) return cron;
+  const [mi, ho, dom, , dow] = p;
+  const every = mi.startsWith('*/') ? mi.slice(2) : null;
+  if (every && ho === '*') return `Cada ${every} minutos`;
+  if (ho === '*' && dom === '*' && dow === '*') return `Cada hora, al minuto ${mi}`;
+  const at = `${pad2(Number(ho))}:${pad2(Number(mi))}`;
+  if (dom === '*' && dow === '*') return `Cada día a las ${at}`;
+  if (dom === '*' && dow !== '*') return `Cada ${WEEKDAYS[Number(dow)] ?? dow} a las ${at}`;
+  if (dom !== '*' && dow === '*') return `El día ${dom} de cada mes a las ${at}`;
+  return cron;
+}
+
 function ScheduleManager() {
   const { data: workflows } = useWorkflows();
   const [workflowId, setWorkflowId] = useState<string>('');
@@ -191,17 +228,22 @@ function ScheduleManager() {
   const { token, role } = useAuth();
   const t = useT();
   const qc = useQueryClient();
-  const [mode, setMode] = useState<'interval' | 'cron'>('interval');
-  const [seconds, setSeconds] = useState('60');
-  const [cron, setCron] = useState('*/5 * * * *');
+  const [freq, setFreq] = useState<Freq>('daily');
+  const [everyN, setEveryN] = useState(15);
+  const [hour, setHour] = useState(9);
+  const [minute, setMinute] = useState(0);
+  const [weekday, setWeekday] = useState(1); // lunes
+  const [monthday, setMonthday] = useState(1);
   const [err, setErr] = useState<string | null>(null);
+
+  const cron = buildCron(freq, everyN, hour, minute, weekday, monthday);
+  const selCls = 'h-9 rounded-lg border border-border bg-surface px-2.5 text-sm text-txt-primary outline-none focus:border-primary/60';
 
   const create = async () => {
     if (!wfId) return;
     setErr(null);
     try {
-      const spec = mode === 'interval' ? { everyMs: Math.max(1, Number(seconds) || 0) * 1000 } : { cron };
-      await api.createSchedule(wfId, spec);
+      await api.createSchedule(wfId, { cron });
       await qc.invalidateQueries({ queryKey: ['schedules', wfId] });
     } catch (e) {
       setErr(e instanceof Error ? e.message : t('Error al programar'));
@@ -219,8 +261,8 @@ function ScheduleManager() {
           <Clock size={17} />
         </div>
         <div className="flex-1">
-          <div className="text-sm font-semibold text-txt-primary">{t('Triggers programados')}</div>
-          <div className="text-xs text-txt-secondary">{t('Dispara un workflow por intervalo o patrón cron (BullMQ · requiere el worker durable).')}</div>
+          <div className="text-sm font-semibold text-txt-primary">{t('En un horario')}</div>
+          <div className="text-xs text-txt-secondary">{t('Haz que un flujo se ejecute solo, en el horario que elijas.')}</div>
         </div>
       </div>
 
@@ -245,42 +287,61 @@ function ScheduleManager() {
                 </option>
               ))}
             </select>
-            <Badge tone={allowed ? 'accent' : 'default'}>
-              <Zap size={11} /> trigger: {triggerEvent}
-            </Badge>
-            <div className="flex items-center gap-1 rounded-lg border border-border bg-surface p-0.5">
-              {(['interval', 'cron'] as const).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setMode(m)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${mode === m ? 'bg-elevated text-txt-primary' : 'text-txt-secondary hover:text-txt-primary'}`}
-                >
-                  {m === 'interval' ? t('Intervalo') : t('Cron')}
-                </button>
-              ))}
-            </div>
-            {mode === 'interval' ? (
-              <div className="flex items-center gap-1.5 text-xs text-txt-secondary">
-                {t('cada')}
-                <input
-                  value={seconds}
-                  onChange={(e) => setSeconds(e.target.value.replace(/[^\d]/g, ''))}
-                  className="h-9 w-16 rounded-lg border border-border bg-surface px-2 text-center text-sm text-txt-primary outline-none focus:border-primary/60"
-                />
-                s
+            {/* Frecuencia en lenguaje natural (M18): genera el cron por debajo, sin sintaxis a la vista. */}
+            <select value={freq} onChange={(e) => setFreq(e.target.value as Freq)} className={selCls}>
+              <option value="minutes">{t('Cada pocos minutos')}</option>
+              <option value="hourly">{t('Cada hora')}</option>
+              <option value="daily">{t('Cada día')}</option>
+              <option value="weekly">{t('Cada semana')}</option>
+              <option value="monthly">{t('Cada mes')}</option>
+            </select>
+
+            {freq === 'minutes' && (
+              <select value={everyN} onChange={(e) => setEveryN(Number(e.target.value))} className={selCls}>
+                {[5, 10, 15, 30].map((n) => (
+                  <option key={n} value={n}>{t('cada')} {n} min</option>
+                ))}
+              </select>
+            )}
+            {freq === 'weekly' && (
+              <select value={weekday} onChange={(e) => setWeekday(Number(e.target.value))} className={selCls}>
+                {WEEKDAYS.map((d, i) => (
+                  <option key={d} value={i}>{t(d)}</option>
+                ))}
+              </select>
+            )}
+            {freq === 'monthly' && (
+              <select value={monthday} onChange={(e) => setMonthday(Number(e.target.value))} className={selCls}>
+                {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                  <option key={d} value={d}>{t('día')} {d}</option>
+                ))}
+              </select>
+            )}
+            {freq !== 'minutes' && (
+              <div className="flex items-center gap-1.5 text-sm text-txt-secondary">
+                <span>{freq === 'hourly' ? t('al minuto') : t('a las')}</span>
+                {freq !== 'hourly' && (
+                  <select value={hour} onChange={(e) => setHour(Number(e.target.value))} className={selCls}>
+                    {Array.from({ length: 24 }, (_, i) => i).map((h) => (
+                      <option key={h} value={h}>{pad2(h)}</option>
+                    ))}
+                  </select>
+                )}
+                {freq !== 'hourly' && <span>:</span>}
+                <select value={minute} onChange={(e) => setMinute(Number(e.target.value))} className={selCls}>
+                  {Array.from({ length: 12 }, (_, i) => i * 5).map((m) => (
+                    <option key={m} value={m}>{pad2(m)}</option>
+                  ))}
+                </select>
               </div>
-            ) : (
-              <input
-                value={cron}
-                onChange={(e) => setCron(e.target.value)}
-                placeholder="*/5 * * * *"
-                className="h-9 w-40 rounded-lg border border-border bg-surface px-3 font-mono text-sm text-txt-primary outline-none focus:border-primary/60"
-              />
             )}
             <Button size="sm" variant="primary" onClick={create} disabled={!wfId || !allowed || !canApprove(role)}>
               <Plus size={14} /> {t('Programar')}
             </Button>
           </div>
+          <p className="mt-2 text-xs text-txt-secondary">
+            {t('Se ejecutará:')} <span className="font-medium text-txt-primary">{humanCron(cron)}</span>
+          </p>
           {wfId && !allowed && <TriggerMismatch event={triggerEvent} need="cron" wfId={wfId} />}
           {!canApprove(role) && <p className="mt-1 text-[11px] text-warning">{t('El rol')} {role} {t('no puede programar (requiere workflow:write).')}</p>}
           {err && <p className="mt-2 text-xs text-danger">{err}</p>}
@@ -292,9 +353,9 @@ function ScheduleManager() {
               (schedules ?? []).map((s) => (
                 <div key={s.id} className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs">
                   <Badge tone={s.active ? 'accent' : 'default'}>
-                    <Clock size={11} /> {s.cron ? 'cron' : t('intervalo')}
+                    <Clock size={11} /> {s.active ? t('Activo') : t('En pausa')}
                   </Badge>
-                  <span className="min-w-0 flex-1 truncate font-mono text-txt-secondary">{s.cron ?? humanEvery(s.everyMs ?? 0)}</span>
+                  <span className="min-w-0 flex-1 truncate text-txt-secondary">{s.cron ? humanCron(s.cron) : humanEvery(s.everyMs ?? 0)}</span>
                   <button onClick={() => remove(s.id)} className="flex h-7 w-7 items-center justify-center rounded-md text-txt-secondary hover:bg-danger/15 hover:text-danger" aria-label={t('Eliminar')}>
                     <Trash2 size={14} />
                   </button>
