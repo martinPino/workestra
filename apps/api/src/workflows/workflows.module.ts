@@ -2,9 +2,12 @@ import { Module } from '@nestjs/common';
 import { WorkflowsController } from './workflows.controller';
 import { WorkflowsService } from './workflows.service';
 import { TriggersModule } from '../triggers/triggers.module';
+import { RbacModule } from '../rbac/rbac.module';
 
 @Module({
-  imports: [TriggersModule], // al borrar un flujo, desregistra sus disparadores de Jira (best-effort)
+  // TriggersModule: al borrar un flujo, desregistra sus disparadores de Jira (best-effort).
+  // RbacModule: provee RbacService a ScopesGuard, usado por @Delete(':id') con @RequireScopes.
+  imports: [TriggersModule, RbacModule],
   controllers: [WorkflowsController],
   providers: [WorkflowsService],
 })
