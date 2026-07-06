@@ -141,6 +141,11 @@ export const api = {
     fetch(`${API}/workflows/generate`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ prompt }) }).then((r) =>
       json<{ name: string; graph: WorkflowGraph }>(r),
     ),
+  // «Chat con IA en el editor» (M30): instrucción + grafo actual → grafo modificado.
+  editWorkflowGraph: (graph: WorkflowGraph, prompt: string) =>
+    fetch(`${API}/workflows/edit`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ prompt, graph }) }).then((r) =>
+      json<{ name: string; graph: WorkflowGraph }>(r),
+    ),
   getWorkflow: (id: string) => fetch(`${API}/workflows/${id}`, { headers: authHeaders() }).then((r) => json<WorkflowDto>(r)),
   deleteWorkflow: (id: string) =>
     fetch(`${API}/workflows/${id}`, { method: 'DELETE', headers: authHeaders() }).then((r) => json<{ deleted: boolean }>(r)),

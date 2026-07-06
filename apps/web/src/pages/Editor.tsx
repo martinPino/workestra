@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import ReactFlow, {
   Background,
   BackgroundVariant,
@@ -12,7 +12,7 @@ import ReactFlow, {
   type Node as RFNode,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Undo2, Redo2, LayoutGrid, StickyNote, Play, Check, Boxes, Loader2, UploadCloud, PanelRightClose, PanelRightOpen, Menu, X } from 'lucide-react';
+import { Undo2, Redo2, LayoutGrid, StickyNote, Play, Check, Boxes, Loader2, UploadCloud, PanelRightClose, PanelRightOpen, Menu, X, Sparkles } from 'lucide-react';
 import { cn } from '../lib/cn';
 import { useMediaQuery } from '../lib/useMediaQuery';
 import type { ExecutionEvent } from '@core/contracts';
@@ -23,6 +23,7 @@ import { computeLayout } from '../lib/layout';
 import { AfNode } from '../nodes/AfNode';
 import { CommentNode } from '../nodes/CommentNode';
 import { PropertiesPanel } from '../components/PropertiesPanel';
+import { AiChatPanel } from '../components/AiChatPanel';
 import { SubtaskTree } from '../components/SubtaskTree';
 import { docToReactFlow, docToWorkflowGraph, workflowGraphToDoc, STARTER_DOC } from '../graph';
 import { listNodeTypes } from '../editor/node-types';
@@ -81,6 +82,17 @@ export function Editor() {
   wfRef.current = workflowId;
   const isDesktop = useMediaQuery('(min-width: 768px)');
   const [inspectorOpen, setInspectorOpen] = useState(isDesktop); // en móvil arranca cerrado (ver canvas)
+  const [aiChatOpen, setAiChatOpen] = useState(false); // chat de IA para editar el flujo (M30)
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Recién creado con «Construir con IA» (?ai=1): abre el chat para seguir puliendo, y cierra el inspector.
+  useEffect(() => {
+    if (searchParams.get('ai') === '1') {
+      setAiChatOpen(true);
+      setInspectorOpen(false);
+      searchParams.delete('ai');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, []);
   const nodeTypes = useMemo(() => ({ af: AfNode, comment: CommentNode }), []);
   const base = useMemo(() => docToReactFlow(doc, nodeStatus), [doc, nodeStatus]);
 
@@ -293,6 +305,9 @@ export function Editor() {
           <Button size="sm" variant="subtle" onClick={() => s().addCommentAt({ x: 260, y: 120 })}>
             <StickyNote size={14} /> {t('Nota')}
           </Button>
+          <Button size="sm" variant={aiChatOpen ? 'primary' : 'subtle'} onClick={() => setAiChatOpen((v) => !v)}>
+            <Sparkles size={14} /> {t('IA')}
+          </Button>
           <div className="mx-1 h-4 w-px bg-border" />
           <Button size="sm" variant={activated ? 'secondary' : 'primary'} onClick={handleActivate}>
             {activated ? <Check size={14} /> : <UploadCloud size={14} />} {activated ? t('Activo') : t('Activar')}
@@ -417,6 +432,9 @@ export function Editor() {
             </IconButton>
           </aside>
         )}
+
+        {/* Chat de IA (M30): panel derecho para seguir modificando el flujo conversando. */}
+        {aiChatOpen && <AiChatPanel onClose={() => setAiChatOpen(false)} />}
       </div>
     </div>
   );

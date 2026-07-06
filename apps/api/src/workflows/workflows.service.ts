@@ -73,28 +73,58 @@ export class WorkflowsService {
 
   /**
    * «Construir con IA» (M29): genera un grafo de workflow desde una descripción en lenguaje natural. Pide al
-   * LLM un JSON con el catálogo de nodos + los conectores/agentes REALES del workspace, y VALIDA (schema +
-   * DAG). Si sale inválido, reintenta UNA vez pasándole el error. Devuelve el nombre sugerido + el grafo.
+   * LLM un JSON con el catálogo de nodos + los conectores/agentes REALES del workspace, y VALIDA (schema + DAG).
    */
   async generate(prompt: string, workspaceId: string): Promise<{ name: string; graph: WorkflowGraph }> {
+    const clean = this.cleanPrompt(prompt);
+    return this.runLlmGraph(await this.catalogPrompt(workspaceId), clean);
+  }
+
+  /**
+   * «Chat con IA en el editor» (M30): modifica el grafo ACTUAL según una instrucción en lenguaje natural
+   * («añade un Slack al final», «cambia el trigger a cada mañana»). Le pasa el grafo actual + el catálogo y
+   * exige el flujo COMPLETO modificado; valida schema + DAG igual que `generate`.
+   */
+  async editGraph(graph: unknown, prompt: string, workspaceId: string): Promise<{ name: string; graph: WorkflowGraph }> {
+    const clean = this.cleanPrompt(prompt);
+    const current = this.parseGraph(graph); // valida que el grafo de entrada esté bien formado
+    const user = [
+      'Flujo ACTUAL (JSON):',
+      JSON.stringify({ nodes: current.nodes, edges: current.edges }),
+      '',
+      'Aplica este cambio y DEVUELVE EL FLUJO COMPLETO modificado (todos los nodos que deben quedar, con sus posiciones y configs; no solo el cambio):',
+      clean,
+    ].join('\n');
+    return this.runLlmGraph(await this.catalogPrompt(workspaceId), user);
+  }
+
+  private cleanPrompt(prompt: string): string {
     const clean = (prompt ?? '').trim();
     if (!clean) throw new BadRequestException('Describe lo que quieres automatizar.');
     // Tope de entrada: acota el coste del LLM por petición (la salida ya está topada por el proveedor).
     if (clean.length > 2000) throw new BadRequestException('La descripción es demasiado larga (máx. 2000 caracteres).');
+    return clean;
+  }
+
+  /** System prompt con el catálogo de nodos + los conectores/agentes REALES del workspace (ids válidos). */
+  private async catalogPrompt(workspaceId: string): Promise<string> {
     const [connectors, agents] = await Promise.all([
       this.p.connectors.listByWorkspace(workspaceId),
       this.p.agents.list(workspaceId),
     ]);
-    const system = buildGeneratePrompt(
+    return buildGeneratePrompt(
       connectors.map((c) => ({ id: c.id, provider: c.provider, key: c.key })),
       agents.map((a) => ({ id: a.id, name: a.name })),
     );
+  }
+
+  /** Bucle común: pide el JSON al LLM, extrae, valida (schema + DAG) y reintenta 1 vez con el error. */
+  private async runLlmGraph(system: string, user: string): Promise<{ name: string; graph: WorkflowGraph }> {
     const model = process.env.LLM_MODEL ?? 'llama-3.3-70b-versatile';
     const base = [
       { role: 'system' as const, content: system },
-      { role: 'user' as const, content: clean },
+      { role: 'user' as const, content: user },
     ];
-
     let lastErr = 'sin respuesta';
     for (let attempt = 0; attempt < 2; attempt++) {
       const messages =

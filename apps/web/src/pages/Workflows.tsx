@@ -85,7 +85,7 @@ export function Workflows() {
       const { name, graph } = await api.generateWorkflow(aiPrompt.trim());
       const wf = await api.createWorkflow(name, graph);
       await qc.invalidateQueries({ queryKey: ['workflows'] });
-      navigate(`/workflows/${wf.id}`);
+      navigate(`/workflows/${wf.id}?ai=1`); // abre el chat de IA para seguir puliendo (M30)
     } catch {
       setAiErr(t('La IA no pudo montar el flujo. Reformula la descripción o inténtalo de nuevo.'));
       setAiBusy(false);
