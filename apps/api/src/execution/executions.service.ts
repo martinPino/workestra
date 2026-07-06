@@ -1,6 +1,6 @@
 import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
 import type { Queue } from 'bullmq';
-import { emptyContext, type ExecutionStatus } from '@core/contracts';
+import { emptyContext, type ExecutionStatus, type TriggerType } from '@core/contracts';
 import { validateDag } from '@core/domain';
 import { WorkflowRunner, type RunInput } from '@core/engine';
 import { SystemClock, CuidIdGenerator } from '@core/infra';
@@ -25,8 +25,17 @@ export class ExecutionsService {
     private readonly hub: ExecutionEventHub,
   ) {}
 
-  /** Crea la ejecución (para devolver su id al instante), la corre en background y emite eventos. */
-  async start(workflowId: string, workspaceId: string, contextInput?: Record<string, unknown>) {
+  /**
+   * Crea la ejecución (para devolver su id al instante), la corre en background y emite eventos.
+   * `triggerType` (por defecto 'manual') queda GRABADO de forma durable en la ejecución: así la tabla
+   * de Ejecuciones distingue disparos manuales de webhooks/cron/api en vez de mostrar todo como 'manual'.
+   */
+  async start(
+    workflowId: string,
+    workspaceId: string,
+    contextInput?: Record<string, unknown>,
+    triggerType: TriggerType = 'manual',
+  ) {
     const wf = await this.p.workflows.get(workflowId);
     assertInWorkspace(wf?.workspaceId, workspaceId, 'Workflow');
 
@@ -51,7 +60,7 @@ export class ExecutionsService {
     const execution = await this.p.executions.create({
       workflowVersionId: runVersion.id,
       workspaceId, // verificado == wf.workspaceId
-      triggerType: 'manual',
+      triggerType,
       context: initialContext,
     });
 
@@ -60,7 +69,7 @@ export class ExecutionsService {
       workflowVersionId: runVersion.id,
       workspaceId,
       graph: runVersion.graph,
-      triggerType: 'manual',
+      triggerType,
       initialContext,
     };
 

@@ -111,10 +111,17 @@ export class WebhooksService {
     }
 
     // El ingreso es público (autenticado por HMAC); la ejecución se ancla al workspace del webhook.
-    const result = await this.executions.start(wh.workflowId, wh.workspaceId, {
-      ticket: { webhook: payload },
-      variables: { trigger: 'webhook', webhookId, payload },
-    });
+    // `triggerType: 'webhook'` queda grabado de forma durable → la tabla de Ejecuciones lo distingue
+    // de un disparo manual (antes todo salía como 'manual' porque start() lo fijaba por defecto).
+    const result = await this.executions.start(
+      wh.workflowId,
+      wh.workspaceId,
+      {
+        ticket: { webhook: payload },
+        variables: { trigger: 'webhook', webhookId, payload },
+      },
+      'webhook',
+    );
     return { executionId: result.executionId, status: result.status };
   }
 
