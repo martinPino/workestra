@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import type { NodeConfigSchema, FieldSchema } from '../editor/node-types';
-import { CONNECTOR_ACTIONS } from '../editor/connector-actions';
 import { useConnectors, useAgents } from '../lib/hooks';
 import { useT } from '../i18n';
 
@@ -26,45 +25,6 @@ function validateJsonTemplate(s: string): string | null {
   } catch (e) {
     return e instanceof Error ? e.message.replace(/^JSON\.parse:\s*/, '') : 'JSON inválido';
   }
-}
-
-/**
- * Selector de "acción" (plantilla) según el proveedor del conector elegido. Al elegir una acción
- * rellena method + path + body del nodo; luego el usuario los puede ajustar. Depende de `connectorId`
- * ya seleccionado en el mismo config (para saber el proveedor).
- */
-function ActionTemplatePicker({
-  value,
-  onChange,
-}: {
-  value: Record<string, unknown>;
-  onChange: (v: Record<string, unknown>) => void;
-}) {
-  const t = useT();
-  const { data: connectors } = useConnectors();
-  const provider = connectors?.find((c) => c.id === String(value.connectorId ?? ''))?.provider;
-  const actions = provider ? (CONNECTOR_ACTIONS[provider] ?? []) : [];
-  if (!provider || actions.length === 0) return null;
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="text-[11px] font-medium text-txt-secondary">{t('Plantilla de acción')} ({provider})</span>
-      <select
-        value=""
-        onChange={(e) => {
-          const a = actions.find((x) => x.id === e.target.value);
-          if (a) onChange({ ...value, method: a.method, path: a.path, body: a.body ?? '' });
-        }}
-        className={inputBase}
-      >
-        <option value="">{t('— elige una acción para rellenar ruta + cuerpo —')}</option>
-        {actions.map((a) => (
-          <option key={a.id} value={a.id}>
-            {a.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
 }
 
 /** Unidades de tiempo humanas → milisegundos. El valor guardado SIEMPRE es ms (el motor no cambia). */
@@ -178,8 +138,6 @@ export function SchemaForm({ schema, value, onChange }: Props) {
             <span className="text-[11px] font-medium text-txt-secondary">{field.label}</span>
             <Field field={field} value={value[key]} onChange={(v) => set(key, v)} />
           </label>
-          {/* Tras elegir el conector, ofrece plantillas de acción que rellenan método/ruta/cuerpo. */}
-          {field.type === 'connector' && <ActionTemplatePicker value={value} onChange={onChange} />}
         </div>
       ))}
     </div>

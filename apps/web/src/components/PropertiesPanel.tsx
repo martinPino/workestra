@@ -1,6 +1,7 @@
 import { useEditorStore } from '../editor/store';
 import { getNodeType } from '../editor/node-types';
 import { SchemaForm } from './SchemaForm';
+import { ConnectorForm } from './ConnectorForm';
 import { useT } from '../i18n';
 
 /** Panel de propiedades: se genera desde el config schema del tipo del nodo seleccionado. */
@@ -38,9 +39,14 @@ export function PropertiesPanel() {
       </div>
       <div className="h-px bg-border" />
       {/* key={node.id}: remonta el formulario al cambiar de nodo para que los campos con estado local
-          (p. ej. la unidad del campo `duration`) se re-inicialicen desde el nodo recién seleccionado en
-          vez de heredar el estado del anterior. Editar el MISMO nodo no remonta (node.id estable). */}
-      <SchemaForm key={node.id} schema={def.configSchema} value={node.config} onChange={(config) => updateConfig(node.id, config)} />
+          (unidad del campo `duration`, cloudId/avanzado del conector) se re-inicialicen desde el nodo
+          recién seleccionado en vez de heredar el estado del anterior. Editar el MISMO nodo no remonta. */}
+      {node.kind === 'connector' ? (
+        // El nodo Conector usa un editor por ACCIONES (M20): sin method/path/JSON a la vista.
+        <ConnectorForm key={node.id} value={node.config} onChange={(config) => updateConfig(node.id, config)} />
+      ) : (
+        <SchemaForm key={node.id} schema={def.configSchema} value={node.config} onChange={(config) => updateConfig(node.id, config)} />
+      )}
     </div>
   );
 }
