@@ -164,6 +164,16 @@ export const api = {
     fetch(`${API}/workflows/edit`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ prompt, graph, model }) }).then((r) =>
       json<{ name: string; graph: WorkflowGraph }>(r),
     ),
+  // «Chat consciente del contexto» (M36): mensaje + grafo actual + contexto (nombre, notas, nodo seleccionado).
+  // La IA decide: edita el flujo (kind:'edit') o responde una pregunta sobre él (kind:'answer').
+  chatWorkflow: (
+    graph: WorkflowGraph,
+    message: string,
+    ctx: { name?: string; notes?: string[]; selected?: string; model?: string } = {},
+  ) =>
+    fetch(`${API}/workflows/chat`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ message, graph, ...ctx }) }).then((r) =>
+      json<{ kind: 'edit'; name: string; graph: WorkflowGraph } | { kind: 'answer'; text: string }>(r),
+    ),
   getWorkflow: (id: string) => fetch(`${API}/workflows/${id}`, { headers: authHeaders() }).then((r) => json<WorkflowDto>(r)),
   deleteWorkflow: (id: string) =>
     fetch(`${API}/workflows/${id}`, { method: 'DELETE', headers: authHeaders() }).then((r) => json<{ deleted: boolean }>(r)),

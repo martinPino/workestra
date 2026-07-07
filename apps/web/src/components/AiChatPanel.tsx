@@ -12,13 +12,16 @@ import { useT } from '../i18n';
 type Msg = { role: 'user' | 'ai'; text: string };
 
 /**
- * Chat de IA en el editor (M30): el usuario sigue modificando el flujo conversando («añade un Slack al
- * final», «cambia el trigger a cada mañana»). Cada mensaje envía el GRAFO ACTUAL + la instrucción al backend,
- * que devuelve el grafo modificado; lo cargamos con `loadDoc` (el autoguardado del editor lo persiste).
+ * Chat de IA en el editor, consciente del contexto (M30 · M36). El usuario está VIENDO un flujo en el lienzo
+ * y conversa: puede pedir un cambio («añade un Slack al final») o hacer una PREGUNTA sobre el flujo («¿qué
+ * hace esto?»). Cada mensaje envía el CONTEXTO COMPLETO del flujo — grafo actual + nombre + notas del lienzo +
+ * nodo seleccionado — y la IA decide: editar el flujo (lo aplicamos, reversible con ⌘Z) o responder en texto.
  */
 export function AiChatPanel({ onClose }: { onClose: () => void }) {
   const t = useT();
-  const [messages, setMessages] = useState<Msg[]>([{ role: 'ai', text: t('Dime qué quieres cambiar en el flujo y lo hago. Ej.: «añade un aviso a Slack al final».') }]);
+  const [messages, setMessages] = useState<Msg[]>([
+    { role: 'ai', text: t('Pregúntame sobre este flujo o dime qué cambiar. Ej.: «¿qué hace este flujo?» o «añade un aviso a Slack al final».') },
+  ]);
   const [input, setInput] = useState('');
   const [model, setModel] = useState(DEFAULT_GENERATION_MODEL); // M34: modelo elegido para el chat de IA
   const [keysOpen, setKeysOpen] = useState(false); // M35: «usa tu propia clave»
@@ -30,30 +33,39 @@ export function AiChatPanel({ onClose }: { onClose: () => void }) {
   }, [messages, busy]);
 
   const send = async (text: string) => {
-    const instruction = text.trim();
-    if (!instruction || busy) return;
+    const message = text.trim();
+    if (!message || busy) return;
     setInput('');
-    setMessages((m) => [...m, { role: 'user', text: instruction }]);
+    setMessages((m) => [...m, { role: 'user', text: message }]);
     setBusy(true);
     try {
-      // El grafo ES el estado: mandamos el actual + la instrucción, sin arrastrar historial de chat.
-      const current = docToWorkflowGraph(useEditorStore.getState().history.doc);
-      const { graph } = await api.editWorkflowGraph(current, instruction, model);
-      const newDoc = workflowGraphToDoc(graph);
-      // replaceGraph (no loadDoc): conserva las notas del usuario y es REVERSIBLE con ⌘Z.
-      useEditorStore.getState().replaceGraph(newDoc.nodes, newDoc.edges);
-      setMessages((m) => [...m, { role: 'ai', text: t('Listo, actualicé el flujo. Pulsa ⌘Z para deshacer.') }]);
+      // Damos a la IA TODO el contexto del flujo que el usuario está viendo, no solo los nodos:
+      const st = useEditorStore.getState();
+      const doc = st.history.doc;
+      const current = docToWorkflowGraph(doc);
+      const notes = doc.comments.map((c) => c.text).filter((s) => s.trim()); // notas pegadas en el lienzo
+      const selected = st.selection[0]; // key del nodo que tiene seleccionado (o undefined)
+      const res = await api.chatWorkflow(current, message, { name: st.workflowName, notes, selected, model });
+      if (res.kind === 'edit') {
+        const newDoc = workflowGraphToDoc(res.graph);
+        // replaceGraph (no loadDoc): conserva las notas del usuario y es REVERSIBLE con ⌘Z.
+        useEditorStore.getState().replaceGraph(newDoc.nodes, newDoc.edges);
+        setMessages((m) => [...m, { role: 'ai', text: t('Listo, actualicé el flujo. Pulsa ⌘Z para deshacer.') }]);
+      } else {
+        // Pregunta: la IA respondió con texto usando el contexto del flujo; no tocamos el lienzo.
+        setMessages((m) => [...m, { role: 'ai', text: res.text }]);
+      }
     } catch (e) {
       // Muestra el motivo real del backend (p. ej. «descripción demasiado larga») en vez de un genérico.
       const detail = e instanceof Error ? (e.message.match(/^HTTP \d+:\s*(.+)/)?.[1] ?? '') : '';
-      setMessages((m) => [...m, { role: 'ai', text: detail ? `${t('No pude aplicar ese cambio.')} ${detail}` : t('No pude aplicar ese cambio. Prueba a decirlo de otra forma.') }]);
-      setInput(instruction); // no perder el texto si falló
+      setMessages((m) => [...m, { role: 'ai', text: detail ? `${t('No pude responder.')} ${detail}` : t('No pude responder. Prueba a decirlo de otra forma.') }]);
+      setInput(message); // no perder el texto si falló
     } finally {
       setBusy(false);
     }
   };
 
-  const suggestions = [t('Añade un aviso a Slack al final'), t('Cambia el disparador a cada mañana'), t('Añade un paso que resuma con IA')];
+  const suggestions = [t('¿Qué hace este flujo?'), t('Añade un aviso a Slack al final'), t('¿Cómo puedo mejorarlo?')];
 
   return (
     <aside className="absolute inset-y-0 right-0 z-30 flex w-full max-w-sm flex-col border-l border-border bg-surface md:static md:z-0 md:w-96 md:max-w-none">

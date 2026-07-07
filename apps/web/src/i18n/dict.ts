@@ -239,6 +239,13 @@ export const EN: Record<string, string> = {
   conectada: 'connected',
   'Reemplazar clave…': 'Replace key…',
   'Clave de': 'Key for',
+  // --- M36 · Chat del editor consciente del contexto ---
+  'Pregúntame sobre este flujo o dime qué cambiar. Ej.: «¿qué hace este flujo?» o «añade un aviso a Slack al final».':
+    'Ask me about this flow or tell me what to change. E.g. "what does this flow do?" or "add a Slack alert at the end".',
+  '¿Qué hace este flujo?': 'What does this flow do?',
+  '¿Cómo puedo mejorarlo?': 'How can I improve it?',
+  'No pude responder.': "I couldn't answer.",
+  'No pude responder. Prueba a decirlo de otra forma.': "I couldn't answer. Try rephrasing it.",
   // --- M32 · Conecta tu IA (MCP) ---
   'Conecta tu IA': 'Connect your AI',
   'Genera una clave y pégala en Claude Desktop, Cursor o ChatGPT para construir y ejecutar tus automatizaciones desde ahí.':

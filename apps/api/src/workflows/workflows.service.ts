@@ -112,6 +112,116 @@ export class WorkflowsService {
     return this.runLlmGraph(await this.catalogPrompt(workspaceId), user, workspaceId, model);
   }
 
+  /**
+   * «Chat consciente del contexto en el editor» (M36). A diferencia de `editGraph` (que SIEMPRE reescribe el
+   * grafo), aquí el usuario está VIENDO un flujo en el lienzo y conversa: puede pedir un cambio O hacer una
+   * pregunta. Le pasamos el CONTEXTO COMPLETO del flujo (nombre + grafo + notas del lienzo + nodo seleccionado)
+   * y el modelo decide: `{kind:'edit', graph}` si pide cambiar, o `{kind:'answer', text}` si pregunta/comenta.
+   */
+  async chatGraph(
+    graph: unknown,
+    message: string,
+    workspaceId: string,
+    opts: { name?: string; notes?: string[]; selected?: string; model?: string } = {},
+  ): Promise<{ kind: 'edit'; name: string; graph: WorkflowGraph } | { kind: 'answer'; text: string }> {
+    const clean = this.cleanPrompt(message);
+    const current = this.parseGraph(graph); // valida que el grafo de entrada esté bien formado
+
+    // Cuota diaria por workspace (M33): corta ANTES de gastar si ya superó su presupuesto de IA.
+    const limit = this.tokenLimit();
+    if (limit > 0 && (await this.p.usage.todayTokens(workspaceId)) >= limit) {
+      throw new BadRequestException('Has alcanzado el límite diario de IA de tu espacio de trabajo. Inténtalo de nuevo mañana o sube el límite.');
+    }
+    const llm = await this.buildRouter(workspaceId); // BYOK (M35): claves del workspace o de plataforma
+    const chosen = opts.model?.trim() || process.env.LLM_MODEL || 'llama-3.3-70b-versatile';
+
+    const system = [
+      await this.catalogPrompt(workspaceId),
+      '',
+      'MODO CHAT DEL EDITOR: el usuario está VIENDO este flujo en el lienzo y conversa contigo. Puede pedir un CAMBIO o hacer una PREGUNTA sobre el flujo.',
+      'Responde SIEMPRE con UN ÚNICO objeto JSON, sin texto alrededor ni ```:',
+      '- Si pide crear, modificar o arreglar el flujo: {"kind":"edit","name":"<nombre corto>","graph":{"nodes":[...],"edges":[...]}} con el flujo COMPLETO resultante (todos los nodos con sus posiciones y configs, no solo el cambio).',
+      '- Si pregunta, pide una explicación o solo comenta (no pide cambiar nada): {"kind":"answer","text":"<respuesta clara y breve, en el MISMO idioma del usuario>"}.',
+      'Apóyate en el CONTEXTO del flujo que te doy para responder. No inventes ids de conectores/agentes: usa solo los del catálogo.',
+    ].join('\n');
+
+    const ctx: string[] = [];
+    if (opts.name?.trim()) ctx.push(`Nombre del flujo: ${opts.name.trim()}`);
+    ctx.push('Flujo ACTUAL (JSON):', JSON.stringify({ nodes: current.nodes, edges: current.edges }));
+    const notes = (opts.notes ?? []).map((n) => (n ?? '').trim()).filter(Boolean).slice(0, 20);
+    if (notes.length) ctx.push('', 'Notas que el usuario dejó en el lienzo:', ...notes.map((n) => `- ${n}`));
+    if (opts.selected?.trim()) ctx.push('', `Ahora mismo el usuario tiene seleccionado el nodo con key «${opts.selected.trim()}» (búscalo en el JSON).`);
+    const user = [...ctx, '', 'Mensaje del usuario:', clean].join('\n');
+
+    const base = [
+      { role: 'system' as const, content: system },
+      { role: 'user' as const, content: user },
+    ];
+    let lastErr = 'sin respuesta';
+    let rateLimited = false;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const messages =
+        attempt === 0
+          ? base
+          : [...base, { role: 'user' as const, content: `Tu respuesta anterior no fue válida (${lastErr}). Devuelve SOLO el objeto JSON con "kind":"edit" o "kind":"answer".` }];
+      let res;
+      try {
+        res = await llm.chat({ model: chosen, messages });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (isRateLimitError(msg)) rateLimited = true;
+        lastErr = `error del modelo: ${msg}`;
+        break;
+      }
+      const used = (res.usage?.inputTokens ?? 0) + (res.usage?.outputTokens ?? 0);
+      if (used > 0) await this.p.usage.add(workspaceId, used).catch(() => undefined);
+      const jsonStr = extractJsonObject(res.content ?? '');
+      if (!jsonStr) {
+        lastErr = 'no se encontró JSON en la respuesta';
+        continue;
+      }
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(jsonStr);
+      } catch {
+        lastErr = 'JSON mal formado';
+        continue;
+      }
+      const o = (parsed ?? {}) as { kind?: string; text?: string; answer?: string; name?: string; graph?: unknown; nodes?: unknown };
+      // Respuesta de texto (pregunta): no toca el flujo. Detecta `kind:'answer'` o un objeto con texto y sin grafo.
+      const isAnswer = o.kind === 'answer' || (o.graph === undefined && o.nodes === undefined && (typeof o.text === 'string' || typeof o.answer === 'string'));
+      if (isAnswer) {
+        const text = String(o.text ?? o.answer ?? '').trim();
+        if (text) return { kind: 'answer', text: text.slice(0, 4000) };
+        lastErr = 'respuesta de texto vacía';
+        continue;
+      }
+      // Edición: valida schema + DAG + inicio, igual que la generación.
+      const g = WorkflowGraphSchema.safeParse(o.graph ?? parsed);
+      if (!g.success) {
+        lastErr = `estructura inválida: ${JSON.stringify(g.error.issues.slice(0, 2))}`;
+        continue;
+      }
+      const dag = validateDag(g.data);
+      if (!dag.valid) {
+        lastErr = `no es un DAG válido: ${dag.errors.join('; ')}`;
+        continue;
+      }
+      if (!g.data.nodes.some((n) => n.type === 'trigger')) {
+        lastErr = 'el flujo debe tener un nodo de inicio (trigger)';
+        continue;
+      }
+      const name = typeof o.name === 'string' && o.name.trim() ? o.name.trim().slice(0, 80) : opts.name?.trim() || 'Automatización con IA';
+      return { kind: 'edit', name, graph: g.data };
+    }
+    if (rateLimited) {
+      throw new BadRequestException(
+        'La IA ha alcanzado su límite de uso por ahora. Inténtalo de nuevo en unos minutos, o conecta otro proveedor de IA (sube el plan de Groq o añade una clave de OpenAI).',
+      );
+    }
+    throw new BadRequestException(`La IA no pudo responder. ${lastErr}`);
+  }
+
   private cleanPrompt(prompt: string): string {
     const clean = (prompt ?? '').trim();
     if (!clean) throw new BadRequestException('Describe lo que quieres automatizar.');

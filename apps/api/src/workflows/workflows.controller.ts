@@ -30,6 +30,23 @@ export class WorkflowsController {
     return this.svc.editGraph(body?.graph, body?.prompt ?? '', workspaceId, body?.model);
   }
 
+  // «Chat consciente del contexto» (M36): recibe el flujo actual + su contexto (nombre, notas, nodo
+  // seleccionado) y decide → {kind:'edit', graph} si pide un cambio, o {kind:'answer', text} si pregunta.
+  @Post('chat')
+  @UseGuards(ScopesGuard)
+  @RequireScopes('workflow:write')
+  chat(
+    @Body() body: { message: string; graph: unknown; name?: string; notes?: string[]; selected?: string; model?: string },
+    @Workspace() workspaceId: string,
+  ) {
+    return this.svc.chatGraph(body?.graph, body?.message ?? '', workspaceId, {
+      name: body?.name,
+      notes: body?.notes,
+      selected: body?.selected,
+      model: body?.model,
+    });
+  }
+
   @Get()
   list(@Workspace() workspaceId: string) {
     return this.svc.list(workspaceId);
