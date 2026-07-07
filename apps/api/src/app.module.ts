@@ -14,6 +14,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
 import { SchedulesModule } from './schedules/schedules.module';
 import { ConnectorsModule } from './connectors/connectors.module';
 import { TriggersModule } from './triggers/triggers.module';
+import { ApiKeysModule } from './api-keys/api-keys.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { TriggersModule } from './triggers/triggers.module';
     SchedulesModule,
     ConnectorsModule,
     TriggersModule,
+    ApiKeysModule,
   ],
   controllers: [HealthController],
   providers: [

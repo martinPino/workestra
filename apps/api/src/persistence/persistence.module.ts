@@ -13,6 +13,7 @@ import type {
   IScheduleRepository,
   IConnectorRepository,
   ITriggerBindingRepository,
+  IApiKeyRepository,
 } from '@core/engine';
 import type { MemoryEvent } from '@core/contracts';
 import IORedis from 'ioredis';
@@ -44,6 +45,8 @@ import {
   PrismaScheduleRepository,
   PrismaConnectorRepository,
   PrismaTriggerBindingRepository,
+  InMemoryApiKeyRepository,
+  PrismaApiKeyRepository,
 } from '@core/infra';
 
 export const PERSISTENCE = Symbol('PERSISTENCE');
@@ -69,6 +72,8 @@ export interface PersistenceBundle {
   connectors: IConnectorRepository;
   /** Bindings de disparador (M19): enlace receta↔workflow para triggers sin código (p. ej. Jira). */
   triggerBindings: ITriggerBindingRepository;
+  /** Claves de API por workspace (M32): credencial duradera para MCP / apps externas. */
+  apiKeys: IApiKeyRepository;
   prisma?: PrismaClient;
 }
 
@@ -164,6 +169,7 @@ async function buildPersistence(): Promise<PersistenceBundle> {
       schedules: new PrismaScheduleRepository(prisma),
       connectors: new PrismaConnectorRepository(prisma),
       triggerBindings: new PrismaTriggerBindingRepository(prisma),
+      apiKeys: new PrismaApiKeyRepository(prisma),
     };
   }
   return {
@@ -181,6 +187,7 @@ async function buildPersistence(): Promise<PersistenceBundle> {
     schedules: new InMemoryScheduleRepository(),
     connectors: new InMemoryConnectorRepository(),
     triggerBindings: new InMemoryTriggerBindingRepository(),
+    apiKeys: new InMemoryApiKeyRepository(),
   };
 }
 

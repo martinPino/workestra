@@ -8,6 +8,7 @@ import type {
   WorkflowGraph,
   Agent,
   MemoryScope,
+  Role,
 } from '@core/contracts';
 
 /**
@@ -364,4 +365,49 @@ export interface IMemoryStore {
   get(scope: MemoryScope, ownerId: string, key: string): Promise<unknown | undefined>;
   set(scope: MemoryScope, ownerId: string, key: string, value: unknown): Promise<void>;
   append(scope: MemoryScope, ownerId: string, key: string, value: unknown): Promise<void>;
+}
+
+// --------- Puerto de claves de API (credencial duradera para MCP / apps externas, M32) ---------
+
+export interface ApiKeyRecord {
+  id: string;
+  workspaceId: string;
+  /** `sub` del principal (para req.user). */
+  userSub: string;
+  /** Snapshot del email al crear la clave (para whoami/listado). */
+  email: string;
+  /** Snapshot del rol al crear la clave: dirige el RBAC de todo lo que haga la clave. */
+  role: Role;
+  /** sha256(raw) hex. La clave en claro (`af_…`) NUNCA se persiste. */
+  hashedKey: string;
+  prefix: string;
+  last4: string;
+  label: string;
+  createdAt: Date;
+  lastUsedAt: Date | null;
+  revokedAt: Date | null;
+}
+
+/**
+ * Claves de API por workspace (M32). La clave en claro se muestra UNA vez al crearla; aquí solo vive su
+ * hash. `findByHash` devuelve solo claves ACTIVAS (no revocadas) — es el punto de entrada de la auth por key.
+ */
+export interface IApiKeyRepository {
+  create(input: {
+    workspaceId: string;
+    userSub: string;
+    email: string;
+    role: Role;
+    hashedKey: string;
+    prefix: string;
+    last4: string;
+    label: string;
+  }): Promise<ApiKeyRecord>;
+  /** Solo claves activas (revokedAt = null). Es el lookup de autenticación. */
+  findByHash(hashedKey: string): Promise<ApiKeyRecord | null>;
+  listByWorkspace(workspaceId: string): Promise<ApiKeyRecord[]>;
+  /** Revoca (marca revokedAt) solo si pertenece al workspace. Devuelve la fila o null. */
+  revoke(id: string, workspaceId: string): Promise<ApiKeyRecord | null>;
+  /** Best-effort: sella el último uso (no debe bloquear la petición si falla). */
+  touchLastUsed(id: string): Promise<void>;
 }

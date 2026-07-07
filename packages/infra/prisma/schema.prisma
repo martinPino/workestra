@@ -40,6 +40,7 @@ model Workspace {
   memories   Memory[]
   webhooks   Webhook[]
   plugins    Plugin[]
+  apiKeys    ApiKey[]
 
   @@unique([organizationId, slug])
 }
@@ -381,6 +382,28 @@ model Prompt {
   template    String
   variables   Json?
   version     Int       @default(1)
+}
+
+// Clave de API por workspace (M32): credencial DURADERA para que apps externas (Claude Desktop, ChatGPT,
+// Cursor) hablen con la API / el servidor MCP. Se guarda solo el sha256 de la clave (`hashedKey`); la clave
+// en claro (`af_…`) se muestra UNA vez al crearla. `role` es un snapshot del rol al emitirla (dirige el RBAC).
+model ApiKey {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userSub     String // `sub` del principal (para req.user)
+  email       String // snapshot para whoami/listado
+  role        Role // snapshot del rol al crear la clave
+  hashedKey   String    @unique // sha256(raw) hex; la clave en claro NUNCA se guarda
+  prefix      String // "af"
+  last4       String // últimos 4 chars, para mostrar en la lista
+  label       String
+  createdAt   DateTime  @default(now())
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+
+  @@index([workspaceId])
+  @@index([hashedKey])
 }
 
 model Plugin {

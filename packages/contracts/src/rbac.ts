@@ -8,7 +8,7 @@ import type { Role } from './enums';
  */
 export const ROLE_SCOPES: Record<Role, string[]> = {
   OWNER: ['*'],
-  ADMIN: ['workspace:*', 'workflow:*', 'agent:*', 'execution:*', 'connector:*', 'tool:*', 'secret:read', 'plugin:*'],
+  ADMIN: ['workspace:*', 'workflow:*', 'agent:*', 'execution:*', 'connector:*', 'tool:*', 'secret:read', 'plugin:*', 'apikey:manage'],
   EDITOR: [
     'workflow:read',
     'workflow:write',
