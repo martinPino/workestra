@@ -27,16 +27,22 @@ export const toolLabel = (key: string): string => TOOL_CATALOG.find((c) => c.key
 export interface McpPreset {
   name: string;
   url: string;
+  /** Color de marca para la insignia (M42). El texto de la inicial es blanco salvo `darkText`. */
+  color: string;
+  darkText?: boolean;
 }
 
 export const MCP_PRESETS: McpPreset[] = [
-  { name: 'GitHub', url: 'https://api.githubcopilot.com/mcp/' },
-  { name: 'Notion', url: 'https://mcp.notion.com/mcp' },
-  { name: 'Linear', url: 'https://mcp.linear.app/mcp' },
-  { name: 'Sentry', url: 'https://mcp.sentry.dev/mcp' },
-  { name: 'Atlassian', url: 'https://mcp.atlassian.com/v1/sse' },
-  { name: 'Stripe', url: 'https://mcp.stripe.com' },
-  { name: 'Hugging Face', url: 'https://huggingface.co/mcp' },
-  { name: 'DeepWiki', url: 'https://mcp.deepwiki.com/mcp' },
-  { name: 'Context7', url: 'https://mcp.context7.com/mcp' },
+  { name: 'GitHub', url: 'https://api.githubcopilot.com/mcp/', color: '#181717' },
+  { name: 'Notion', url: 'https://mcp.notion.com/mcp', color: '#000000' },
+  { name: 'Linear', url: 'https://mcp.linear.app/mcp', color: '#5E6AD2' },
+  { name: 'Sentry', url: 'https://mcp.sentry.dev/mcp', color: '#362D59' },
+  { name: 'Atlassian', url: 'https://mcp.atlassian.com/v1/sse', color: '#0052CC' },
+  { name: 'Stripe', url: 'https://mcp.stripe.com', color: '#635BFF' },
+  { name: 'Hugging Face', url: 'https://huggingface.co/mcp', color: '#FFD21E', darkText: true },
+  { name: 'DeepWiki', url: 'https://mcp.deepwiki.com/mcp', color: '#1F6FEB' },
+  { name: 'Context7', url: 'https://mcp.context7.com/mcp', color: '#0EA5E9' },
 ];
+
+export const mcpPresetFor = (server: { url?: string; name?: string }): McpPreset | undefined =>
+  MCP_PRESETS.find((p) => p.url === server.url) ?? (server.name ? MCP_PRESETS.find((p) => p.name === server.name) : undefined);

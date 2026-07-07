@@ -3,6 +3,7 @@ import { Plus, Check, X, Boxes, Wrench } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, type McpServerRef } from '../lib/api';
 import { TOOL_CATALOG, MCP_PRESETS } from '../lib/tools';
+import { McpLogo } from '../lib/mcp-logos';
 import { useT } from '../i18n';
 
 const CIRCLE = 52;
@@ -11,7 +12,7 @@ const LINK = 30; // alto del abanico de líneas punteadas del puerto a los círc
 
 type Item =
   | { kind: 'builtin'; key: string; label: string; icon: typeof Wrench }
-  | { kind: 'mcp'; id: string; label: string };
+  | { kind: 'mcp'; id: string; label: string; url: string };
 
 /**
  * Puerto «Herramientas» del nodo Agente estilo n8n (M40): del puerto cuelgan las herramientas del agente como
@@ -71,7 +72,7 @@ export function AgentToolsPort({
       const c = TOOL_CATALOG.find((x) => x.key === key);
       return { kind: 'builtin', key, label: c ? t(c.label) : key, icon: c?.icon ?? Wrench };
     }),
-    ...mcpServers.map((s): Item => ({ kind: 'mcp', id: s.id, label: s.name })),
+    ...mcpServers.map((s): Item => ({ kind: 'mcp', id: s.id, label: s.name, url: s.url })),
   ];
 
   const N = items.length;
@@ -121,7 +122,7 @@ export function AgentToolsPort({
             {items.map((it) => (
               <div key={it.kind === 'mcp' ? it.id : it.key} className="group/tool flex flex-col items-center" style={{ width: CIRCLE }}>
                 <div className="relative flex items-center justify-center rounded-full border border-border bg-elevated" style={{ width: CIRCLE, height: CIRCLE }}>
-                  {it.kind === 'mcp' ? <Boxes size={20} className="text-primary" /> : <it.icon size={19} className="text-txt-secondary" />}
+                  {it.kind === 'mcp' ? <McpLogo server={{ url: it.url, name: it.label }} box={30} /> : <it.icon size={19} className="text-txt-secondary" />}
                   {editable && (
                     <button
                       type="button"
@@ -202,13 +203,13 @@ export function AgentToolsPort({
                     addPreset(p);
                   }}
                   title={added ? t('Ya añadido') : p.url}
-                  className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-1 text-[11px] transition-colors ${
+                  className={`inline-flex items-center gap-1.5 rounded-md border px-1.5 py-1 text-[11px] transition-colors ${
                     added
                       ? 'border-primary/50 bg-primary/10 text-primary'
                       : 'border-border bg-surface text-txt-secondary hover:border-border-strong hover:text-txt-primary'
                   }`}
                 >
-                  {added ? <Check size={10} /> : <Plus size={10} />} {p.name}
+                  <McpLogo server={{ url: p.url, name: p.name }} box={16} /> {p.name} {added && <Check size={10} />}
                 </button>
               );
             })}
