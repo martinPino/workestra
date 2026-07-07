@@ -6,15 +6,29 @@ import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.
 import { assertInWorkspace } from '../tenant/tenant.util';
 import { TriggersService } from '../triggers/triggers.service';
 import { extractJsonObject, buildGeneratePrompt, isRateLimitError } from './generate.util';
+import { LlmKeysService } from '../llm-keys/llm-keys.service';
 
 @Injectable()
 export class WorkflowsService {
-  private readonly llm = createLlmRouter(); // «Construir con IA» (M29): lee el proveedor de env (Groq…)
-
   constructor(
     @Inject(PERSISTENCE) private readonly p: PersistenceBundle,
     private readonly triggers: TriggersService,
+    private readonly llmKeys: LlmKeysService,
   ) {}
+
+  /**
+   * Construye el router LLM para un workspace (M35 BYOK): si el workspace aportó sus propias claves, se usan
+   * ESAS (sobrescriben la config de plataforma); si no, `createLlmRouter` cae a las variables de entorno.
+   */
+  private async buildRouter(workspaceId: string) {
+    const byok = await this.llmKeys.resolve(workspaceId);
+    return createLlmRouter({
+      openaiApiKey: byok.openai,
+      anthropicApiKey: byok.anthropic,
+      openrouterApiKey: byok.openrouter,
+      llmApiKey: byok.groq, // Groq/openai-compatible; undefined → LLM_API_KEY de plataforma
+    });
+  }
 
   /** Carga un workflow verificando que pertenece al workspace autenticado (404 si no). */
   private async getOwned(id: string, workspaceId: string) {
@@ -130,6 +144,8 @@ export class WorkflowsService {
     if (limit > 0 && (await this.p.usage.todayTokens(workspaceId)) >= limit) {
       throw new BadRequestException('Has alcanzado el límite diario de IA de tu espacio de trabajo. Inténtalo de nuevo mañana o sube el límite.');
     }
+    // Router del workspace (M35 BYOK): usa sus propias claves si las tiene; si no, las de plataforma.
+    const llm = await this.buildRouter(workspaceId);
     // Modelo elegido por el usuario (M34), o el por defecto. La CADENA DE FALLBACK del router (M33) ya cubre
     // que este proveedor se agote cayendo a otro; no hace falta un fallback de modelo aquí.
     const chosen = model?.trim() || process.env.LLM_MODEL || 'llama-3.3-70b-versatile';
@@ -148,7 +164,7 @@ export class WorkflowsService {
             : [...base, { role: 'user' as const, content: `El JSON anterior no fue válido (${lastErr}). Devuelve SOLO el JSON corregido, sin texto.` }];
         let res;
         try {
-          res = await this.llm.chat({ model, messages });
+          res = await llm.chat({ model, messages });
         } catch (e) {
           // El modelo falló (límite de uso, contexto, red). NO revienta con 500: pasa al siguiente modelo
           // (reintentar el mismo modelo agotado no sirve).

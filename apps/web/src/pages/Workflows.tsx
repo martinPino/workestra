@@ -10,6 +10,7 @@ import { api, type WorkflowDto, type ApiKeyView } from '../lib/api';
 import { STARTER_DOC, docToWorkflowGraph } from '../graph';
 import { WORKFLOW_TEMPLATES, type WorkflowTemplate } from '../editor/templates';
 import { ThinkingSteps } from '../components/ThinkingSteps';
+import { ModelKeysDialog } from '../components/ModelKeysDialog';
 import { GENERATION_MODELS, DEFAULT_GENERATION_MODEL } from '../lib/models';
 import { useT } from '../i18n';
 
@@ -254,6 +255,7 @@ function AiDialog({
   onClose: () => void;
 }) {
   const t = useT();
+  const [keysOpen, setKeysOpen] = useState(false); // M35: diálogo «usa tu propia clave»
   const examples = [
     t('Cuando llegue un ticket, resúmelo con IA y avísame por Slack.'),
     t('Cada mañana, crea una hoja de cálculo con una idea del día.'),
@@ -330,6 +332,9 @@ function AiDialog({
                   </option>
                 ))}
               </select>
+              <button type="button" onClick={() => setKeysOpen(true)} className="shrink-0 text-[11px] font-medium text-primary hover:underline">
+                {t('Usa tu clave')}
+              </button>
             </div>
             {err && <p className="mt-2 text-xs text-danger">{err}</p>}
           </div>
@@ -343,6 +348,7 @@ function AiDialog({
           </div>
         </>
       )}
+      {keysOpen && <ModelKeysDialog onClose={() => setKeysOpen(false)} />}
     </Modal>
   );
 }

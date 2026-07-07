@@ -16,6 +16,7 @@ import { ConnectorsModule } from './connectors/connectors.module';
 import { TriggersModule } from './triggers/triggers.module';
 import { ApiKeysModule } from './api-keys/api-keys.module';
 import { McpModule } from './mcp/mcp.module';
+import { LlmKeysModule } from './llm-keys/llm-keys.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { McpModule } from './mcp/mcp.module';
     TriggersModule,
     ApiKeysModule,
     McpModule,
+    LlmKeysModule,
   ],
   controllers: [HealthController],
   providers: [

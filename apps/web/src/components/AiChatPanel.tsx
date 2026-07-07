@@ -4,6 +4,7 @@ import { IconButton } from '../ui';
 import { useEditorStore } from '../editor/store';
 import { docToWorkflowGraph, workflowGraphToDoc } from '../graph';
 import { ThinkingSteps } from './ThinkingSteps';
+import { ModelKeysDialog } from './ModelKeysDialog';
 import { api } from '../lib/api';
 import { GENERATION_MODELS, DEFAULT_GENERATION_MODEL } from '../lib/models';
 import { useT } from '../i18n';
@@ -20,6 +21,7 @@ export function AiChatPanel({ onClose }: { onClose: () => void }) {
   const [messages, setMessages] = useState<Msg[]>([{ role: 'ai', text: t('Dime qué quieres cambiar en el flujo y lo hago. Ej.: «añade un aviso a Slack al final».') }]);
   const [input, setInput] = useState('');
   const [model, setModel] = useState(DEFAULT_GENERATION_MODEL); // M34: modelo elegido para el chat de IA
+  const [keysOpen, setKeysOpen] = useState(false); // M35: «usa tu propia clave»
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -107,18 +109,23 @@ export function AiChatPanel({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="border-t border-border p-2.5">
-        <select
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
-          aria-label={t('Modelo de IA')}
-          className="mb-2 w-full rounded-lg border border-border bg-surface px-2 py-1 text-[11px] text-txt-secondary outline-none focus:border-primary/60"
-        >
-          {GENERATION_MODELS.map((m) => (
-            <option key={m.value} value={m.value}>
-              {m.label}
-            </option>
-          ))}
-        </select>
+        <div className="mb-2 flex items-center gap-2">
+          <select
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            aria-label={t('Modelo de IA')}
+            className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-2 py-1 text-[11px] text-txt-secondary outline-none focus:border-primary/60"
+          >
+            {GENERATION_MODELS.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+          <button type="button" onClick={() => setKeysOpen(true)} className="shrink-0 text-[11px] font-medium text-primary hover:underline">
+            {t('Usa tu clave')}
+          </button>
+        </div>
         <div className="flex items-end gap-2 rounded-xl border border-border bg-surface p-1.5 focus-within:border-primary/60">
           <textarea
             value={input}
@@ -139,6 +146,7 @@ export function AiChatPanel({ onClose }: { onClose: () => void }) {
           </IconButton>
         </div>
       </div>
+      {keysOpen && <ModelKeysDialog onClose={() => setKeysOpen(false)} />}
     </aside>
   );
 }

@@ -227,6 +227,18 @@ export const EN: Record<string, string> = {
     "I'll apply your change: I analyze the flow and adjust the nodes.",
   'La IA no pudo montar el flujo.': "The AI couldn't build the flow.",
   'Modelo de IA': 'AI model',
+  // --- M35 · BYOK: usa tu propia clave ---
+  'Usa tu clave': 'Use your key',
+  'Usa tu propia clave de IA': 'Use your own AI key',
+  'Si añades tu clave, la IA de tu espacio usará esa (tu saldo) en vez de la de la plataforma. Se guarda cifrada.':
+    "If you add your key, your workspace's AI will use it (your credit) instead of the platform's. Stored encrypted.",
+  'Tus claves de IA': 'Your AI keys',
+  'No se pudieron cargar las claves.': "Couldn't load the keys.",
+  'No se pudo guardar la clave.': "Couldn't save the key.",
+  'No se pudo quitar la clave.': "Couldn't remove the key.",
+  conectada: 'connected',
+  'Reemplazar clave…': 'Replace key…',
+  'Clave de': 'Key for',
   // --- M32 · Conecta tu IA (MCP) ---
   'Conecta tu IA': 'Connect your AI',
   'Genera una clave y pégala en Claude Desktop, Cursor o ChatGPT para construir y ejecutar tus automatizaciones desde ahí.':

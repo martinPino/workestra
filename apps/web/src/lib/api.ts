@@ -13,6 +13,12 @@ export interface WorkflowDto {
   graph: WorkflowGraph;
 }
 
+/** Clave de IA propia del workspace (BYOK, M35): solo el proveedor y los últimos 4 chars. */
+export interface LlmKeyView {
+  provider: string;
+  last4: string;
+}
+
 /** Vista de una clave de API (M32): sin hash ni clave en claro. */
 export interface ApiKeyView {
   id: string;
@@ -186,6 +192,14 @@ export const api = {
     ),
   revokeApiKey: (id: string) =>
     fetch(`${API}/api-keys/${id}`, { method: 'DELETE', headers: authHeaders() }).then((r) => json<{ revoked: boolean }>(r)),
+  // --- Claves de IA propias del workspace (BYOK, M35) ---
+  listLlmKeys: () => fetch(`${API}/llm-keys`, { headers: authHeaders() }).then((r) => json<LlmKeyView[]>(r)),
+  setLlmKey: (provider: string, apiKey: string) =>
+    fetch(`${API}/llm-keys`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ provider, apiKey }) }).then((r) =>
+      json<{ provider: string; last4: string }>(r),
+    ),
+  removeLlmKey: (provider: string) =>
+    fetch(`${API}/llm-keys/${provider}`, { method: 'DELETE', headers: authHeaders() }).then((r) => json<{ removed: boolean }>(r)),
   /** Delta del stream (M9): solo los eventos con `seq > since`, para el poll incremental de la consola. */
   getExecutionEvents: (id: string, since: number) =>
     fetch(`${API}/executions/${id}/events?since=${since}`, { headers: authHeaders() }).then((r) => json<{ events: ExecutionEvent[] }>(r)),
