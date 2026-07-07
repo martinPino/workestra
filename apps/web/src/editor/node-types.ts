@@ -1,5 +1,5 @@
 import type { NodeType } from '@core/contracts';
-import { Zap, Wrench, GitBranch, Globe, BrainCircuit, Sparkles, Timer, UserCheck, Plug, Flag, Split, type LucideIcon } from 'lucide-react';
+import { Zap, Wrench, GitBranch, Globe, BrainCircuit, Sparkles, Timer, UserCheck, Plug, Flag, Split, Braces, type LucideIcon } from 'lucide-react';
 
 /** Subconjunto de JSON Schema que entiende el NodePropertiesPanel. */
 export interface FieldSchema {
@@ -136,6 +136,25 @@ registerNodeType({
         placeholder: '{"model":"gpt-4.1-mini","messages":[{"role":"user","content":"{{http:noticias.json.articles.0.title}}"}]}',
         multiline: true,
         format: 'json',
+      },
+    },
+  },
+});
+
+registerNodeType({
+  kind: 'code',
+  label: 'Transformar datos',
+  icon: Braces,
+  color: 'text-sky-400',
+  category: 'logic',
+  configSchema: {
+    title: 'Transformar datos',
+    fields: {
+      code: {
+        type: 'string',
+        label: 'Script — recibe `input` (salida de pasos previos) y haz `return`',
+        placeholder: "const items = input['agent:extraer.output'] || [];\nreturn items.map(x => ({ name: x.name, total: x.qty * x.price }));",
+        multiline: true,
       },
     },
   },

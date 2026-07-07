@@ -239,6 +239,9 @@ export const EN: Record<string, string> = {
   conectada: 'connected',
   'Reemplazar clave…': 'Replace key…',
   'Clave de': 'Key for',
+  // --- M46 · Nodo «Transformar datos» (code) ---
+  'Transformar datos': 'Transform data',
+  'Script — recibe `input` (salida de pasos previos) y haz `return`': 'Script — receives `input` (previous steps output), then `return`',
   // --- M38 · Barra flotante de controles del nodo ---
   Duplicar: 'Duplicate',
   'Desactivar paso': 'Disable step',

@@ -3,6 +3,7 @@ import type { ModelRouter } from '@core/llm';
 import { NodeExecutorRegistry } from './registry';
 import { createDefaultNodeRegistry, WorkNodeExecutor, WaitNodeExecutor } from './executors';
 import { ConditionNodeExecutor, HttpNodeExecutor } from './executors-io';
+import { CodeNodeExecutor } from './code-node';
 import { ToolRegistry, MockTool, HttpTool } from './tools';
 import { ToolAuthorizationService } from './tool-authorization';
 import { AgentRuntime } from './agent-runtime';
@@ -40,6 +41,7 @@ export function createRuntimeRegistry(deps: RuntimeRegistryDeps): NodeExecutorRe
   const registry = createDefaultNodeRegistry(); // trigger + end
   registry.register(new ConditionNodeExecutor());
   registry.register(new HttpNodeExecutor());
+  registry.register(new CodeNodeExecutor()); // M46: nodo «Transformar datos» (JS en worker aislado)
   registry.register(new WaitNodeExecutor());
   registry.register(new WorkNodeExecutor('tool', deps.stepDelayMs ?? 0));
 
