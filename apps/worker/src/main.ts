@@ -15,6 +15,7 @@ import {
   EventStorePublisher,
   InMemoryMemoryStore,
   RedisContextStore,
+  RedisWorkspaceUsageRepository,
   RedisEventPublisher,
   CompositeEventPublisher,
   BestEffortPublisher,
@@ -84,6 +85,8 @@ async function main(): Promise<void> {
         registry,
         clock: new SystemClock(),
         ids: new CuidIdGenerator(),
+        // M33: cuota diaria por workspace — el mismo Redis que la API, así los tokens de agentes cuentan.
+        usage: new RedisWorkspaceUsageRepository(redis),
       });
 
       return runner.run({ ...input, resumeCompleted, startSeq });

@@ -6,5 +6,7 @@
  */
 export function isProviderRateLimited(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
-  return /\bHTTP 429\b|\b429\b|rate.?limit|too many requests|tokens per (day|minute)|insufficient_quota|\bquota\b/i.test(msg);
+  // Patrones ANCLADOS al formato real de los proveedores (evita falsos positivos: un 400 de validación
+  // cuyo cuerpo/nombre de modelo contenga «quota» o «429» sueltos NO debe disparar fallback de pago).
+  return /HTTP 429|rate.?limit|RateLimitError|too many requests|tokens per (day|minute)|insufficient_quota/i.test(msg);
 }

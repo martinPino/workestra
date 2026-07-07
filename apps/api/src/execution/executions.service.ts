@@ -39,6 +39,13 @@ export class ExecutionsService {
     const wf = await this.p.workflows.get(workflowId);
     assertInWorkspace(wf?.workspaceId, workspaceId, 'Workflow');
 
+    // Cuota por workspace (M33): no se arrancan ejecuciones si el workspace ya superó su tope diario de IA
+    // (cubre también webhooks/cron, que es donde más se dispara el gasto de agentes).
+    const limit = Math.max(0, Number(process.env.WORKSPACE_TOKEN_LIMIT ?? 0) || 0);
+    if (limit > 0 && (await this.p.usage.todayTokens(workspaceId)) >= limit) {
+      throw new BadRequestException('Este espacio de trabajo alcanzó su límite diario de IA. Inténtalo de nuevo mañana o sube el límite.');
+    }
+
     // Pin de versión: la ejecución se ancla a la versión resuelta (published inmutable). Editar y
     // publicar después NO altera esta ejecución (criterio de aceptación M4p).
     const runVersion = await this.p.workflows.resolveRunVersion(workflowId);
@@ -101,6 +108,7 @@ export class ExecutionsService {
       registry: this.registry,
       clock: this.clock,
       ids: this.ids,
+      usage: this.p.usage, // M33: los tokens de ejecución cuentan hacia la cuota diaria del workspace
     });
     void runner.run(input).catch(() => {
       /* execution.failed ya fue emitido al stream por el runner */

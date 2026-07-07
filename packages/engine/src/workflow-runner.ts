@@ -8,6 +8,7 @@ import type {
   INodeExecutorRegistry,
   IClock,
   IIdGenerator,
+  IWorkspaceUsageRepository,
 } from './ports';
 
 export interface RunnerDeps {
@@ -17,6 +18,8 @@ export interface RunnerDeps {
   registry: INodeExecutorRegistry;
   clock: IClock;
   ids: IIdGenerator;
+  /** Contador de cuota por workspace (M33): suma los tokens de ejecución (agentes) hacia el tope diario. */
+  usage?: IWorkspaceUsageRepository;
 }
 
 export interface RunInput {
@@ -161,6 +164,9 @@ export class WorkflowRunner {
         const cost = result.usage?.cost ?? 0;
         await this.deps.executions.appendLog({ executionId, nodeKey: key, stepKey, level: 'info', status: 'ok', tokens, cost });
         if (tokens > 0 || cost > 0) await this.deps.executions.addUsage(executionId, tokens, cost);
+        // Cuota por workspace (M33): los tokens de EJECUCIÓN (agentes/router) también cuentan hacia el tope
+        // diario. Best-effort: no rompe la ejecución si el contador falla.
+        if (tokens > 0 && this.deps.usage) await this.deps.usage.add(this.workspaceId, tokens).catch(() => undefined);
         await this.emit(executionId, {
           type: 'node.succeeded',
           nodeKey: key,

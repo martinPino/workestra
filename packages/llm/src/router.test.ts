@@ -29,6 +29,9 @@ describe('ModelRouter — fallback entre proveedores (M33)', () => {
     expect(isProviderRateLimited(new Error('tokens per day (TPD)'))).toBe(true);
     expect(isProviderRateLimited(new Error('HTTP 500 server error'))).toBe(false);
     expect(isProviderRateLimited(new Error('modelo inválido'))).toBe(false);
+    // NO falsos positivos: un 400 de validación cuyo cuerpo/modelo contiene «quota»/«429» sueltos.
+    expect(isProviderRateLimited(new Error('LLM HTTP 400: your quota configuration field is invalid'))).toBe(false);
+    expect(isProviderRateLimited(new Error('LLM HTTP 400 para el modelo «gpt-429-turbo»: model_not_found'))).toBe(false);
   });
 
   it('cae al siguiente proveedor cuando el primario está agotado, con su modelo', async () => {
