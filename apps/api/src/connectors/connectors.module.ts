@@ -12,5 +12,6 @@ const isProd = process.env.NODE_ENV === 'production';
   imports: [AuthModule, RbacModule],
   controllers: isProd ? [ConnectorsController] : [ConnectorsController, DevOAuthController],
   providers: [ConnectorsService],
+  exports: [ConnectorsService], // reutilizado por el módulo MCP (M32)
 })
 export class ConnectorsModule {}

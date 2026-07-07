@@ -10,5 +10,6 @@ import { RbacModule } from '../rbac/rbac.module';
   imports: [TriggersModule, RbacModule],
   controllers: [WorkflowsController],
   providers: [WorkflowsService],
+  exports: [WorkflowsService], // reutilizado por el módulo MCP (M32)
 })
 export class WorkflowsModule {}

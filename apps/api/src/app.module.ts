@@ -15,6 +15,7 @@ import { SchedulesModule } from './schedules/schedules.module';
 import { ConnectorsModule } from './connectors/connectors.module';
 import { TriggersModule } from './triggers/triggers.module';
 import { ApiKeysModule } from './api-keys/api-keys.module';
+import { McpModule } from './mcp/mcp.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { ApiKeysModule } from './api-keys/api-keys.module';
     ConnectorsModule,
     TriggersModule,
     ApiKeysModule,
+    McpModule,
   ],
   controllers: [HealthController],
   providers: [
