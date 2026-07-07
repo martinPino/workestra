@@ -239,6 +239,9 @@ export const EN: Record<string, string> = {
   conectada: 'connected',
   'Reemplazar clave…': 'Replace key…',
   'Clave de': 'Key for',
+  // --- M48 · Nodo «Descargar fichero» ---
+  'Descargar fichero': 'Download file',
+  'URL del fichero (admite {{variables}})': 'File URL (supports {{variables}})',
   // --- M46 · Nodo «Transformar datos» (code) ---
   'Transformar datos': 'Transform data',
   'Script — recibe `input` (salida de pasos previos) y haz `return`': 'Script — receives `input` (previous steps output), then `return`',

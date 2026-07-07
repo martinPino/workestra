@@ -24,7 +24,7 @@ import { RbacModule } from '../rbac/rbac.module';
     {
       provide: NODE_REGISTRY,
       useFactory: (p: PersistenceBundle) =>
-        buildNodeRegistry({ agents: p.agents, memory: p.memory, pendingReviews: p.pendingReviews, connectors: p.connectors, secrets: p.secrets }),
+        buildNodeRegistry({ agents: p.agents, memory: p.memory, pendingReviews: p.pendingReviews, connectors: p.connectors, secrets: p.secrets, files: p.files }),
       inject: [PERSISTENCE],
     },
   ],

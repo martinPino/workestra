@@ -11,6 +11,7 @@ export const NodeType = z.enum([
   'api',
   'llm',
   'code',
+  'download',
   'memory',
   'human',
   'connector',

@@ -1,4 +1,4 @@
-import type { IAgentRepository, IMemoryStore, IPendingReviewRepository, IConnectorRepository, ISecretStore } from '@core/engine';
+import type { IAgentRepository, IMemoryStore, IPendingReviewRepository, IConnectorRepository, ISecretStore, IFileStore } from '@core/engine';
 import { createRuntimeRegistry, type NodeExecutorRegistry } from '@core/sdk-plugins';
 import { createLlmRouter } from '@core/llm';
 import { McpToolResolver } from '@core/infra';
@@ -17,6 +17,7 @@ export function buildNodeRegistry(deps: {
   pendingReviews?: IPendingReviewRepository;
   connectors?: IConnectorRepository;
   secrets?: ISecretStore;
+  files?: IFileStore;
 }): NodeExecutorRegistry {
   return createRuntimeRegistry({
     agents: deps.agents,
@@ -28,6 +29,7 @@ export function buildNodeRegistry(deps: {
     llmRouter: createLlmRouter(),
     httpAllowlist: HTTP_ALLOWLIST,
     mcp: new McpToolResolver(deps.secrets), // M40/M45: tools MCP + credencial cifrada del servidor conectado
+    files: deps.files, // M48: almacén de ficheros para el nodo «Descargar fichero»
     stepDelayMs: stepDelay,
   });
 }

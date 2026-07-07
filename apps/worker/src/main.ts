@@ -23,6 +23,7 @@ import {
   SystemClock,
   CuidIdGenerator,
   McpToolResolver,
+  RedisFileStore,
 } from '@core/infra';
 import { createRuntimeRegistry } from '@core/sdk-plugins';
 import { createLlmRouter } from '@core/llm';
@@ -61,6 +62,7 @@ async function main(): Promise<void> {
     llmRouter: createLlmRouter(),
     httpAllowlist: HTTP_ALLOWLIST,
     mcp: new McpToolResolver(new PrismaSecretStore(prisma)), // M40/M45: tools MCP + credencial del servidor conectado
+    files: new RedisFileStore(redis), // M48: mismo almacén de ficheros que la API (Redis compartido)
     stepDelayMs: stepDelay,
   });
 

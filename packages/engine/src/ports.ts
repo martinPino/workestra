@@ -32,6 +32,31 @@ export interface IMcpToolResolver {
   resolve(workspaceId: string, servers: McpServerRef[]): Promise<McpTool[]>;
 }
 
+/** Referencia a un fichero guardado (M48): metadatos ligeros que viajan en el contexto (no los bytes). */
+export interface FileRef {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
+}
+
+/** Fichero completo (metadatos + bytes) recuperado del almacén. */
+export interface StoredFile {
+  name: string;
+  mimeType: string;
+  bytes: Uint8Array;
+}
+
+/**
+ * Almacén de ficheros de un workspace (M48): guarda bytes fuera del contexto (que es JSON y se persiste) para
+ * poder mover ficheros/PDFs entre nodos. Los bytes viven con TTL en Redis (efímeros, como en n8n); el contexto
+ * solo lleva una `FileRef` ligera. Adaptadores en infra (Redis + InMemory).
+ */
+export interface IFileStore {
+  put(workspaceId: string, file: StoredFile): Promise<FileRef>;
+  get(workspaceId: string, id: string): Promise<StoredFile | null>;
+}
+
 /**
  * Puertos hexagonales del motor. El `WorkflowRunner` depende SOLO de estas interfaces;
  * los adaptadores concretos (Prisma/Redis/BullMQ) viven en `@core/infra` y se inyectan.

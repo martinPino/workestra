@@ -15,6 +15,7 @@ import type {
   ITriggerBindingRepository,
   IApiKeyRepository,
   IWorkspaceUsageRepository,
+  IFileStore,
 } from '@core/engine';
 import type { MemoryEvent } from '@core/contracts';
 import IORedis from 'ioredis';
@@ -50,6 +51,8 @@ import {
   PrismaApiKeyRepository,
   InMemoryWorkspaceUsageRepository,
   RedisWorkspaceUsageRepository,
+  InMemoryFileStore,
+  RedisFileStore,
 } from '@core/infra';
 
 export const PERSISTENCE = Symbol('PERSISTENCE');
@@ -79,6 +82,7 @@ export interface PersistenceBundle {
   apiKeys: IApiKeyRepository;
   /** Uso/cuota de tokens LLM por workspace (M33): contador diario para no agotar el presupuesto común. */
   usage: IWorkspaceUsageRepository;
+  files: IFileStore;
   prisma?: PrismaClient;
 }
 
@@ -177,6 +181,8 @@ async function buildPersistence(): Promise<PersistenceBundle> {
       apiKeys: new PrismaApiKeyRepository(prisma),
       // Cuota diaria por workspace en Redis (compartido con el worker; TTL auto-resetea el contador).
       usage: new RedisWorkspaceUsageRepository(redis),
+      // Ficheros efímeros en Redis (compartido con el worker; TTL 48h). M48.
+      files: new RedisFileStore(redis),
     };
   }
   return {
@@ -196,6 +202,7 @@ async function buildPersistence(): Promise<PersistenceBundle> {
     triggerBindings: new InMemoryTriggerBindingRepository(),
     apiKeys: new InMemoryApiKeyRepository(),
     usage: new InMemoryWorkspaceUsageRepository(),
+    files: new InMemoryFileStore(),
   };
 }
 

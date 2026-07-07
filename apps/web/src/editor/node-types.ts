@@ -1,5 +1,5 @@
 import type { NodeType } from '@core/contracts';
-import { Zap, Wrench, GitBranch, Globe, BrainCircuit, Sparkles, Timer, UserCheck, Plug, Flag, Split, Braces, type LucideIcon } from 'lucide-react';
+import { Zap, Wrench, GitBranch, Globe, BrainCircuit, Sparkles, Timer, UserCheck, Plug, Flag, Split, Braces, Download, type LucideIcon } from 'lucide-react';
 
 /** Subconjunto de JSON Schema que entiende el NodePropertiesPanel. */
 export interface FieldSchema {
@@ -134,6 +134,27 @@ registerNodeType({
         type: 'string',
         label: 'Cuerpo (JSON, opcional · admite {{variables}})',
         placeholder: '{"model":"gpt-4.1-mini","messages":[{"role":"user","content":"{{http:noticias.json.articles.0.title}}"}]}',
+        multiline: true,
+        format: 'json',
+      },
+    },
+  },
+});
+
+registerNodeType({
+  kind: 'download',
+  label: 'Descargar fichero',
+  icon: Download,
+  color: 'text-cyan-400',
+  category: 'io',
+  configSchema: {
+    title: 'Descargar fichero',
+    fields: {
+      url: { type: 'string', label: 'URL del fichero (admite {{variables}})', placeholder: 'https://…/factura.pdf' },
+      headers: {
+        type: 'string',
+        label: 'Cabeceras (JSON, opcional · admite {{variables}})',
+        placeholder: '{"Authorization":"Bearer TU_TOKEN"}',
         multiline: true,
         format: 'json',
       },
