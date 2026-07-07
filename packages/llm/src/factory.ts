@@ -19,12 +19,16 @@ export interface LlmConfig {
   openaiApiKey?: string;
   openaiBaseUrl?: string;
   openaiModel?: string;
+  /** OpenRouter (agregador compatible OpenAI, último eslabón/catch-all de la cadena). */
+  openrouterApiKey?: string;
+  openrouterModel?: string;
 }
 
 /** Modelos por defecto de cada eslabón de la cadena de fallback (sobrescribibles por env). */
 const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
 const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
 const DEFAULT_ANTHROPIC_MODEL = 'claude-haiku-4-5-20251001';
+const DEFAULT_OPENROUTER_MODEL = 'meta-llama/llama-3.3-70b-instruct';
 
 /**
  * Construye el router a partir de config/env. Cambiar el proveedor de un modelo NO requiere tocar a
@@ -55,6 +59,11 @@ export function createLlmRouter(config: LlmConfig = {}): ModelRouter {
   const openaiBase = config.openaiBaseUrl ?? process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1';
   if (openaiKey) router.registerProvider(new OpenAiCompatibleProvider(openaiBase, openaiKey, undefined, 'openai'));
 
+  // OpenRouter (agregador compatible OpenAI): último eslabón/catch-all de la cadena.
+  const openrouterKey = config.openrouterApiKey ?? process.env.OPENROUTER_API_KEY;
+  const openrouterBase = process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1';
+  if (openrouterKey) router.registerProvider(new OpenAiCompatibleProvider(openrouterBase, openrouterKey, undefined, 'openrouter'));
+
   if (config.forceProvider) {
     for (const model of Object.keys(MODEL_REGISTRY)) router.route(model, config.forceProvider);
     router.setDefault(config.forceProvider);
@@ -72,6 +81,7 @@ export function createLlmRouter(config: LlmConfig = {}): ModelRouter {
   if (llmBase) chain.push({ providerId: 'openai-compatible', model: llmModel ?? DEFAULT_GROQ_MODEL });
   if (openaiKey) chain.push({ providerId: 'openai', model: config.openaiModel ?? process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL });
   if (anthropicKey) chain.push({ providerId: 'anthropic', model: config.anthropicModel ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_ANTHROPIC_MODEL });
+  if (openrouterKey) chain.push({ providerId: 'openrouter', model: config.openrouterModel ?? process.env.OPENROUTER_MODEL ?? DEFAULT_OPENROUTER_MODEL });
   router.setFallbackChain(chain);
 
   return router;
