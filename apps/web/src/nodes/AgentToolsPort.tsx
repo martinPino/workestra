@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Plus, Check, X, Boxes, Wrench } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, type McpServerRef } from '../lib/api';
-import { TOOL_CATALOG } from '../lib/tools';
+import { TOOL_CATALOG, MCP_PRESETS } from '../lib/tools';
 import { useT } from '../i18n';
 
 const CIRCLE = 52;
@@ -59,6 +59,11 @@ export function AgentToolsPort({
     save.mutate({ mcpServers: [...mcpServers, { id: `mcp_${Date.now().toString(36)}`, name, url }] });
     setForm({ name: '', url: '' });
     setOpen(false); // cerrar el menú al añadir el servidor
+  };
+  const addPreset = (p: { name: string; url: string }) => {
+    if (mcpServers.some((s) => s.url === p.url)) return; // ya añadido
+    save.mutate({ mcpServers: [...mcpServers, { id: `mcp_${Date.now().toString(36)}`, name: p.name, url: p.url }] });
+    setOpen(false);
   };
 
   const items: Item[] = [
@@ -181,6 +186,35 @@ export function AgentToolsPort({
           <p className="flex items-center gap-1.5 px-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-txt-disabled">
             <Boxes size={11} /> {t('Servidor MCP')}
           </p>
+
+          {/* Presets populares: añadir de un clic sin escribir la URL (M41). */}
+          <p className="px-1 pb-1 text-[10px] text-txt-disabled">{t('Populares')}</p>
+          <div className="mb-2 flex flex-wrap gap-1">
+            {MCP_PRESETS.map((p) => {
+              const added = mcpServers.some((s) => s.url === p.url);
+              return (
+                <button
+                  key={p.url}
+                  type="button"
+                  disabled={added}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    addPreset(p);
+                  }}
+                  title={added ? t('Ya añadido') : p.url}
+                  className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-1 text-[11px] transition-colors ${
+                    added
+                      ? 'border-primary/50 bg-primary/10 text-primary'
+                      : 'border-border bg-surface text-txt-secondary hover:border-border-strong hover:text-txt-primary'
+                  }`}
+                >
+                  {added ? <Check size={10} /> : <Plus size={10} />} {p.name}
+                </button>
+              );
+            })}
+          </div>
+
+          <p className="px-1 pb-1 text-[10px] text-txt-disabled">{t('O añade uno propio')}</p>
           <input
             value={form.name}
             onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}

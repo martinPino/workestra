@@ -18,3 +18,25 @@ export const TOOL_CATALOG: ToolDef[] = [
 ];
 
 export const toolLabel = (key: string): string => TOOL_CATALOG.find((c) => c.key === key)?.label ?? key;
+
+/**
+ * Servidores MCP populares para añadir de un clic (M41), sin escribir la URL. Son endpoints MCP remotos
+ * conocidos. Muchos requieren iniciar sesión / clave: si es así, el usuario pega la URL con su clave desde
+ * «Añadir servidor MCP». Los públicos (DeepWiki, Context7, Hugging Face) funcionan sin credenciales.
+ */
+export interface McpPreset {
+  name: string;
+  url: string;
+}
+
+export const MCP_PRESETS: McpPreset[] = [
+  { name: 'GitHub', url: 'https://api.githubcopilot.com/mcp/' },
+  { name: 'Notion', url: 'https://mcp.notion.com/mcp' },
+  { name: 'Linear', url: 'https://mcp.linear.app/mcp' },
+  { name: 'Sentry', url: 'https://mcp.sentry.dev/mcp' },
+  { name: 'Atlassian', url: 'https://mcp.atlassian.com/v1/sse' },
+  { name: 'Stripe', url: 'https://mcp.stripe.com' },
+  { name: 'Hugging Face', url: 'https://huggingface.co/mcp' },
+  { name: 'DeepWiki', url: 'https://mcp.deepwiki.com/mcp' },
+  { name: 'Context7', url: 'https://mcp.context7.com/mcp' },
+];

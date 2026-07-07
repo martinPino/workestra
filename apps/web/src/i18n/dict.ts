@@ -253,6 +253,9 @@ export const EN: Record<string, string> = {
   'Devuelve lo que recibe (para pruebas).': 'Returns what it receives (for testing).',
   // --- M40 · Servidores MCP por agente ---
   'Servidor MCP': 'MCP server',
+  Populares: 'Popular',
+  'Ya añadido': 'Already added',
+  'O añade uno propio': 'Or add your own',
   'Nombre (p. ej. GitHub)': 'Name (e.g. GitHub)',
   'Añadir servidor MCP': 'Add MCP server',
   'Si el servidor necesita clave, inclúyela en la URL. Sus herramientas quedarán disponibles para el agente.':
