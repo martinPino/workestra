@@ -7,7 +7,9 @@
  * y Jira llevan sus colores de marca. Quien no tenga logo (p. ej. `dev`) usa el icono genérico del que llama.
  */
 
-const WITH_LOGO = new Set(['slack', 'jira', 'github', 'google-sheets', 'gmail', 'google-calendar']);
+import { siGoogledrive } from 'simple-icons';
+
+const WITH_LOGO = new Set(['slack', 'jira', 'github', 'google-sheets', 'gmail', 'google-calendar', 'google-drive', 'salesforce']);
 
 /** ¿Este proveedor tiene un logo de marca? (si no, el llamante pinta su icono/gradiente genérico). */
 export function hasProviderLogo(provider: string | undefined): boolean {
@@ -78,6 +80,29 @@ function CalendarLogo({ size }: { size: number }) {
   );
 }
 
+function GoogleDriveLogo({ size }: { size: number }) {
+  // Marca real de Google Drive (simple-icons, monocromo en azul Google).
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" role="img" aria-label="Google Drive" xmlns="http://www.w3.org/2000/svg" fill="#4285F4">
+      <path d={siGoogledrive.path} />
+    </svg>
+  );
+}
+
+function SalesforceLogo({ size }: { size: number }) {
+  // Nube en el azul de Salesforce (simple-icons ya no incluye su marca): compuesta de círculos + base.
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" role="img" aria-label="Salesforce" xmlns="http://www.w3.org/2000/svg">
+      <g fill="#00A1E0">
+        <circle cx="8.5" cy="12.5" r="4" />
+        <circle cx="13" cy="10" r="5" />
+        <circle cx="17" cy="13" r="3.6" />
+        <rect x="6" y="12.5" width="12" height="5" rx="2.5" />
+      </g>
+    </svg>
+  );
+}
+
 /** Logo de marca del proveedor. `null` si no hay: el llamante usa su fallback (icono/gradiente genérico). */
 export function ProviderLogo({ provider, size = 18 }: { provider: string | undefined; size?: number }) {
   switch (provider) {
@@ -93,6 +118,10 @@ export function ProviderLogo({ provider, size = 18 }: { provider: string | undef
       return <GmailLogo size={size} />;
     case 'google-calendar':
       return <CalendarLogo size={size} />;
+    case 'google-drive':
+      return <GoogleDriveLogo size={size} />;
+    case 'salesforce':
+      return <SalesforceLogo size={size} />;
     default:
       return null;
   }
