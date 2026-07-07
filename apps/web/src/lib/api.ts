@@ -13,6 +13,18 @@ export interface WorkflowDto {
   graph: WorkflowGraph;
 }
 
+/** Vista de una clave de API (M32): sin hash ni clave en claro. */
+export interface ApiKeyView {
+  id: string;
+  prefix: string;
+  last4: string;
+  label: string;
+  role: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
 export interface ExecutionRow {
   id: string;
   status: string;
@@ -166,6 +178,14 @@ export const api = {
       json<{ executionId: string; status: string }>(r),
     ),
   getExecution: (id: string) => fetch(`${API}/executions/${id}`, { headers: authHeaders() }).then((r) => json<ExecutionDetailDto>(r)),
+  // --- Claves de API / MCP (M32): conectar Claude Desktop/ChatGPT/Cursor ---
+  listApiKeys: () => fetch(`${API}/api-keys`, { headers: authHeaders() }).then((r) => json<ApiKeyView[]>(r)),
+  createApiKey: (label: string) =>
+    fetch(`${API}/api-keys`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ label }) }).then((r) =>
+      json<{ id: string; rawKey: string; view: ApiKeyView }>(r),
+    ),
+  revokeApiKey: (id: string) =>
+    fetch(`${API}/api-keys/${id}`, { method: 'DELETE', headers: authHeaders() }).then((r) => json<{ revoked: boolean }>(r)),
   /** Delta del stream (M9): solo los eventos con `seq > since`, para el poll incremental de la consola. */
   getExecutionEvents: (id: string, since: number) =>
     fetch(`${API}/executions/${id}/events?since=${since}`, { headers: authHeaders() }).then((r) => json<{ events: ExecutionEvent[] }>(r)),

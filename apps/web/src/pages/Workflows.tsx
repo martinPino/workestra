@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Plus, Boxes, GitBranch, Play, Workflow as WorkflowIcon, Trash2, X, Sparkles, Plug } from 'lucide-react';
+import { Plus, Boxes, GitBranch, Play, Workflow as WorkflowIcon, Trash2, X, Sparkles, Plug, Copy, Check, KeyRound } from 'lucide-react';
 import { Page } from '../app/AppShell';
 import { Card, Button, PageHeader, Badge, Dot, EmptyState, Skeleton, IconButton, Input, Textarea } from '../ui';
 import { useWorkflows } from '../lib/hooks';
-import { api, type WorkflowDto } from '../lib/api';
+import { api, type WorkflowDto, type ApiKeyView } from '../lib/api';
 import { STARTER_DOC, docToWorkflowGraph } from '../graph';
 import { WORKFLOW_TEMPLATES, type WorkflowTemplate } from '../editor/templates';
 import { ThinkingSteps } from '../components/ThinkingSteps';
@@ -131,7 +131,7 @@ export function Workflows() {
             </div>
             <div className="mt-2.5 flex items-center gap-1.5">
               <span className="text-sm font-semibold text-txt-primary">{t('Usar desde tu IA (MCP)')}</span>
-              <Badge tone="default">{t('pronto')}</Badge>
+              <Badge tone="primary">{t('nuevo')}</Badge>
             </div>
             <div className="mt-1 text-xs text-txt-secondary">{t('Ejecútalo desde Claude, Cursor o ChatGPT.')}</div>
           </Card>
@@ -324,34 +324,194 @@ function AiDialog({
   );
 }
 
-/** «Usar desde tu IA (MCP)»: aún no disponible (fase 2). Explica qué será. */
+/** Botón de copiar al portapapeles con feedback «copiado». */
+function CopyBtn({ text, label }: { text: string; label: string }) {
+  const t = useT();
+  const [done, setDone] = useState(false);
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          setDone(true);
+          setTimeout(() => setDone(false), 1500);
+        } catch {
+          /* portapapeles no disponible: no-op */
+        }
+      }}
+      className="flex shrink-0 items-center gap-1 rounded-md border border-border bg-elevated px-2 py-1 text-[11px] text-txt-secondary hover:text-txt-primary"
+    >
+      {done ? <Check size={12} className="text-success" /> : <Copy size={12} />}
+      {done ? t('Copiado') : t('Copiar')}
+    </button>
+  );
+}
+
+/**
+ * «Usar desde tu IA (MCP)» (M32): genera/revoca claves de API y muestra la config para pegar en Claude
+ * Desktop, Cursor o ChatGPT. La clave en claro se ve UNA sola vez al crearla.
+ */
 function McpDialog({ onClose }: { onClose: () => void }) {
   const t = useT();
+  const [keys, setKeys] = useState<ApiKeyView[]>([]);
+  const [label, setLabel] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [created, setCreated] = useState<{ rawKey: string } | null>(null);
+  const [client, setClient] = useState<'claude' | 'cursor' | 'chatgpt'>('claude');
+
+  const load = async () => {
+    try {
+      setKeys(await api.listApiKeys());
+    } catch {
+      setErr(t('No se pudieron cargar las claves. Revisa la conexión con la API.'));
+    }
+  };
+  useEffect(() => {
+    load();
+  }, []);
+
+  const create = async () => {
+    if (busy) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await api.createApiKey(label.trim() || 'MCP');
+      setCreated({ rawKey: res.rawKey });
+      setLabel('');
+      await load();
+    } catch {
+      setErr(t('No se pudo crear la clave.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const revoke = async (id: string) => {
+    try {
+      await api.revokeApiKey(id);
+      await load();
+    } catch {
+      setErr(t('No se pudo revocar la clave.'));
+    }
+  };
+
+  const mcpUrl = created ? `${api.base}/mcp/${created.rawKey}` : '';
+  const snippet =
+    client === 'chatgpt'
+      ? mcpUrl
+      : JSON.stringify({ mcpServers: { agentflow: { url: mcpUrl } } }, null, 2);
+  const clientHint: Record<typeof client, string> = {
+    claude: t('Claude Desktop → Ajustes → Conectores → Añadir servidor MCP remoto, y pega la URL. O usa el bloque de config.'),
+    cursor: t('Cursor → pega este bloque en ~/.cursor/mcp.json.'),
+    chatgpt: t('ChatGPT → Ajustes → Conectores → Añadir, y pega esta URL.'),
+  };
+
   return (
-    <Modal label={t('Usar desde tu IA (MCP)')} onClose={onClose}>
+    <Modal label={t('Usar desde tu IA (MCP)')} onClose={onClose} wide>
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-elevated text-txt-secondary">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/12 text-primary">
             <Plug size={16} />
           </span>
           <div>
-            <h2 className="flex items-center gap-1.5 text-base font-semibold text-txt-primary">
-              {t('Usar desde tu IA (MCP)')} <Badge tone="default">{t('pronto')}</Badge>
-            </h2>
+            <h2 className="text-base font-semibold text-txt-primary">{t('Conecta tu IA')}</h2>
+            <p className="mt-0.5 text-xs text-txt-secondary">{t('Genera una clave y pégala en Claude Desktop, Cursor o ChatGPT para construir y ejecutar tus automatizaciones desde ahí.')}</p>
           </div>
         </div>
         <IconButton onClick={onClose} aria-label={t('Cerrar')}>
           <X size={16} />
         </IconButton>
       </div>
-      <p className="mt-4 text-sm leading-relaxed text-txt-secondary">
-        {t('Pronto podrás exponer esta automatización como un servidor MCP: copias un pequeño ajuste en Claude, Cursor o ChatGPT y podrás lanzarla desde tu propio asistente de IA.')}
-      </p>
-      <div className="mt-5 flex justify-end">
-        <Button variant="secondary" onClick={onClose}>
-          {t('Entendido')}
-        </Button>
-      </div>
+
+      {created ? (
+        // Clave recién creada: se muestra UNA vez + la config lista para pegar.
+        <div className="mt-4 space-y-3">
+          <div className="rounded-lg border border-warning/40 bg-warning/5 p-3 text-xs text-txt-secondary">
+            {t('Guarda esta clave ahora: por seguridad no volverás a verla. Si la pierdes, genera otra.')}
+          </div>
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2">
+            <code className="min-w-0 flex-1 truncate font-mono text-xs text-txt-primary">{created.rawKey}</code>
+            <CopyBtn text={created.rawKey} label={t('Copiar clave')} />
+          </div>
+          <div className="flex gap-1.5">
+            {(['claude', 'cursor', 'chatgpt'] as const).map((c) => (
+              <button
+                key={c}
+                onClick={() => setClient(c)}
+                className={`rounded-md border px-2.5 py-1 text-[11px] ${client === c ? 'border-primary/50 bg-primary/12 text-primary' : 'border-border bg-card text-txt-secondary hover:text-txt-primary'}`}
+              >
+                {c === 'claude' ? 'Claude Desktop' : c === 'cursor' ? 'Cursor' : 'ChatGPT'}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] leading-relaxed text-txt-secondary">{clientHint[client]}</p>
+          <div className="relative rounded-lg border border-border bg-surface p-3">
+            <div className="absolute right-2 top-2">
+              <CopyBtn text={snippet} label={t('Copiar configuración')} />
+            </div>
+            <pre className="overflow-x-auto whitespace-pre-wrap break-all pr-16 font-mono text-[11px] leading-relaxed text-txt-secondary">{snippet}</pre>
+          </div>
+          <div className="flex justify-end">
+            <Button variant="secondary" onClick={() => setCreated(null)}>
+              {t('Hecho')}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-4 space-y-4">
+          <div className="flex items-end gap-2">
+            <div className="flex-1">
+              <label className="mb-1 block text-xs text-txt-secondary">{t('Nombre de la clave (para reconocerla)')}</label>
+              <Input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    create();
+                  }
+                }}
+                placeholder={t('Mi Claude Desktop')}
+              />
+            </div>
+            <Button variant="primary" onClick={create} disabled={busy}>
+              <KeyRound size={14} /> {busy ? t('Generando…') : t('Generar clave')}
+            </Button>
+          </div>
+          {err && <p className="text-xs text-danger">{err}</p>}
+
+          <div>
+            <div className="mb-1.5 text-xs font-medium text-txt-secondary">{t('Tus claves')}</div>
+            {keys.length === 0 ? (
+              <p className="text-xs text-txt-disabled">{t('Aún no has generado ninguna clave.')}</p>
+            ) : (
+              <div className="space-y-1.5">
+                {keys.map((k) => (
+                  <div key={k.id} className="flex items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate text-xs font-medium text-txt-primary">{k.label}</span>
+                        <code className="font-mono text-[11px] text-txt-disabled">af…{k.last4}</code>
+                        {k.revokedAt && <Badge tone="danger">{t('revocada')}</Badge>}
+                      </div>
+                      <div className="mt-0.5 text-[10px] text-txt-disabled">
+                        {k.lastUsedAt ? t('Último uso') + ': ' + new Date(k.lastUsedAt).toLocaleString() : t('Sin uso todavía')}
+                      </div>
+                    </div>
+                    {!k.revokedAt && (
+                      <Button variant="ghost" size="sm" onClick={() => revoke(k.id)} className="shrink-0 hover:text-danger">
+                        {t('Revocar')}
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </Modal>
   );
 }

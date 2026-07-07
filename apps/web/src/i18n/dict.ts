@@ -226,6 +226,33 @@ export const EN: Record<string, string> = {
   'Voy a aplicar tu cambio: analizo el flujo y ajusto los nodos.':
     "I'll apply your change: I analyze the flow and adjust the nodes.",
   'La IA no pudo montar el flujo.': "The AI couldn't build the flow.",
+  // --- M32 · Conecta tu IA (MCP) ---
+  'Conecta tu IA': 'Connect your AI',
+  'Genera una clave y pégala en Claude Desktop, Cursor o ChatGPT para construir y ejecutar tus automatizaciones desde ahí.':
+    'Generate a key and paste it into Claude Desktop, Cursor or ChatGPT to build and run your automations from there.',
+  'Guarda esta clave ahora: por seguridad no volverás a verla. Si la pierdes, genera otra.':
+    "Save this key now: for security you won't see it again. If you lose it, generate another.",
+  'Copiar clave': 'Copy key',
+  Copiado: 'Copied',
+  'Copiar configuración': 'Copy configuration',
+  'Claude Desktop → Ajustes → Conectores → Añadir servidor MCP remoto, y pega la URL. O usa el bloque de config.':
+    'Claude Desktop → Settings → Connectors → Add remote MCP server, and paste the URL. Or use the config block.',
+  'Cursor → pega este bloque en ~/.cursor/mcp.json.': 'Cursor → paste this block into ~/.cursor/mcp.json.',
+  'ChatGPT → Ajustes → Conectores → Añadir, y pega esta URL.': 'ChatGPT → Settings → Connectors → Add, and paste this URL.',
+  Hecho: 'Done',
+  'Nombre de la clave (para reconocerla)': 'Key name (so you recognize it)',
+  'Mi Claude Desktop': 'My Claude Desktop',
+  'Generando…': 'Generating…',
+  'Generar clave': 'Generate key',
+  'No se pudo crear la clave.': "Couldn't create the key.",
+  'No se pudo revocar la clave.': "Couldn't revoke the key.",
+  'No se pudieron cargar las claves. Revisa la conexión con la API.': "Couldn't load the keys. Check the API connection.",
+  'Tus claves': 'Your keys',
+  'Aún no has generado ninguna clave.': "You haven't generated any keys yet.",
+  revocada: 'revoked',
+  'Último uso': 'Last used',
+  'Sin uso todavía': 'Not used yet',
+  Revocar: 'Revoke',
   'Escribe un cambio…': 'Type a change…',
   'Instrucción para la IA': 'Instruction for the AI',
   'Enviar': 'Send',
