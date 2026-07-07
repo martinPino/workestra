@@ -5,6 +5,7 @@ import { createDefaultNodeRegistry, WorkNodeExecutor, WaitNodeExecutor } from '.
 import { ConditionNodeExecutor, HttpNodeExecutor } from './executors-io';
 import { CodeNodeExecutor } from './code-node';
 import { DownloadFileNodeExecutor } from './download-node';
+import { ExtractTextNodeExecutor } from './extract-node';
 import { ToolRegistry, MockTool, HttpTool } from './tools';
 import { ToolAuthorizationService } from './tool-authorization';
 import { AgentRuntime } from './agent-runtime';
@@ -46,6 +47,7 @@ export function createRuntimeRegistry(deps: RuntimeRegistryDeps): NodeExecutorRe
   registry.register(new HttpNodeExecutor());
   registry.register(new CodeNodeExecutor()); // M46: nodo «Transformar datos» (JS en worker aislado)
   registry.register(new DownloadFileNodeExecutor(deps.files)); // M48: nodo «Descargar fichero»
+  registry.register(new ExtractTextNodeExecutor(deps.files)); // M49: nodo «Extraer texto» (PDF/CSV/texto)
   registry.register(new WaitNodeExecutor());
   registry.register(new WorkNodeExecutor('tool', deps.stepDelayMs ?? 0));
 

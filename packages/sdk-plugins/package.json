@@ -10,7 +10,9 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -20,6 +22,10 @@
     "@core/contracts": "workspace:*",
     "@core/domain": "workspace:*",
     "@core/engine": "workspace:*",
-    "@core/llm": "workspace:*"
+    "@core/llm": "workspace:*",
+    "pdf-parse": "1.1.1"
+  },
+  "devDependencies": {
+    "@types/pdf-parse": "^1.1.5"
   }
 }

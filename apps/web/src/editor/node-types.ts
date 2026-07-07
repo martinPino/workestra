@@ -1,5 +1,5 @@
 import type { NodeType } from '@core/contracts';
-import { Zap, Wrench, GitBranch, Globe, BrainCircuit, Sparkles, Timer, UserCheck, Plug, Flag, Split, Braces, Download, type LucideIcon } from 'lucide-react';
+import { Zap, Wrench, GitBranch, Globe, BrainCircuit, Sparkles, Timer, UserCheck, Plug, Flag, Split, Braces, Download, FileText, type LucideIcon } from 'lucide-react';
 
 /** Subconjunto de JSON Schema que entiende el NodePropertiesPanel. */
 export interface FieldSchema {
@@ -157,6 +157,24 @@ registerNodeType({
         placeholder: '{"Authorization":"Bearer TU_TOKEN"}',
         multiline: true,
         format: 'json',
+      },
+    },
+  },
+});
+
+registerNodeType({
+  kind: 'extract',
+  label: 'Extraer texto',
+  icon: FileText,
+  color: 'text-teal-400',
+  category: 'io',
+  configSchema: {
+    title: 'Extraer texto de un fichero',
+    fields: {
+      fileId: {
+        type: 'string',
+        label: 'Fichero (referencia de un paso «Descargar fichero»)',
+        placeholder: '{{file:descargar.id}}',
       },
     },
   },
