@@ -39,6 +39,7 @@ export const MCP_PRESETS: McpPreset[] = [
   { name: 'Sentry', url: 'https://mcp.sentry.dev/mcp', color: '#362D59' },
   { name: 'Atlassian', url: 'https://mcp.atlassian.com/v1/sse', color: '#0052CC' },
   { name: 'Stripe', url: 'https://mcp.stripe.com', color: '#635BFF' },
+  { name: 'Salesforce', url: 'https://mcp.salesforce.com/mcp', color: '#00A1E0' },
   { name: 'Hugging Face', url: 'https://huggingface.co/mcp', color: '#FFD21E', darkText: true },
   { name: 'DeepWiki', url: 'https://mcp.deepwiki.com/mcp', color: '#1F6FEB' },
   { name: 'Context7', url: 'https://mcp.context7.com/mcp', color: '#0EA5E9' },
