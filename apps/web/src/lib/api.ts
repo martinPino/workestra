@@ -283,11 +283,19 @@ export const api = {
   listAgents: () => fetch(`${API}/agents`, { headers: authHeaders() }).then((r) => json<AgentDto[]>(r)),
   createAgent: (body: AgentInput) =>
     fetch(`${API}/agents`, { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) }).then((r) => json<AgentDto>(r)),
-  // Verifica un servidor MCP (M43): prueba la conexión y avisa si faltan credenciales o no responde.
-  verifyMcp: (url: string) =>
-    fetch(`${API}/agents/mcp/verify`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ url }) }).then((r) =>
-      json<{ ok: boolean; tools?: number; needsAuth?: boolean; reason?: string }>(r),
+  // Verifica un servidor MCP (M43/M45): prueba la conexión (con su credencial si está conectado) y avisa si
+  // faltan credenciales o no responde.
+  verifyMcp: (url: string, serverId?: string) =>
+    fetch(`${API}/agents/mcp/verify`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ url, serverId }) }).then((r) =>
+      json<{ ok: boolean; tools?: number; needsAuth?: boolean; connected?: boolean; reason?: string }>(r),
     ),
+  // «Conectar» un servidor MCP (M45): guarda su credencial cifrada para activarlo.
+  connectMcp: (serverId: string, token: string) =>
+    fetch(`${API}/agents/mcp/connect`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ serverId, token }) }).then((r) =>
+      json<{ connected: boolean }>(r),
+    ),
+  disconnectMcp: (serverId: string) =>
+    fetch(`${API}/agents/mcp/connect/${serverId}`, { method: 'DELETE', headers: authHeaders() }).then((r) => json<{ connected: boolean }>(r)),
   updateAgent: (id: string, body: Partial<AgentInput>) =>
     fetch(`${API}/agents/${id}`, { method: 'PATCH', headers: authHeaders(), body: JSON.stringify(body) }).then((r) => json<AgentDto>(r)),
   deleteAgent: (id: string) =>

@@ -60,7 +60,7 @@ async function main(): Promise<void> {
     selfBase: process.env.API_SELF_URL ?? 'http://localhost:3001',
     llmRouter: createLlmRouter(),
     httpAllowlist: HTTP_ALLOWLIST,
-    mcp: new McpToolResolver(), // M40: herramientas de servidores MCP enganchados a los agentes
+    mcp: new McpToolResolver(new PrismaSecretStore(prisma)), // M40/M45: tools MCP + credencial del servidor conectado
     stepDelayMs: stepDelay,
   });
 

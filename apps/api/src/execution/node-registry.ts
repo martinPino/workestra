@@ -27,7 +27,7 @@ export function buildNodeRegistry(deps: {
     selfBase: SELF_BASE,
     llmRouter: createLlmRouter(),
     httpAllowlist: HTTP_ALLOWLIST,
-    mcp: new McpToolResolver(), // M40: herramientas de servidores MCP enganchados a los agentes
+    mcp: new McpToolResolver(deps.secrets), // M40/M45: tools MCP + credencial cifrada del servidor conectado
     stepDelayMs: stepDelay,
   });
 }

@@ -21,11 +21,22 @@ export class AgentsController {
     return this.svc.create(body, workspaceId);
   }
 
-  // Verifica un servidor MCP (M43): se conecta y lista sus tools. Sirve para avisar en la UI si faltan
-  // credenciales (401/403) o no responde, como el warning de n8n. No toca datos: solo prueba la conexión.
+  // Verifica un servidor MCP (M43/M45): se conecta (con su credencial si está conectado) y lista sus tools.
+  // Sirve para avisar en la UI si faltan credenciales (401/403) o no responde, como el warning de n8n.
   @Post('mcp/verify')
-  verifyMcp(@Body() body: { url: string }) {
-    return this.svc.verifyMcp(body?.url ?? '');
+  verifyMcp(@Body() body: { url: string; serverId?: string }, @Workspace() workspaceId: string) {
+    return this.svc.verifyMcp(body?.url ?? '', workspaceId, body?.serverId);
+  }
+
+  // «Conectar» un servidor MCP (M45): guarda su credencial cifrada para activarlo. «Desconectar» la borra.
+  @Post('mcp/connect')
+  connectMcp(@Body() body: { serverId: string; token: string }, @Workspace() workspaceId: string) {
+    return this.svc.connectMcp(workspaceId, body?.serverId ?? '', body?.token ?? '');
+  }
+
+  @Delete('mcp/connect/:serverId')
+  disconnectMcp(@Param('serverId') serverId: string, @Workspace() workspaceId: string) {
+    return this.svc.disconnectMcp(workspaceId, serverId);
   }
 
   @Patch(':id')

@@ -259,6 +259,13 @@ export const EN: Record<string, string> = {
   'Faltan las credenciales para': 'Missing credentials for',
   'Incluye tu clave en la URL para que funcione.': 'Include your key in the URL to make it work.',
   'No se pudo conectar con': "Couldn't connect to",
+  'Conéctalo para activarlo.': 'Connect it to activate it.',
+  'La credencial de': 'The credential for',
+  'no es válida. Vuelve a conectar.': "isn't valid. Connect again.",
+  'Pega tu credencial (token o clave de API). Se guarda cifrada y se usa para autorizar el servidor.':
+    'Paste your credential (token or API key). Stored encrypted and used to authorize the server.',
+  'Token o clave de API': 'Token or API key',
+  'No se pudo conectar. Revisa la credencial.': "Couldn't connect. Check the credential.",
   'Nombre (p. ej. GitHub)': 'Name (e.g. GitHub)',
   'Añadir servidor MCP': 'Add MCP server',
   'Si el servidor necesita clave, inclúyela en la URL. Sus herramientas quedarán disponibles para el agente.':

@@ -1,5 +1,5 @@
 import type { McpServerRef } from '@core/contracts';
-import type { IMcpToolResolver, McpTool } from '@core/engine';
+import type { IMcpToolResolver, McpTool, ISecretStore } from '@core/engine';
 import { McpHttpClient } from './mcp-http-client';
 
 /** Nombre de función válido para el modelo (^[a-zA-Z0-9_-]+): saneado y acotado. */
@@ -11,18 +11,22 @@ function safeName(raw: string): string {
  * Resuelve los servidores MCP de un agente en herramientas invocables (M40). Conecta a cada servidor EN
  * PARALELO, lista sus tools y las envuelve; el `invoke` de cada una llama al servidor con su nombre original.
  * Las tools se prefijan con el nombre del servidor para no colisionar. Un servidor que falla se omite (su
- * error no rompe la ejecución del agente). No hay estado: se instancia una sola vez y se reutiliza.
+ * error no rompe la ejecución del agente). Si el servidor está CONECTADO (M45), envía su credencial cifrada
+ * (secret store) como `Authorization: Bearer`. Es (casi) sin estado; se instancia una vez y se reutiliza.
  */
 export class McpToolResolver implements IMcpToolResolver {
-  async resolve(_workspaceId: string, servers: McpServerRef[]): Promise<McpTool[]> {
-    const perServer = await Promise.all(servers.map((s) => this.fromServer(s)));
+  constructor(private readonly secrets?: ISecretStore) {}
+
+  async resolve(workspaceId: string, servers: McpServerRef[]): Promise<McpTool[]> {
+    const perServer = await Promise.all(servers.map((s) => this.fromServer(workspaceId, s)));
     return perServer.flat();
   }
 
-  private async fromServer(server: McpServerRef): Promise<McpTool[]> {
+  private async fromServer(workspaceId: string, server: McpServerRef): Promise<McpTool[]> {
     if (!/^https?:\/\//i.test(server.url)) return []; // solo http(s)
     try {
-      const client = new McpHttpClient(server.url);
+      const token = this.secrets ? await this.secrets.get(workspaceId, `mcp:auth:${server.id}`).catch(() => undefined) : undefined;
+      const client = new McpHttpClient(server.url, token ? { Authorization: `Bearer ${token}` } : {});
       await client.initialize();
       const tools = await client.listTools();
       return tools.map((tt) => ({

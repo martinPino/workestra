@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Plus, Check, X, Boxes, Wrench, TriangleAlert } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Plus, Check, X, Boxes, Wrench, TriangleAlert, Plug } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type McpServerRef } from '../lib/api';
 import { TOOL_CATALOG, MCP_PRESETS } from '../lib/tools';
@@ -15,30 +16,113 @@ type Item =
   | { kind: 'mcp'; id: string; label: string; url: string };
 
 /**
- * Aviso de credenciales del servidor MCP (M43): verifica la conexión (initialize + tools/list) y, si falla,
- * pinta un triángulo rojo con el motivo — como n8n. Muchos MCP usan tu cuenta, así que sin permiso/clave dan
- * 401/403. La verificación se cachea por URL (dedupe entre nodos que usan el mismo servidor).
+ * Aviso + «Conectar» de un servidor MCP (M43/M45). Verifica la conexión (con la credencial guardada si está
+ * conectado); si falla, pinta el triángulo rojo. Al pasar el cursor, muestra un TOOLTIP con el motivo y, si
+ * faltan credenciales, un botón «Conectar» que abre un diálogo para pegar la credencial (se guarda cifrada y
+ * se usa como `Authorization` al ejecutar). Muchos MCP usan tu cuenta personal, así que necesitan permiso.
  */
-function McpWarn({ url, name }: { url: string; name: string }) {
+function McpWarn({ server }: { server: { id: string; name: string; url: string } }) {
   const t = useT();
+  const qc = useQueryClient();
+  const [dialog, setDialog] = useState(false);
+  const [token, setToken] = useState('');
+
   const q = useQuery({
-    queryKey: ['mcp-verify', url],
-    queryFn: () => api.verifyMcp(url),
+    queryKey: ['mcp-verify', server.id],
+    queryFn: () => api.verifyMcp(server.url, server.id),
     staleTime: 5 * 60_000,
     retry: false,
     refetchOnWindowFocus: false,
   });
+  const connect = useMutation({
+    mutationFn: () => api.connectMcp(server.id, token),
+    onSuccess: () => {
+      setDialog(false);
+      setToken('');
+      qc.invalidateQueries({ queryKey: ['mcp-verify', server.id] });
+    },
+  });
+
   if (!q.data || q.data.ok) return null;
-  const msg = q.data.needsAuth
-    ? `${t('Faltan las credenciales para')} ${name}. ${t('Incluye tu clave en la URL para que funcione.')}`
-    : `${t('No se pudo conectar con')} ${name}.`;
+  const needsAuth = q.data.needsAuth;
+  const msg = needsAuth
+    ? q.data.connected
+      ? `${t('La credencial de')} ${server.name} ${t('no es válida. Vuelve a conectar.')}`
+      : `${t('Faltan las credenciales para')} ${server.name}. ${t('Conéctalo para activarlo.')}`
+    : `${t('No se pudo conectar con')} ${server.name}.`;
+
   return (
-    <span
-      title={msg}
-      aria-label={msg}
-      className="absolute -bottom-1 left-1/2 z-10 flex h-4 w-4 -translate-x-1/2 items-center justify-center rounded-full border-2 border-elevated bg-danger text-white shadow-card"
-    >
-      <TriangleAlert size={9} strokeWidth={2.75} />
+    <span className="group/warn absolute -bottom-1.5 left-1/2 z-20 -translate-x-1/2">
+      <span className="flex h-4 w-4 items-center justify-center rounded-full border-2 border-elevated bg-danger text-white shadow-card">
+        <TriangleAlert size={9} strokeWidth={2.75} />
+      </span>
+      {/* Tooltip en hover (con puente `pb` para que no parpadee al pasar al botón). */}
+      <span className="absolute bottom-full left-1/2 hidden -translate-x-1/2 pb-1.5 group-hover/warn:block">
+        <span className="pointer-events-auto block w-max max-w-[210px] rounded-lg border border-border bg-elevated p-2 text-[11px] leading-snug text-txt-secondary shadow-pop">
+          {msg}
+          {needsAuth && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setDialog(true);
+              }}
+              className="mt-1.5 flex w-full items-center justify-center gap-1 rounded-md bg-primary/15 py-1 text-[11px] font-medium text-primary hover:bg-primary/25"
+            >
+              <Plug size={11} /> {t('Conectar')}
+            </button>
+          )}
+        </span>
+      </span>
+
+      {dialog &&
+        createPortal(
+          <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" role="dialog" aria-modal="true" onMouseDown={(e) => e.stopPropagation()}>
+            <button type="button" aria-label={t('Cerrar')} className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setDialog(false)} />
+            <div className="relative w-full max-w-sm rounded-xl border border-border bg-surface p-5 shadow-lg">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2">
+                  <McpLogo server={server} box={28} />
+                  <h2 className="text-base font-semibold text-txt-primary">
+                    {t('Conectar')} {server.name}
+                  </h2>
+                </div>
+                <button type="button" aria-label={t('Cerrar')} onClick={() => setDialog(false)} className="text-txt-disabled hover:text-txt-primary">
+                  <X size={16} />
+                </button>
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-txt-secondary">
+                {t('Pega tu credencial (token o clave de API). Se guarda cifrada y se usa para autorizar el servidor.')}
+              </p>
+              <input
+                type="password"
+                value={token}
+                autoFocus
+                onChange={(e) => setToken(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && token.trim()) connect.mutate();
+                }}
+                placeholder={t('Token o clave de API')}
+                className="mt-3 w-full rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-txt-primary outline-none focus:border-primary/60"
+              />
+              {connect.isError && <p className="mt-2 text-xs text-danger">{t('No se pudo conectar. Revisa la credencial.')}</p>}
+              <div className="mt-4 flex justify-end gap-2">
+                <button type="button" onClick={() => setDialog(false)} className="rounded-lg border border-border px-3 py-1.5 text-xs text-txt-secondary hover:text-txt-primary">
+                  {t('Cancelar')}
+                </button>
+                <button
+                  type="button"
+                  disabled={!token.trim() || connect.isPending}
+                  onClick={() => connect.mutate()}
+                  className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90 disabled:opacity-40"
+                >
+                  {t('Conectar')}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
     </span>
   );
 }
@@ -152,7 +236,7 @@ export function AgentToolsPort({
               <div key={it.kind === 'mcp' ? it.id : it.key} className="group/tool flex flex-col items-center" style={{ width: CIRCLE }}>
                 <div className="relative flex items-center justify-center rounded-full border border-border bg-elevated" style={{ width: CIRCLE, height: CIRCLE }}>
                   {it.kind === 'mcp' ? <McpLogo server={{ url: it.url, name: it.label }} box={30} /> : <it.icon size={19} className="text-txt-secondary" />}
-                  {it.kind === 'mcp' && <McpWarn url={it.url} name={it.label} />}
+                  {it.kind === 'mcp' && <McpWarn server={{ id: it.id, name: it.label, url: it.url }} />}
                   {editable && (
                     <button
                       type="button"
