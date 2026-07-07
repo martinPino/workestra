@@ -12,6 +12,8 @@ export const NodeSchema = z.object({
   position: PositionSchema,
   agentId: z.string().nullish(),
   toolId: z.string().nullish(),
+  // M38: paso DESACTIVADO. Al ejecutar, el motor lo salta puenteando sus aristas (el resto del flujo sigue).
+  disabled: z.boolean().nullish(),
 });
 export type WorkflowNode = z.infer<typeof NodeSchema>;
 

@@ -6,6 +6,8 @@ export interface EditorNode {
   kind: NodeType;
   position: { x: number; y: number };
   config: Record<string, unknown>;
+  /** M38: paso desactivado — se ve atenuado y el motor lo salta al ejecutar. */
+  disabled?: boolean;
 }
 
 export interface EditorEdge {

@@ -6,6 +6,7 @@ import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.
 import { assertInWorkspace } from '../tenant/tenant.util';
 import { TriggersService } from '../triggers/triggers.service';
 import { extractJsonObject, buildGeneratePrompt, isRateLimitError } from './generate.util';
+import { buildAssistantPreamble } from './assistant-context';
 import { LlmKeysService } from '../llm-keys/llm-keys.service';
 
 @Injectable()
@@ -122,7 +123,7 @@ export class WorkflowsService {
     graph: unknown,
     message: string,
     workspaceId: string,
-    opts: { name?: string; notes?: string[]; selected?: string; model?: string } = {},
+    opts: { name?: string; notes?: string[]; selected?: string; model?: string; page?: string } = {},
   ): Promise<{ kind: 'edit'; name: string; graph: WorkflowGraph } | { kind: 'answer'; text: string }> {
     const clean = this.cleanPrompt(message);
     const current = this.parseGraph(graph); // valida que el grafo de entrada esté bien formado
@@ -136,6 +137,9 @@ export class WorkflowsService {
     const chosen = opts.model?.trim() || process.env.LLM_MODEL || 'llama-3.3-70b-versatile';
 
     const system = [
+      // Contexto de identidad (M37): quién es el asistente, de qué va AgentFlow y en qué página está el usuario.
+      buildAssistantPreamble(opts.page),
+      '',
       await this.catalogPrompt(workspaceId),
       '',
       'MODO CHAT DEL EDITOR: el usuario está VIENDO este flujo en el lienzo y conversa contigo. Puede pedir un CAMBIO o hacer una PREGUNTA sobre el flujo.',

@@ -239,6 +239,11 @@ export const EN: Record<string, string> = {
   conectada: 'connected',
   'Reemplazar clave…': 'Replace key…',
   'Clave de': 'Key for',
+  // --- M38 · Barra flotante de controles del nodo ---
+  Duplicar: 'Duplicate',
+  'Desactivar paso': 'Disable step',
+  'Activar paso': 'Enable step',
+  Desactivado: 'Disabled',
   // --- M36 · Chat del editor consciente del contexto ---
   'Pregúntame sobre este flujo o dime qué cambiar. Ej.: «¿qué hace este flujo?» o «añade un aviso a Slack al final».':
     'Ask me about this flow or tell me what to change. E.g. "what does this flow do?" or "add a Slack alert at the end".',

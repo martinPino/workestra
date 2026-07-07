@@ -36,7 +36,7 @@ export class WorkflowsController {
   @UseGuards(ScopesGuard)
   @RequireScopes('workflow:write')
   chat(
-    @Body() body: { message: string; graph: unknown; name?: string; notes?: string[]; selected?: string; model?: string },
+    @Body() body: { message: string; graph: unknown; name?: string; notes?: string[]; selected?: string; model?: string; page?: string },
     @Workspace() workspaceId: string,
   ) {
     return this.svc.chatGraph(body?.graph, body?.message ?? '', workspaceId, {
@@ -44,6 +44,7 @@ export class WorkflowsController {
       notes: body?.notes,
       selected: body?.selected,
       model: body?.model,
+      page: body?.page,
     });
   }
 

@@ -1,6 +1,6 @@
 import type { WorkflowGraph, ExecutionContext, ExecutionEvent, NodeControl, WorkflowNode, OutgoingEdge } from '@core/contracts';
 import { EXECUTION_EVENT_SCHEMA_VERSION } from '@core/contracts';
-import { validateDag, createScheduler, mergeContexts, shouldRunNode, type ContextContribution } from '@core/domain';
+import { validateDag, createScheduler, mergeContexts, shouldRunNode, stripDisabledNodes, type ContextContribution } from '@core/domain';
 import type {
   IExecutionRepository,
   IContextStore,
@@ -190,7 +190,10 @@ export class WorkflowRunner {
 
   async run(input: RunInput): Promise<string> {
     this.workspaceId = input.workspaceId;
-    const validation = validateDag(input.graph);
+    // M38: los pasos DESACTIVADOS se podan (puenteando sus aristas) antes de ejecutar. El resto del flujo
+    // corre como si no estuvieran. Todo lo que sigue (scheduler, nodeByKey, aristas) usa el grafo ya podado.
+    const graph = stripDisabledNodes(input.graph);
+    const validation = validateDag(graph);
     if (!validation.valid) {
       throw new Error(`Grafo inválido: ${validation.errors.map((e) => e.code).join(', ')}`);
     }
@@ -212,12 +215,12 @@ export class WorkflowRunner {
     await this.deps.executions.updateStatus(executionId, 'RUNNING');
     await this.emit(executionId, resuming ? { type: 'execution.status', status: 'RUNNING' } : { type: 'execution.started' });
 
-    const scheduler = createScheduler(input.graph);
-    const nodeByKey = new Map(input.graph.nodes.map((n) => [n.key, n]));
+    const scheduler = createScheduler(graph);
+    const nodeByKey = new Map(graph.nodes.map((n) => [n.key, n]));
     // Aristas salientes por nodo (para que el Router inspeccione sus destinos en runtime, M14).
     const outgoingByKey = new Map<string, OutgoingEdge[]>();
-    for (const n of input.graph.nodes) outgoingByKey.set(n.key, []);
-    for (const e of input.graph.edges) {
+    for (const n of graph.nodes) outgoingByKey.set(n.key, []);
+    for (const e of graph.edges) {
       const t = nodeByKey.get(e.target);
       if (t && outgoingByKey.has(e.source) && e.source !== e.target) {
         outgoingByKey.get(e.source)!.push({ target: e.target, targetType: t.type, targetConfig: t.config, sourceHandle: e.sourceHandle ?? null });
@@ -239,7 +242,7 @@ export class WorkflowRunner {
         // muertas (rama/router aguas arriba no lo eligió, o predecesor saltado) → se SALTA.
         const toRun: string[] = [];
         const toSkip: string[] = [];
-        for (const key of ready) (shouldRunNode(key, input.graph.edges, completed, ctx) ? toRun : toSkip).push(key);
+        for (const key of ready) (shouldRunNode(key, graph.edges, completed, ctx) ? toRun : toSkip).push(key);
 
         // El skip es terminal y propaga aguas abajo (sus aristas quedan muertas en la sig. iteración).
         for (const key of toSkip) {

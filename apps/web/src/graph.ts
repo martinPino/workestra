@@ -8,6 +8,10 @@ export interface AfNodeData {
   status?: NodeRunStatus;
   /** Config del nodo: la carta la usa para resolver identidad (p. ej. el agente elegido). */
   config?: Record<string, unknown>;
+  /** M38: paso desactivado (se pinta atenuado; el motor lo salta). */
+  disabled?: boolean;
+  /** M38: true solo en el editor → muestra la barra flotante de controles al hover (no en solo-lectura). */
+  editable?: boolean;
 }
 export interface CommentNodeData {
   id: string;
@@ -18,6 +22,7 @@ export interface CommentNodeData {
 export function docToReactFlow(
   doc: GraphDoc,
   nodeStatus: Record<string, NodeRunStatus>,
+  editable = false,
 ): { nodes: RFNode[]; edges: RFEdge[] } {
   const commentNodes: RFNode[] = doc.comments.map((c) => ({
     id: c.id,
@@ -30,7 +35,7 @@ export function docToReactFlow(
     id: n.id,
     type: 'af',
     position: n.position,
-    data: { kind: n.kind, status: nodeStatus[n.id], config: n.config } satisfies AfNodeData,
+    data: { kind: n.kind, status: nodeStatus[n.id], config: n.config, disabled: n.disabled, editable } satisfies AfNodeData,
   }));
   const edges: RFEdge[] = doc.edges.map((e) => ({
     id: e.id,
@@ -50,6 +55,7 @@ export function docToWorkflowGraph(doc: GraphDoc): WorkflowGraph {
       type: n.kind,
       config: n.config,
       position: { x: Math.round(n.position.x), y: Math.round(n.position.y) },
+      ...(n.disabled ? { disabled: true } : {}), // M38: solo se persiste cuando está desactivado
     })),
     edges: doc.edges.map((e) => ({ source: e.source, target: e.target, sourceHandle: e.sourceHandle ?? null })),
   };
@@ -63,6 +69,7 @@ export function workflowGraphToDoc(graph: WorkflowGraph): GraphDoc {
       kind: n.type,
       position: n.position,
       config: (n.config as Record<string, unknown>) ?? {},
+      ...(n.disabled ? { disabled: true } : {}), // M38
     })),
     edges: graph.edges.map((e, i) => ({
       id: `e_${e.source}_${e.target}_${i}`,

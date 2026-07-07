@@ -169,7 +169,7 @@ export const api = {
   chatWorkflow: (
     graph: WorkflowGraph,
     message: string,
-    ctx: { name?: string; notes?: string[]; selected?: string; model?: string } = {},
+    ctx: { name?: string; notes?: string[]; selected?: string; model?: string; page?: string } = {},
   ) =>
     fetch(`${API}/workflows/chat`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ message, graph, ...ctx }) }).then((r) =>
       json<{ kind: 'edit'; name: string; graph: WorkflowGraph } | { kind: 'answer'; text: string }>(r),

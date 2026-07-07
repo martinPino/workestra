@@ -20,6 +20,7 @@ import {
   moveNodes,
   addEdge,
   updateNodeConfig,
+  setNodeDisabled,
   pasteFragment,
   addComment,
   updateComment,
@@ -58,6 +59,10 @@ interface EditorState {
   addNodeOfKind(kind: NodeType | string, position: { x: number; y: number }): void;
   connect(source: string, target: string, sourceHandle?: string | null): boolean;
   removeSelected(): void;
+  /** M38 (barra flotante del nodo): borrar / duplicar / activar-desactivar un paso concreto. */
+  removeNodeById(id: string): void;
+  duplicateNode(id: string): void;
+  toggleNodeDisabled(id: string): void;
   setPositionsLive(moves: { id: string; position: { x: number; y: number } }[]): void;
   commitMove(moves: Move[]): void;
   updateConfig(id: string, config: Record<string, unknown>): void;
@@ -123,6 +128,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const remaining = selectedEdges.filter((id) => doc2.edges.some((e) => e.id === id));
     if (remaining.length > 0) get().dispatchCmd(removeEdges(doc2, remaining));
     set({ selection: [], selectedEdges: [] });
+  },
+
+  // --- M38: acciones por-nodo de la barra flotante ---
+  removeNodeById: (id) => {
+    get().dispatchCmd(removeNodes(get().history.doc, [id]));
+    set((s) => ({ selection: s.selection.filter((x) => x !== id) }));
+  },
+  duplicateNode: (id) => {
+    const node = get().history.doc.nodes.find((n) => n.id === id);
+    if (!node) return;
+    const newId = `${node.kind}-${uid()}`;
+    get().dispatchCmd(
+      addNode({ ...node, id: newId, position: { x: node.position.x + 40, y: node.position.y + 40 }, config: { ...node.config } }),
+    );
+    set({ selection: [newId], selectedEdges: [] });
+  },
+  toggleNodeDisabled: (id) => {
+    const node = get().history.doc.nodes.find((n) => n.id === id);
+    if (!node) return;
+    get().dispatchCmd(setNodeDisabled(get().history.doc, id, !node.disabled));
   },
 
   setPositionsLive: (moves) =>

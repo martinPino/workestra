@@ -91,6 +91,16 @@ export function updateNodeConfig(doc: GraphDoc, id: string, config: Record<strin
   };
 }
 
+/** M38: activa/desactiva un paso. La inversa restaura el estado previo (undo/redo exacto). */
+export function setNodeDisabled(doc: GraphDoc, id: string, disabled: boolean): Command {
+  const prev = doc.nodes.find((n) => n.id === id)?.disabled ?? false;
+  return {
+    label: disabled ? 'Desactivar paso' : 'Activar paso',
+    redo: (d) => ({ ...d, nodes: d.nodes.map((n) => (n.id === id ? { ...n, disabled } : n)) }),
+    undo: (d) => ({ ...d, nodes: d.nodes.map((n) => (n.id === id ? { ...n, disabled: prev } : n)) }),
+  };
+}
+
 export function pasteFragment(nodes: EditorNode[], edges: EditorEdge[]): Command {
   const nodeIds = new Set(nodes.map((n) => n.id));
   const edgeIds = new Set(edges.map((e) => e.id));

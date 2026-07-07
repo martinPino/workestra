@@ -4,6 +4,8 @@
 export { validateDag, topologicalLevels, hasCycle } from './dag';
 export type { DagValidationError, DagValidationResult } from './dag';
 
+export { stripDisabledNodes } from './disabled';
+
 export { buildExecutionPlan } from './execution-plan';
 export type { ExecutionPlan } from './execution-plan';
 

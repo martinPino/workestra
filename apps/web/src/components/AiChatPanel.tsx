@@ -45,7 +45,7 @@ export function AiChatPanel({ onClose }: { onClose: () => void }) {
       const current = docToWorkflowGraph(doc);
       const notes = doc.comments.map((c) => c.text).filter((s) => s.trim()); // notas pegadas en el lienzo
       const selected = st.selection[0]; // key del nodo que tiene seleccionado (o undefined)
-      const res = await api.chatWorkflow(current, message, { name: st.workflowName, notes, selected, model });
+      const res = await api.chatWorkflow(current, message, { name: st.workflowName, notes, selected, model, page: 'editor' });
       if (res.kind === 'edit') {
         const newDoc = workflowGraphToDoc(res.graph);
         // replaceGraph (no loadDoc): conserva las notas del usuario y es REVERSIBLE con ⌘Z.

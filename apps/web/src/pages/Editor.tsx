@@ -94,7 +94,7 @@ export function Editor() {
     }
   }, []);
   const nodeTypes = useMemo(() => ({ af: AfNode, comment: CommentNode }), []);
-  const base = useMemo(() => docToReactFlow(doc, nodeStatus), [doc, nodeStatus]);
+  const base = useMemo(() => docToReactFlow(doc, nodeStatus, true), [doc, nodeStatus]); // editable → barra flotante (M38)
 
   // «Falta configurar» (M26): pasos que aún no funcionarían (app sin conectar, asistente sin elegir…).
   // Se pintan como aviso en cada nodo (AfNode) y bloquean Probar/Activar con un mensaje claro.
