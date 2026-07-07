@@ -18,16 +18,16 @@ export class WorkflowsController {
   @Post('generate')
   @UseGuards(ScopesGuard)
   @RequireScopes('workflow:write')
-  generate(@Body() body: { prompt: string }, @Workspace() workspaceId: string) {
-    return this.svc.generate(body?.prompt ?? '', workspaceId);
+  generate(@Body() body: { prompt: string; model?: string }, @Workspace() workspaceId: string) {
+    return this.svc.generate(body?.prompt ?? '', workspaceId, body?.model);
   }
 
   // «Chat con IA en el editor» (M30): modifica el grafo actual según una instrucción → {name, graph}.
   @Post('edit')
   @UseGuards(ScopesGuard)
   @RequireScopes('workflow:write')
-  edit(@Body() body: { prompt: string; graph: unknown }, @Workspace() workspaceId: string) {
-    return this.svc.editGraph(body?.graph, body?.prompt ?? '', workspaceId);
+  edit(@Body() body: { prompt: string; graph: unknown; model?: string }, @Workspace() workspaceId: string) {
+    return this.svc.editGraph(body?.graph, body?.prompt ?? '', workspaceId, body?.model);
   }
 
   @Get()

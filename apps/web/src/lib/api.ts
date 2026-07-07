@@ -148,14 +148,14 @@ export const api = {
     fetch(`${API}/workflows`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ name, graph }) }).then((r) =>
       json<WorkflowDto>(r),
     ),
-  // «Construir con IA» (M29): descripción en lenguaje natural → grafo generado por la IA.
-  generateWorkflow: (prompt: string) =>
-    fetch(`${API}/workflows/generate`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ prompt }) }).then((r) =>
+  // «Construir con IA» (M29): descripción en lenguaje natural → grafo generado por la IA. Modelo opcional (M34).
+  generateWorkflow: (prompt: string, model?: string) =>
+    fetch(`${API}/workflows/generate`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ prompt, model }) }).then((r) =>
       json<{ name: string; graph: WorkflowGraph }>(r),
     ),
-  // «Chat con IA en el editor» (M30): instrucción + grafo actual → grafo modificado.
-  editWorkflowGraph: (graph: WorkflowGraph, prompt: string) =>
-    fetch(`${API}/workflows/edit`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ prompt, graph }) }).then((r) =>
+  // «Chat con IA en el editor» (M30): instrucción + grafo actual → grafo modificado. Modelo opcional (M34).
+  editWorkflowGraph: (graph: WorkflowGraph, prompt: string, model?: string) =>
+    fetch(`${API}/workflows/edit`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ prompt, graph, model }) }).then((r) =>
       json<{ name: string; graph: WorkflowGraph }>(r),
     ),
   getWorkflow: (id: string) => fetch(`${API}/workflows/${id}`, { headers: authHeaders() }).then((r) => json<WorkflowDto>(r)),

@@ -226,6 +226,7 @@ export const EN: Record<string, string> = {
   'Voy a aplicar tu cambio: analizo el flujo y ajusto los nodos.':
     "I'll apply your change: I analyze the flow and adjust the nodes.",
   'La IA no pudo montar el flujo.': "The AI couldn't build the flow.",
+  'Modelo de IA': 'AI model',
   // --- M32 · Conecta tu IA (MCP) ---
   'Conecta tu IA': 'Connect your AI',
   'Genera una clave y pégala en Claude Desktop, Cursor o ChatGPT para construir y ejecutar tus automatizaciones desde ahí.':

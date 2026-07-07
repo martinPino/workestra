@@ -87,16 +87,16 @@ export function registerTools(server: McpServerLike, ctx: McpContext): void {
   server.registerTool('delete_workflow', { title: 'Borrar automatización', description: 'Borra una automatización con todo su historial. Irreversible.', inputSchema: { id: z.string() } },
     async ({ id }) => run(role, r, 'workflow:delete', () => ctx.workflows.remove(id, ws)));
 
-  server.registerTool('generate_workflow', { title: 'Generar con IA', description: 'Describe la automatización y la IA la monta y la CREA en el workspace.', inputSchema: { prompt: z.string() } },
-    async ({ prompt }) => run(role, r, 'workflow:write', async () => {
-      const { name, graph } = await ctx.workflows.generate(prompt, ws);
+  server.registerTool('generate_workflow', { title: 'Generar con IA', description: 'Describe la automatización y la IA la monta y la CREA en el workspace. Opcional: elige el modelo.', inputSchema: { prompt: z.string(), model: z.string().optional() } },
+    async ({ prompt, model }) => run(role, r, 'workflow:write', async () => {
+      const { name, graph } = await ctx.workflows.generate(prompt, ws, model);
       return ctx.workflows.create({ name, graph }, ws);
     }));
 
-  server.registerTool('edit_workflow', { title: 'Editar con IA', description: 'Modifica una automatización existente en lenguaje natural y guarda el resultado.', inputSchema: { id: z.string(), prompt: z.string() } },
-    async ({ id, prompt }) => run(role, r, 'workflow:write', async () => {
+  server.registerTool('edit_workflow', { title: 'Editar con IA', description: 'Modifica una automatización existente en lenguaje natural y guarda el resultado. Opcional: elige el modelo.', inputSchema: { id: z.string(), prompt: z.string(), model: z.string().optional() } },
+    async ({ id, prompt, model }) => run(role, r, 'workflow:write', async () => {
       const wf = (await ctx.workflows.get(id, ws)) as { graph?: unknown };
-      const { graph } = await ctx.workflows.editGraph(wf.graph, prompt, ws);
+      const { graph } = await ctx.workflows.editGraph(wf.graph, prompt, ws, model);
       return ctx.workflows.saveGraph(id, graph, ws);
     }));
 

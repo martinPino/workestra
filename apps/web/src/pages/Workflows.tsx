@@ -10,6 +10,7 @@ import { api, type WorkflowDto, type ApiKeyView } from '../lib/api';
 import { STARTER_DOC, docToWorkflowGraph } from '../graph';
 import { WORKFLOW_TEMPLATES, type WorkflowTemplate } from '../editor/templates';
 import { ThinkingSteps } from '../components/ThinkingSteps';
+import { GENERATION_MODELS, DEFAULT_GENERATION_MODEL } from '../lib/models';
 import { useT } from '../i18n';
 
 /** Estado del diálogo «ponle nombre antes de crear». `template` null = empezar en blanco. */
@@ -29,6 +30,7 @@ export function Workflows() {
   // «Construir con IA» (M29) y «Usar por MCP» (fase 2): diálogos propios.
   const [aiOpen, setAiOpen] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
+  const [aiModel, setAiModel] = useState(DEFAULT_GENERATION_MODEL); // M34: modelo elegido para «Construir con IA»
   const [aiBusy, setAiBusy] = useState(false);
   const [aiErr, setAiErr] = useState<string | null>(null);
   const [mcpOpen, setMcpOpen] = useState(false);
@@ -83,7 +85,7 @@ export function Workflows() {
     setAiBusy(true);
     setAiErr(null);
     try {
-      const { name, graph } = await api.generateWorkflow(aiPrompt.trim());
+      const { name, graph } = await api.generateWorkflow(aiPrompt.trim(), aiModel);
       const wf = await api.createWorkflow(name, graph);
       await qc.invalidateQueries({ queryKey: ['workflows'] });
       navigate(`/workflows/${wf.id}?ai=1`); // abre el chat de IA para seguir puliendo (M30)
@@ -190,6 +192,8 @@ export function Workflows() {
       {aiOpen && (
         <AiDialog
           prompt={aiPrompt}
+          model={aiModel}
+          onModel={setAiModel}
           busy={aiBusy}
           err={aiErr}
           onPrompt={setAiPrompt}
@@ -232,6 +236,8 @@ function Modal({ label, onClose, children, wide }: { label: string; onClose: () 
 /** «Construir con IA»: describe la automatización y la IA la monta. */
 function AiDialog({
   prompt,
+  model,
+  onModel,
   busy,
   err,
   onPrompt,
@@ -239,6 +245,8 @@ function AiDialog({
   onClose,
 }: {
   prompt: string;
+  model: string;
+  onModel: (v: string) => void;
   busy: boolean;
   err: string | null;
   onPrompt: (v: string) => void;
@@ -307,6 +315,21 @@ function AiDialog({
                   {ex}
                 </button>
               ))}
+            </div>
+            <div className="mt-3 flex items-center gap-2">
+              <label className="text-xs text-txt-secondary">{t('Modelo de IA')}</label>
+              <select
+                value={model}
+                onChange={(e) => onModel(e.target.value)}
+                aria-label={t('Modelo de IA')}
+                className="flex-1 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-txt-primary outline-none focus:border-primary/60"
+              >
+                {GENERATION_MODELS.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
             </div>
             {err && <p className="mt-2 text-xs text-danger">{err}</p>}
           </div>

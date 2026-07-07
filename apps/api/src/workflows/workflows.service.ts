@@ -75,9 +75,9 @@ export class WorkflowsService {
    * «Construir con IA» (M29): genera un grafo de workflow desde una descripción en lenguaje natural. Pide al
    * LLM un JSON con el catálogo de nodos + los conectores/agentes REALES del workspace, y VALIDA (schema + DAG).
    */
-  async generate(prompt: string, workspaceId: string): Promise<{ name: string; graph: WorkflowGraph }> {
+  async generate(prompt: string, workspaceId: string, model?: string): Promise<{ name: string; graph: WorkflowGraph }> {
     const clean = this.cleanPrompt(prompt);
-    return this.runLlmGraph(await this.catalogPrompt(workspaceId), clean, workspaceId);
+    return this.runLlmGraph(await this.catalogPrompt(workspaceId), clean, workspaceId, model);
   }
 
   /**
@@ -85,7 +85,7 @@ export class WorkflowsService {
    * («añade un Slack al final», «cambia el trigger a cada mañana»). Le pasa el grafo actual + el catálogo y
    * exige el flujo COMPLETO modificado; valida schema + DAG igual que `generate`.
    */
-  async editGraph(graph: unknown, prompt: string, workspaceId: string): Promise<{ name: string; graph: WorkflowGraph }> {
+  async editGraph(graph: unknown, prompt: string, workspaceId: string, model?: string): Promise<{ name: string; graph: WorkflowGraph }> {
     const clean = this.cleanPrompt(prompt);
     const current = this.parseGraph(graph); // valida que el grafo de entrada esté bien formado
     const user = [
@@ -95,7 +95,7 @@ export class WorkflowsService {
       'Aplica este cambio y DEVUELVE EL FLUJO COMPLETO modificado (todos los nodos que deben quedar, con sus posiciones y configs; no solo el cambio):',
       clean,
     ].join('\n');
-    return this.runLlmGraph(await this.catalogPrompt(workspaceId), user, workspaceId);
+    return this.runLlmGraph(await this.catalogPrompt(workspaceId), user, workspaceId, model);
   }
 
   private cleanPrompt(prompt: string): string {
@@ -124,16 +124,16 @@ export class WorkflowsService {
   }
 
   /** Bucle común: pide el JSON al LLM, extrae, valida (schema + DAG) y reintenta 1 vez con el error. */
-  private async runLlmGraph(system: string, user: string, workspaceId: string): Promise<{ name: string; graph: WorkflowGraph }> {
+  private async runLlmGraph(system: string, user: string, workspaceId: string, model?: string): Promise<{ name: string; graph: WorkflowGraph }> {
     // Cuota por workspace (M33): si ya superó su presupuesto diario de IA, corta ANTES de gastar más.
     const limit = this.tokenLimit();
     if (limit > 0 && (await this.p.usage.todayTokens(workspaceId)) >= limit) {
       throw new BadRequestException('Has alcanzado el límite diario de IA de tu espacio de trabajo. Inténtalo de nuevo mañana o sube el límite.');
     }
-    const primary = process.env.LLM_MODEL ?? 'llama-3.3-70b-versatile';
-    // Fallback de modelo: en Groq los límites son POR MODELO, así que si el grande agota su cuota diaria
-    // (429 TPD) probamos con uno más ligero, que tiene su propia cuota. Así «Construir con IA» no muere.
-    const models = [primary, 'llama-3.1-8b-instant'].filter((m, i, a) => m && a.indexOf(m) === i);
+    // Modelo elegido por el usuario (M34), o el por defecto. La CADENA DE FALLBACK del router (M33) ya cubre
+    // que este proveedor se agote cayendo a otro; no hace falta un fallback de modelo aquí.
+    const chosen = model?.trim() || process.env.LLM_MODEL || 'llama-3.3-70b-versatile';
+    const models = [chosen];
     const base = [
       { role: 'system' as const, content: system },
       { role: 'user' as const, content: user },

@@ -5,6 +5,7 @@ import { useEditorStore } from '../editor/store';
 import { docToWorkflowGraph, workflowGraphToDoc } from '../graph';
 import { ThinkingSteps } from './ThinkingSteps';
 import { api } from '../lib/api';
+import { GENERATION_MODELS, DEFAULT_GENERATION_MODEL } from '../lib/models';
 import { useT } from '../i18n';
 
 type Msg = { role: 'user' | 'ai'; text: string };
@@ -18,6 +19,7 @@ export function AiChatPanel({ onClose }: { onClose: () => void }) {
   const t = useT();
   const [messages, setMessages] = useState<Msg[]>([{ role: 'ai', text: t('Dime qué quieres cambiar en el flujo y lo hago. Ej.: «añade un aviso a Slack al final».') }]);
   const [input, setInput] = useState('');
+  const [model, setModel] = useState(DEFAULT_GENERATION_MODEL); // M34: modelo elegido para el chat de IA
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -34,7 +36,7 @@ export function AiChatPanel({ onClose }: { onClose: () => void }) {
     try {
       // El grafo ES el estado: mandamos el actual + la instrucción, sin arrastrar historial de chat.
       const current = docToWorkflowGraph(useEditorStore.getState().history.doc);
-      const { graph } = await api.editWorkflowGraph(current, instruction);
+      const { graph } = await api.editWorkflowGraph(current, instruction, model);
       const newDoc = workflowGraphToDoc(graph);
       // replaceGraph (no loadDoc): conserva las notas del usuario y es REVERSIBLE con ⌘Z.
       useEditorStore.getState().replaceGraph(newDoc.nodes, newDoc.edges);
@@ -105,6 +107,18 @@ export function AiChatPanel({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="border-t border-border p-2.5">
+        <select
+          value={model}
+          onChange={(e) => setModel(e.target.value)}
+          aria-label={t('Modelo de IA')}
+          className="mb-2 w-full rounded-lg border border-border bg-surface px-2 py-1 text-[11px] text-txt-secondary outline-none focus:border-primary/60"
+        >
+          {GENERATION_MODELS.map((m) => (
+            <option key={m.value} value={m.value}>
+              {m.label}
+            </option>
+          ))}
+        </select>
         <div className="flex items-end gap-2 rounded-xl border border-border bg-surface p-1.5 focus-within:border-primary/60">
           <textarea
             value={input}
