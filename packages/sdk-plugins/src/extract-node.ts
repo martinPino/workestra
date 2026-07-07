@@ -3,6 +3,7 @@ import type { IFileStore } from '@core/engine';
 import { interpolate } from './interpolate';
 
 const MAX_TEXT = 300_000; // tope del texto extraído (no infla el contexto persistido).
+const OCR_TIMEOUT = 90_000; // el OCR de una imagen puede tardar (descarga el modelo la 1ª vez).
 
 type PdfParse = (buf: Buffer) => Promise<{ text?: string }>;
 // Lazy require: solo se carga pdf-parse cuando llega un PDF (evita cargar la librería —y su bloque de debug—
@@ -10,6 +11,26 @@ type PdfParse = (buf: Buffer) => Promise<{ text?: string }>;
 function loadPdfParse(): PdfParse {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   return require('pdf-parse') as PdfParse;
+}
+
+/** Función de OCR (inyectable para tests). Recibe los bytes de una imagen + idioma; devuelve el texto. */
+export type OcrFn = (bytes: Uint8Array, lang: string) => Promise<string>;
+
+/** OCR por defecto con tesseract.js (WASM puro; lazy-require: solo se carga cuando llega una imagen). */
+async function tesseractOcr(bytes: Uint8Array, lang: string): Promise<string> {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { createWorker } = require('tesseract.js') as typeof import('tesseract.js');
+  const worker = await createWorker(lang);
+  try {
+    const { data } = await worker.recognize(Buffer.from(bytes));
+    return String(data?.text ?? '').trim();
+  } finally {
+    await worker.terminate().catch(() => undefined);
+  }
+}
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error('el OCR tardó demasiado')), ms))]);
 }
 
 /** Acepta un id suelto o una referencia `{{file:KEY}}` (objeto JSON con `.id`) ya interpolada. */
@@ -27,14 +48,17 @@ function fileIdOf(raw: string): string {
 }
 
 /**
- * Nodo «Extraer texto» (M49): lee un fichero del file store (por su referencia, p. ej. `{{file:descargar.id}}`)
- * y saca su TEXTO. Para PDF de texto usa pdf-parse; para texto/CSV/JSON lo decodifica. Deja el texto en
- * `{{text:KEY.text}}` para que un LLM/agente lo procese (p. ej. extraer los datos de una factura). El OCR de
- * PDFs escaneados (sin capa de texto) queda para un paso posterior.
+ * Nodo «Extraer texto» (M49/M50): lee un fichero del file store (por su referencia, p. ej.
+ * `{{file:descargar.id}}`) y saca su TEXTO. PDF de texto → pdf-parse; IMÁGENES (foto/escaneo de una factura o
+ * recibo) → OCR con tesseract.js; texto/CSV/JSON → decodificación. Deja el texto en `{{text:KEY.text}}` para
+ * que un LLM/agente lo procese (p. ej. extraer los datos de la factura).
  */
 export class ExtractTextNodeExecutor implements INodeExecutor {
   readonly type: NodeType = 'extract';
-  constructor(private readonly files?: IFileStore) {}
+  constructor(
+    private readonly files?: IFileStore,
+    private readonly ocr: OcrFn = tesseractOcr, // inyectable en tests
+  ) {}
 
   async execute(ctx: NodeExecutionContext): Promise<NodeResult> {
     const store = (result: Record<string, unknown>): NodeResult => ({
@@ -54,8 +78,13 @@ export class ExtractTextNodeExecutor implements INodeExecutor {
         const r = await loadPdfParse()(Buffer.from(file.bytes));
         text = (r.text ?? '').trim();
         if (!text) {
-          return store({ name: file.name, chars: 0, text: '', note: 'PDF sin capa de texto (¿escaneado? el OCR llega en un paso posterior).' });
+          return store({ name: file.name, chars: 0, text: '', note: 'PDF sin capa de texto (¿escaneado? sube la imagen y usa OCR).' });
         }
+      } else if (/^image\//i.test(file.mimeType)) {
+        // M50: imagen (foto/escaneo) → OCR. Idioma configurable; por defecto español + inglés.
+        const lang = String(ctx.config.lang ?? '').trim() || 'eng+spa';
+        text = (await withTimeout(this.ocr(file.bytes, lang), OCR_TIMEOUT)).trim();
+        if (!text) return store({ name: file.name, chars: 0, text: '', note: 'No se detectó texto en la imagen.' });
       } else if (/^text\/|json|xml|csv/i.test(file.mimeType)) {
         text = new TextDecoder().decode(file.bytes);
       } else {

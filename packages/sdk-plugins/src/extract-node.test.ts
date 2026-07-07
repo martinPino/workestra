@@ -14,8 +14,8 @@ class FakeFileStore implements IFileStore {
   }
 }
 
-const run = (file: StoredFile | null, fileId: string, files?: IFileStore) =>
-  new ExtractTextNodeExecutor(files ?? new FakeFileStore(file)).execute({
+const run = (file: StoredFile | null, fileId: string, opts: { files?: IFileStore; ocr?: (b: Uint8Array, l: string) => Promise<string> } = {}) =>
+  new ExtractTextNodeExecutor(opts.files ?? new FakeFileStore(file), opts.ocr).execute({
     executionId: 'e1',
     workspaceId: 'ws1',
     nodeKey: 'extraer',
@@ -40,6 +40,19 @@ describe('ExtractTextNodeExecutor (nodo Extraer texto, M49)', () => {
     const file: StoredFile = { name: 't.txt', mimeType: 'text/plain', bytes: new TextEncoder().encode('hola') };
     expect(out(await run(file, 'f1')).text).toBe('hola'); // id suelto
     expect(out(await run(file, '{"id":"f1","name":"t.txt"}')).text).toBe('hola'); // objeto JSON
+  });
+
+  it('una imagen (foto/escaneo) va por OCR y devuelve su texto (M50)', async () => {
+    const img: StoredFile = { name: 'factura.jpg', mimeType: 'image/jpeg', bytes: new Uint8Array([1, 2, 3]) };
+    let seenLang = '';
+    const res = await run(img, 'f1', {
+      ocr: async (_bytes, lang) => {
+        seenLang = lang;
+        return 'FACTURA Nº 42\nTotal: 100€';
+      },
+    });
+    expect(out(res).text).toBe('FACTURA Nº 42\nTotal: 100€');
+    expect(seenLang).toBe('eng+spa'); // idioma por defecto: español + inglés
   });
 
   it('errores legibles sin romper el flujo: sin fichero, no encontrado, tipo no soportado', async () => {
