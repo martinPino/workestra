@@ -4,7 +4,9 @@ import { Injectable } from '@nestjs/common';
 import { McpServer, StreamableHTTPServerTransport, isInitializeRequest } from './mcp-sdk';
 import type { McpServerLike, StreamableTransportLike } from './mcp-sdk';
 import { registerTools, type McpContext } from './tools';
+import { registerArchitectTools } from './architect';
 import { registerResources } from './resources';
+import { registerPrompts } from './prompts';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { AgentsService } from '../agents/agents.service';
 import { ExecutionsService } from '../execution/executions.service';
@@ -40,7 +42,9 @@ export class McpService {
       rbac: this.rbac,
     };
     registerTools(server, ctx);
+    registerArchitectTools(server, ctx);
     registerResources(server, ctx);
+    registerPrompts(server, ctx);
     return server;
   }
 
