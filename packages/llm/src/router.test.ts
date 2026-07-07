@@ -66,6 +66,19 @@ describe('ModelRouter — fallback entre proveedores (M33)', () => {
     expect(res.providerId).toBe('anthropic');
   });
 
+  it('infiere el proveedor por prefijo cuando el modelo no está en el registro', async () => {
+    const router = new ModelRouter();
+    router.registerProvider(fakeProvider('openai-compatible', (req) => ok('openai-compatible', req.model)));
+    router.registerProvider(fakeProvider('openai', (req) => ok('openai', req.model)));
+    router.registerProvider(fakeProvider('anthropic', (req) => ok('anthropic', req.model)));
+    router.setDefault('openai-compatible');
+    // gpt-4o-mini y claude-* NO están en el registro → se infieren por prefijo, no caen al default (Groq).
+    expect((await router.chat({ model: 'gpt-4o-mini', messages: [] })).providerId).toBe('openai');
+    expect((await router.chat({ model: 'claude-haiku-4-5-20251001', messages: [] })).providerId).toBe('anthropic');
+    // «openai/gpt-oss-120b» NO se infiere a openai (lo sirve Groq/OpenRouter) → default.
+    expect((await router.chat({ model: 'openai/gpt-oss-120b', messages: [] })).providerId).toBe('openai-compatible');
+  });
+
   it('un error que NO es rate-limit se lanza sin fallback', async () => {
     const router = new ModelRouter();
     router.registerProvider(fakeProvider('openai-compatible', () => { throw new Error('HTTP 400 bad request'); }));

@@ -44,8 +44,16 @@ export class ModelRouter {
     return this;
   }
 
+  /** Infiere el proveedor por el prefijo del modelo cuando no está en el registro (claude*→anthropic,
+   *  gpt-4/gpt-5/o1/o3→openai). NO cubre «openai/gpt-oss-*» (a propósito: eso lo sirve Groq/OpenRouter). */
+  private inferProviderId(model: string): string | undefined {
+    if (/^claude/i.test(model)) return 'anthropic';
+    if (/^(gpt-[45]|gpt-3|o[13][-.])/i.test(model)) return 'openai';
+    return undefined;
+  }
+
   providerFor(model: string): ILlmProvider {
-    const providerId = this.overrides.get(model) ?? getModelInfo(model)?.provider;
+    const providerId = this.overrides.get(model) ?? getModelInfo(model)?.provider ?? this.inferProviderId(model);
     const provider = providerId ? this.providers.get(providerId) : undefined;
     if (provider) return provider;
     // Fallback: si el proveedor resuelto no está registrado (p. ej. anthropic sin clave) o el modelo
