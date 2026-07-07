@@ -283,6 +283,11 @@ export const api = {
   listAgents: () => fetch(`${API}/agents`, { headers: authHeaders() }).then((r) => json<AgentDto[]>(r)),
   createAgent: (body: AgentInput) =>
     fetch(`${API}/agents`, { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) }).then((r) => json<AgentDto>(r)),
+  // Verifica un servidor MCP (M43): prueba la conexión y avisa si faltan credenciales o no responde.
+  verifyMcp: (url: string) =>
+    fetch(`${API}/agents/mcp/verify`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ url }) }).then((r) =>
+      json<{ ok: boolean; tools?: number; needsAuth?: boolean; reason?: string }>(r),
+    ),
   updateAgent: (id: string, body: Partial<AgentInput>) =>
     fetch(`${API}/agents/${id}`, { method: 'PATCH', headers: authHeaders(), body: JSON.stringify(body) }).then((r) => json<AgentDto>(r)),
   deleteAgent: (id: string) =>

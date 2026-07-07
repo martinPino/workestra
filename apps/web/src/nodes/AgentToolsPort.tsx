@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Plus, Check, X, Boxes, Wrench } from 'lucide-react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Plus, Check, X, Boxes, Wrench, TriangleAlert } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type McpServerRef } from '../lib/api';
 import { TOOL_CATALOG, MCP_PRESETS } from '../lib/tools';
 import { McpLogo } from '../lib/mcp-logos';
@@ -13,6 +13,35 @@ const LINK = 30; // alto del abanico de líneas punteadas del puerto a los círc
 type Item =
   | { kind: 'builtin'; key: string; label: string; icon: typeof Wrench }
   | { kind: 'mcp'; id: string; label: string; url: string };
+
+/**
+ * Aviso de credenciales del servidor MCP (M43): verifica la conexión (initialize + tools/list) y, si falla,
+ * pinta un triángulo rojo con el motivo — como n8n. Muchos MCP usan tu cuenta, así que sin permiso/clave dan
+ * 401/403. La verificación se cachea por URL (dedupe entre nodos que usan el mismo servidor).
+ */
+function McpWarn({ url, name }: { url: string; name: string }) {
+  const t = useT();
+  const q = useQuery({
+    queryKey: ['mcp-verify', url],
+    queryFn: () => api.verifyMcp(url),
+    staleTime: 5 * 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  if (!q.data || q.data.ok) return null;
+  const msg = q.data.needsAuth
+    ? `${t('Faltan las credenciales para')} ${name}. ${t('Incluye tu clave en la URL para que funcione.')}`
+    : `${t('No se pudo conectar con')} ${name}.`;
+  return (
+    <span
+      title={msg}
+      aria-label={msg}
+      className="absolute -bottom-1 left-1/2 z-10 flex h-4 w-4 -translate-x-1/2 items-center justify-center rounded-full border-2 border-elevated bg-danger text-white shadow-card"
+    >
+      <TriangleAlert size={9} strokeWidth={2.75} />
+    </span>
+  );
+}
 
 /**
  * Puerto «Herramientas» del nodo Agente estilo n8n (M40): del puerto cuelgan las herramientas del agente como
@@ -123,6 +152,7 @@ export function AgentToolsPort({
               <div key={it.kind === 'mcp' ? it.id : it.key} className="group/tool flex flex-col items-center" style={{ width: CIRCLE }}>
                 <div className="relative flex items-center justify-center rounded-full border border-border bg-elevated" style={{ width: CIRCLE, height: CIRCLE }}>
                   {it.kind === 'mcp' ? <McpLogo server={{ url: it.url, name: it.label }} box={30} /> : <it.icon size={19} className="text-txt-secondary" />}
+                  {it.kind === 'mcp' && <McpWarn url={it.url} name={it.label} />}
                   {editable && (
                     <button
                       type="button"

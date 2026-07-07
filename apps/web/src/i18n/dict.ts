@@ -256,6 +256,9 @@ export const EN: Record<string, string> = {
   Populares: 'Popular',
   'Ya añadido': 'Already added',
   'O añade uno propio': 'Or add your own',
+  'Faltan las credenciales para': 'Missing credentials for',
+  'Incluye tu clave en la URL para que funcione.': 'Include your key in the URL to make it work.',
+  'No se pudo conectar con': "Couldn't connect to",
   'Nombre (p. ej. GitHub)': 'Name (e.g. GitHub)',
   'Añadir servidor MCP': 'Add MCP server',
   'Si el servidor necesita clave, inclúyela en la URL. Sus herramientas quedarán disponibles para el agente.':

@@ -1,5 +1,6 @@
 import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
 import { type Role, type McpServerRef, McpServerRefSchema } from '@core/contracts';
+import { McpHttpClient } from '@core/infra';
 import { z } from 'zod';
 import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
 
@@ -76,5 +77,23 @@ export class AgentsService {
     const ok = await this.p.agents.delete(id, workspaceId);
     if (!ok) throw new NotFoundException(`Agente no encontrado: ${id}`);
     return { deleted: true };
+  }
+
+  /**
+   * Prueba la conexión con un servidor MCP (M43): initialize + tools/list. Devuelve si está OK (con nº de
+   * tools) o si falla, distinguiendo «faltan credenciales» (401/403) de «no responde». La UI muestra el aviso.
+   */
+  async verifyMcp(url: string): Promise<{ ok: boolean; tools?: number; needsAuth?: boolean; reason?: string }> {
+    if (!/^https?:\/\//i.test(url)) throw new BadRequestException('URL inválida (usa http/https).');
+    try {
+      const client = new McpHttpClient(url);
+      await client.initialize();
+      const tools = await client.listTools();
+      return { ok: true, tools: tools.length };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      const needsAuth = /\b(401|403)\b|unauthor|forbidden|not authenticated/i.test(msg);
+      return { ok: false, needsAuth, reason: msg.slice(0, 200) };
+    }
   }
 }
