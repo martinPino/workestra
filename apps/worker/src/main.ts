@@ -1,6 +1,6 @@
 import { Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
-import { WorkflowRunner, type RunInput } from '@core/engine';
+import { WorkflowRunner, type RunInput, type ScheduleRecord } from '@core/engine';
 import { emptyContext } from '@core/contracts';
 import {
   createPrismaClient,
@@ -11,6 +11,7 @@ import {
   PrismaEventStore,
   PrismaWorkflowRepository,
   PrismaConnectorRepository,
+  PrismaScheduleRepository,
   PrismaSecretStore,
   EventStorePublisher,
   InMemoryMemoryStore,
@@ -25,7 +26,7 @@ import {
   McpToolResolver,
   RedisFileStore,
 } from '@core/infra';
-import { createRuntimeRegistry } from '@core/sdk-plugins';
+import { createRuntimeRegistry, resolveConnectorToken, pollDriveFiles, fetchDriveFileBytes } from '@core/sdk-plugins';
 import { createLlmRouter } from '@core/llm';
 
 /**
@@ -49,6 +50,10 @@ async function main(): Promise<void> {
 
   const nodeRuns = new PrismaNodeRunRepository(prisma);
   const eventStore = new PrismaEventStore(prisma);
+  // Instancias compartidas: el runtime Y el sondeo de triggers (M52) usan los mismos conectores/secretos/ficheros.
+  const connectors = new PrismaConnectorRepository(prisma);
+  const secrets = new PrismaSecretStore(prisma);
+  const fileStore = new RedisFileStore(redis); // M48: mismo almacén de ficheros que la API (Redis compartido)
   const registry = createRuntimeRegistry({
     agents: new PrismaAgentRepository(prisma),
     memory: new InMemoryMemoryStore(),
@@ -56,13 +61,13 @@ async function main(): Promise<void> {
     // que al reanudar en este proceso lea el veredicto persistido y continúe.
     pendingReviews: new PrismaPendingReviewRepository(prisma),
     // Nodo de Conector (M11): mismos repos durables que la API para el dispatch saliente autenticado.
-    connectors: new PrismaConnectorRepository(prisma),
-    secrets: new PrismaSecretStore(prisma),
+    connectors,
+    secrets,
     selfBase: process.env.API_SELF_URL ?? 'http://localhost:3001',
     llmRouter: createLlmRouter(),
     httpAllowlist: HTTP_ALLOWLIST,
-    mcp: new McpToolResolver(new PrismaSecretStore(prisma)), // M40/M45: tools MCP + credencial del servidor conectado
-    files: new RedisFileStore(redis), // M48: mismo almacén de ficheros que la API (Redis compartido)
+    mcp: new McpToolResolver(secrets), // M40/M45: tools MCP + credencial del servidor conectado
+    files: fileStore,
     stepDelayMs: stepDelay,
   });
 
@@ -108,6 +113,86 @@ async function main(): Promise<void> {
   const executionQueue = new Queue('execution', { connection: new IORedis(REDIS_URL, { maxRetriesPerRequest: null }) });
   const scheduleQueue = new Queue('schedule', { connection: new IORedis(REDIS_URL, { maxRetriesPerRequest: null }) });
   const workflows = new PrismaWorkflowRepository(prisma);
+  const schedules = new PrismaScheduleRepository(prisma);
+  const executionRepo = new PrismaExecutionRepository(prisma);
+
+  // Encola UNA ejecución del workflow (anclada a su versión publicada) con variables iniciales extra.
+  async function enqueueWorkflowRun(wf: { id: string; workspaceId: string }, extraVars: Record<string, unknown>): Promise<string> {
+    const runVersion = await workflows.resolveRunVersion(wf.id);
+    const initialContext = { ...emptyContext(), variables: { ...extraVars } };
+    const execution = await executionRepo.create({
+      workflowVersionId: runVersion.id,
+      workspaceId: wf.workspaceId,
+      triggerType: 'cron',
+      context: initialContext,
+    });
+    const input: RunInput = {
+      executionId: execution.id,
+      workflowVersionId: runVersion.id,
+      workspaceId: wf.workspaceId,
+      graph: runVersion.graph,
+      triggerType: 'cron',
+      initialContext,
+    };
+    await executionQueue.add('run', input, {
+      jobId: execution.id,
+      attempts: 5,
+      backoff: { type: 'fixed', delay: 400 },
+      removeOnComplete: 200,
+      removeOnFail: 200,
+    });
+    return execution.id;
+  }
+
+  // M52: sondea la fuente (hoy Google Drive) y encola una ejecución por cada fichero NUEVO desde el último
+  // sondeo (cursor en Redis). Descarga los bytes al file store y deja el `FileRef` en `{{file:trigger}}` para
+  // que el flujo (extraer texto → LLM → CRM) lo consuma directo, como el trigger de Drive de n8n.
+  async function firePollTrigger(schedule: ScheduleRecord, wf: { id: string; workspaceId: string }): Promise<void> {
+    const poll = schedule.poll;
+    if (!poll) return;
+    if (poll.provider !== 'google-drive') {
+      console.warn(`[schedule] ${schedule.id}: proveedor de sondeo no soportado (${poll.provider}).`);
+      return;
+    }
+    const cursorKey = `af:drivepoll:${schedule.id}`;
+    const cursor = await redis.get(cursorKey);
+    const nowIso = new Date().toISOString();
+    if (!cursor) {
+      // Primer sondeo: fija la línea base «desde ahora» (no dispara por ficheros preexistentes).
+      await redis.set(cursorKey, nowIso);
+      console.log(`[schedule] ${schedule.id}: sondeo Drive inicializado en ${nowIso}.`);
+      return;
+    }
+    const resolved = await resolveConnectorToken(connectors, secrets, poll.connectorId, schedule.workspaceId);
+    if (!resolved) {
+      console.warn(`[schedule] ${schedule.id}: conector ${poll.connectorId} no conectado; salto el sondeo.`);
+      return;
+    }
+    const { files, newSince } = await pollDriveFiles({ token: resolved.token, folderId: poll.folderId, sinceIso: cursor });
+    for (const f of files) {
+      // FileRef para el contexto: por defecto solo metadatos; si podemos descargar los bytes, van al store.
+      let fileRef: Record<string, unknown> = { driveId: f.id, name: f.name, mimeType: f.mimeType };
+      try {
+        const bytes = await fetchDriveFileBytes({ token: resolved.token, fileId: f.id, mimeType: f.mimeType });
+        if (bytes) {
+          const ref = await fileStore.put(schedule.workspaceId, { name: f.name, mimeType: f.mimeType, bytes });
+          fileRef = { ...ref, driveId: f.id };
+        }
+      } catch (e) {
+        console.warn(`[schedule] ${schedule.id}: no pude descargar «${f.name}»: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      const execId = await enqueueWorkflowRun(wf, {
+        trigger: 'drive',
+        scheduleId: schedule.id,
+        'file:trigger': fileRef,
+        driveFile: { id: f.id, name: f.name, mimeType: f.mimeType, modifiedTime: f.modifiedTime },
+      });
+      console.log(`[schedule] ${schedule.id}: Drive «${f.name}» → ejecución ${execId}.`);
+    }
+    // Avanza el cursor SOLO tras encolar el lote (si algo falla antes, se reintenta el mismo lote).
+    await redis.set(cursorKey, newSince);
+  }
+
   const scheduleWorker = new Worker<{ scheduleId: string; workflowId: string; workspaceId: string }>(
     'schedule',
     async (job) => {
@@ -121,30 +206,14 @@ async function main(): Promise<void> {
         await scheduleQueue.removeJobScheduler(scheduleId).catch(() => undefined);
         return;
       }
-      const runVersion = await workflows.resolveRunVersion(workflowId);
-      const initialContext = { ...emptyContext(), variables: { trigger: 'schedule', scheduleId } };
-      const execution = await new PrismaExecutionRepository(prisma).create({
-        workflowVersionId: runVersion.id,
-        workspaceId: wf.workspaceId,
-        triggerType: 'cron',
-        context: initialContext,
-      });
-      const input: RunInput = {
-        executionId: execution.id,
-        workflowVersionId: runVersion.id,
-        workspaceId: wf.workspaceId,
-        graph: runVersion.graph,
-        triggerType: 'cron',
-        initialContext,
-      };
-      await executionQueue.add('run', input, {
-        jobId: execution.id,
-        attempts: 5,
-        backoff: { type: 'fixed', delay: 400 },
-        removeOnComplete: 200,
-        removeOnFail: 200,
-      });
-      console.log(`[schedule] ${scheduleId} disparó ejecución ${execution.id} de ${workflowId}`);
+      const schedule = await schedules.get(scheduleId);
+      // M52: un schedule con config `poll` es un SONDEO — lista los ficheros nuevos y encola uno por cada uno.
+      if (schedule?.poll) {
+        await firePollTrigger(schedule, wf);
+        return;
+      }
+      const execId = await enqueueWorkflowRun(wf, { trigger: 'schedule', scheduleId });
+      console.log(`[schedule] ${scheduleId} disparó ejecución ${execId} de ${workflowId}`);
     },
     { connection: new IORedis(REDIS_URL, { maxRetriesPerRequest: null }), concurrency: 4 },
   );

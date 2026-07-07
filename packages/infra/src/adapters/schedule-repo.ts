@@ -1,7 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
-import type { IScheduleRepository, ScheduleRecord } from '@core/engine';
+import type { IScheduleRepository, ScheduleRecord, SchedulePoll } from '@core/engine';
 
-type NewSchedule = { workspaceId: string; workflowId: string; cron: string | null; everyMs: number | null };
+type NewSchedule = { workspaceId: string; workflowId: string; cron: string | null; everyMs: number | null; poll?: SchedulePoll | null };
 
 /** Schedule repo in-memory (dev/tests). */
 export class InMemoryScheduleRepository implements IScheduleRepository {
@@ -34,7 +34,14 @@ export class PrismaScheduleRepository implements IScheduleRepository {
 
   async create(input: NewSchedule): Promise<ScheduleRecord> {
     const row = await this.prisma.scheduledTrigger.create({
-      data: { workspaceId: input.workspaceId, workflowId: input.workflowId, cron: input.cron, everyMs: input.everyMs, active: true },
+      data: {
+        workspaceId: input.workspaceId,
+        workflowId: input.workflowId,
+        cron: input.cron,
+        everyMs: input.everyMs,
+        poll: (input.poll ?? undefined) as never, // M52: JSON de sondeo
+        active: true,
+      },
     });
     return this.toDomain(row);
   }
@@ -60,6 +67,7 @@ export class PrismaScheduleRepository implements IScheduleRepository {
     workflowId: string;
     cron: string | null;
     everyMs: number | null;
+    poll?: unknown;
     active: boolean;
     createdAt: Date;
   }): ScheduleRecord {
@@ -69,6 +77,7 @@ export class PrismaScheduleRepository implements IScheduleRepository {
       workflowId: row.workflowId,
       cron: row.cron,
       everyMs: row.everyMs,
+      poll: (row.poll ?? null) as ScheduleRecord['poll'],
       active: row.active,
       createdAt: row.createdAt.toISOString(),
     };

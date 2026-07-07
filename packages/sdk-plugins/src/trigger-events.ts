@@ -60,6 +60,16 @@ export const TRIGGER_EVENTS: TriggerEventDef[] = [
     providerEvents: ['jira:issue_updated'],
     triggerEvent: 'webhook',
   },
+  {
+    // M52: Google Drive no envía webhooks simples → se SONDEA (schedule con config `poll`). El worker lista
+    // los ficheros nuevos de la carpeta y dispara una ejecución por cada uno (con el fichero en el contexto).
+    id: 'google-drive.file_created',
+    label: 'Cuando llega un fichero nuevo a Google Drive',
+    icon: '📄',
+    kind: 'external',
+    provider: 'google-drive',
+    triggerEvent: 'cron', // se materializa como un sondeo programado
+  },
 ];
 
 export function listTriggerEvents(): TriggerEventDef[] {

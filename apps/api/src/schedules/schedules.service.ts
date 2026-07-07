@@ -1,6 +1,6 @@
 import { Injectable, Inject, BadRequestException, OnModuleInit } from '@nestjs/common';
 import type { Queue } from 'bullmq';
-import type { ScheduleRecord } from '@core/engine';
+import type { ScheduleRecord, SchedulePoll } from '@core/engine';
 import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
 import { assertInWorkspace } from '../tenant/tenant.util';
 import { triggerEventOf } from '../workflows/trigger.util';
@@ -41,6 +41,8 @@ const MAX_PER_WORKFLOW = Number(process.env.SCHEDULE_MAX_PER_WORKFLOW ?? 20);
 export interface CreateScheduleInput {
   cron?: string;
   everyMs?: number;
+  /** M52: config de sondeo (p. ej. Google Drive). El worker, al disparar, lista los ficheros nuevos. */
+  poll?: SchedulePoll;
 }
 
 /**
@@ -102,11 +104,19 @@ export class SchedulesService implements OnModuleInit {
       throw new BadRequestException(`Máximo ${MAX_PER_WORKFLOW} triggers programados por workflow.`);
     }
 
+    // M52: valida la config de sondeo (opcional). Un poll de Google Drive necesita el conector.
+    if (input.poll !== undefined) {
+      if (!input.poll || typeof input.poll.provider !== 'string' || typeof input.poll.connectorId !== 'string') {
+        throw new BadRequestException('`poll` debe incluir `provider` y `connectorId`.');
+      }
+    }
+
     const record = await this.p.schedules.create({
       workspaceId,
       workflowId,
       cron: hasCron ? (input.cron as string).trim() : null,
       everyMs: hasEvery ? (input.everyMs as number) : null,
+      poll: input.poll ?? null,
     });
     // Atomicidad (saga): si registrar el repeatable falla, COMPENSA borrando el registro para no
     // dejar una fila huérfana que `onModuleInit` resucitaría en un reinicio (disparo fantasma).

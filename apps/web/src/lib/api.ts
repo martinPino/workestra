@@ -238,7 +238,11 @@ export const api = {
     fetch(`${API}/workflows/${workflowId}/schedules`, { headers: authHeaders() }).then((r) =>
       json<Array<{ id: string; cron: string | null; everyMs: number | null; active: boolean }>>(r),
     ),
-  createSchedule: (workflowId: string, spec: { cron?: string; everyMs?: number }) =>
+  createSchedule: (
+    workflowId: string,
+    // M52: `poll` convierte el schedule en un SONDEO (p. ej. Google Drive: nuevo fichero).
+    spec: { cron?: string; everyMs?: number; poll?: { provider: string; connectorId: string; folderId?: string } },
+  ) =>
     fetch(`${API}/workflows/${workflowId}/schedules`, { method: 'POST', headers: authHeaders(), body: JSON.stringify(spec) }).then((r) =>
       json<{ id: string; cron: string | null; everyMs: number | null; active: boolean }>(r),
     ),

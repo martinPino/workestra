@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
+import type { SchedulePoll } from '@core/engine';
 import { ScopesGuard } from '../rbac/scopes.guard';
 import { RequireScopes } from '../rbac/scopes.decorator';
 import { Workspace } from '../auth/workspace.decorator';
@@ -12,7 +13,11 @@ export class SchedulesController {
   @Post()
   @UseGuards(ScopesGuard)
   @RequireScopes('workflow:write')
-  create(@Param('workflowId') workflowId: string, @Body() body: { cron?: string; everyMs?: number }, @Workspace() workspaceId: string) {
+  create(
+    @Param('workflowId') workflowId: string,
+    @Body() body: { cron?: string; everyMs?: number; poll?: SchedulePoll },
+    @Workspace() workspaceId: string,
+  ) {
     return this.svc.create(workflowId, workspaceId, body);
   }
 

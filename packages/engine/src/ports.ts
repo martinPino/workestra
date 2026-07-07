@@ -294,6 +294,13 @@ export interface IWebhookRepository {
 
 // --------- Puerto de triggers programados (cron/intervalo, M7-B) ---------
 
+/** M52: config de SONDEO de un schedule (p. ej. «Google Drive: nuevo fichero»): al disparar, lista y encola. */
+export interface SchedulePoll {
+  provider: string; // p. ej. 'google-drive'
+  connectorId: string; // conector conectado del que sacar el token
+  folderId?: string; // carpeta a vigilar (opcional)
+}
+
 export interface ScheduleRecord {
   id: string;
   workspaceId: string;
@@ -302,13 +309,15 @@ export interface ScheduleRecord {
   cron: string | null;
   /** Intervalo en ms (excluyente con `cron`). */
   everyMs: number | null;
+  /** M52: si está presente, al disparar se SONDEA la fuente y se encola una ejecución por cada ítem nuevo. */
+  poll?: SchedulePoll | null;
   active: boolean;
   createdAt: string;
 }
 
 /** Registro durable de triggers programados (la planificación real vive en BullMQ). */
 export interface IScheduleRepository {
-  create(input: { workspaceId: string; workflowId: string; cron: string | null; everyMs: number | null }): Promise<ScheduleRecord>;
+  create(input: { workspaceId: string; workflowId: string; cron: string | null; everyMs: number | null; poll?: SchedulePoll | null }): Promise<ScheduleRecord>;
   get(id: string): Promise<ScheduleRecord | null>;
   listByWorkflow(workflowId: string): Promise<ScheduleRecord[]>;
   /** Todos los schedules activos (para re-registrar los repeatables al arrancar). */

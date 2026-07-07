@@ -181,6 +181,7 @@ model ScheduledTrigger {
   workflow    Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   cron        String? // patrón cron de 5 campos (excluyente con everyMs)
   everyMs     Int? // intervalo en ms (excluyente con cron)
+  poll        Json? // M52: config de sondeo (p. ej. {provider,connectorId,folderId}) → lista y dispara por fichero nuevo
   active      Boolean   @default(true)
   createdAt   DateTime  @default(now())
 
