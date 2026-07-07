@@ -17,3 +17,4 @@ export * from './adapters/schedule-repo';
 export * from './adapters/connector-repo';
 export * from './adapters/trigger-binding-repo';
 export * from './adapters/api-key-repo';
+export * from './adapters/workspace-usage-repo';

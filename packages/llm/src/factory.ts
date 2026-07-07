@@ -8,12 +8,23 @@ export interface LlmConfig {
   /** Fuerza que TODOS los modelos se sirvan por este proveedor (útil para dev/tests). */
   forceProvider?: 'mock' | 'anthropic' | 'openai-compatible';
   anthropicApiKey?: string;
+  /** Modelo por defecto de Anthropic para el fallback. */
+  anthropicModel?: string;
   /** Endpoint compatible OpenAI (Groq/OpenRouter/Ollama…). Habilita el proveedor por defecto. */
   llmBaseUrl?: string;
   llmApiKey?: string;
   /** Modelo del endpoint compatible que se enruta explícitamente a ese proveedor. */
   llmModel?: string;
+  /** OpenAI (proveedor de pago, 2º en la cadena de fallback). */
+  openaiApiKey?: string;
+  openaiBaseUrl?: string;
+  openaiModel?: string;
 }
+
+/** Modelos por defecto de cada eslabón de la cadena de fallback (sobrescribibles por env). */
+const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
+const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
+const DEFAULT_ANTHROPIC_MODEL = 'claude-haiku-4-5-20251001';
 
 /**
  * Construye el router a partir de config/env. Cambiar el proveedor de un modelo NO requiere tocar a
@@ -38,6 +49,12 @@ export function createLlmRouter(config: LlmConfig = {}): ModelRouter {
     router.setDefault('openai-compatible'); // modelos desconocidos → endpoint compatible
   }
 
+  // OpenAI como proveedor SEPARADO (id='openai'), 2º en la cadena de fallback. Usa el mismo cliente
+  // compatible con /chat/completions apuntando a api.openai.com.
+  const openaiKey = config.openaiApiKey ?? process.env.OPENAI_API_KEY;
+  const openaiBase = config.openaiBaseUrl ?? process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1';
+  if (openaiKey) router.registerProvider(new OpenAiCompatibleProvider(openaiBase, openaiKey, undefined, 'openai'));
+
   if (config.forceProvider) {
     for (const model of Object.keys(MODEL_REGISTRY)) router.route(model, config.forceProvider);
     router.setDefault(config.forceProvider);
@@ -48,5 +65,14 @@ export function createLlmRouter(config: LlmConfig = {}): ModelRouter {
   // clave, u openai-compatible sin base), el fallback al proveedor por defecto lo cubre.
   for (const model of Object.keys(MODEL_REGISTRY)) router.route(model, getModelInfo(model)!.provider);
   if (llmBase && llmModel) router.route(llmModel, 'openai-compatible');
+
+  // Cadena de fallback entre proveedores (M33): default Groq → si se agota, OpenAI → si se agota, Anthropic.
+  // Solo se incluye un eslabón si su clave está configurada.
+  const chain = [];
+  if (llmBase) chain.push({ providerId: 'openai-compatible', model: llmModel ?? DEFAULT_GROQ_MODEL });
+  if (openaiKey) chain.push({ providerId: 'openai', model: config.openaiModel ?? process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL });
+  if (anthropicKey) chain.push({ providerId: 'anthropic', model: config.anthropicModel ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_ANTHROPIC_MODEL });
+  router.setFallbackChain(chain);
+
   return router;
 }

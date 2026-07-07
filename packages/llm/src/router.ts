@@ -1,17 +1,34 @@
 import type { ILlmProvider, LlmRequest, LlmResponse } from '@core/contracts';
 import { getModelInfo } from './pricing';
+import { isProviderRateLimited } from './rate-limit';
+
+/** Un eslabón de la cadena de fallback: qué proveedor probar y con qué modelo. */
+export interface FallbackEntry {
+  providerId: string;
+  model: string;
+}
 
 /**
  * Enruta cada modelo a un proveedor. El consumidor (AgentRuntime) solo llama a `chat`; cambiar
  * qué proveedor sirve un modelo (por config) no toca al consumidor — criterio de aceptación T-LLM.
+ *
+ * Fallback entre proveedores (M33): si el proveedor primario se agota (429/cuota), `chat` cae al
+ * siguiente proveedor de la cadena con SU modelo por defecto (p. ej. Groq→OpenAI→Anthropic).
  */
 export class ModelRouter {
   private readonly providers = new Map<string, ILlmProvider>();
   private readonly overrides = new Map<string, string>(); // model -> providerId
   private defaultProviderId?: string;
+  private fallbackChain: FallbackEntry[] = [];
 
   registerProvider(provider: ILlmProvider): this {
     this.providers.set(provider.id, provider);
+    return this;
+  }
+
+  /** Fija la cadena de fallback (orden de proveedores a probar cuando el primario se agota). */
+  setFallbackChain(chain: FallbackEntry[]): this {
+    this.fallbackChain = chain;
     return this;
   }
 
@@ -38,7 +55,26 @@ export class ModelRouter {
     throw new Error(`No hay proveedor LLM registrado para el modelo "${model}" (proveedor ${providerId ?? 'desconocido'}).`);
   }
 
-  chat(req: LlmRequest): Promise<LlmResponse> {
-    return this.providerFor(req.model).chat(req);
+  async chat(req: LlmRequest): Promise<LlmResponse> {
+    const primary = this.providerFor(req.model);
+    // Cadena de intentos: primero el proveedor del modelo pedido (con su modelo), luego el resto de la
+    // cadena de fallback (cada uno con su modelo por defecto), saltando el primario para no repetirlo.
+    const attempts: Array<{ provider: ILlmProvider; model: string }> = [{ provider: primary, model: req.model }];
+    for (const entry of this.fallbackChain) {
+      const provider = this.providers.get(entry.providerId);
+      if (provider && provider.id !== primary.id) attempts.push({ provider, model: entry.model });
+    }
+
+    let lastErr: unknown;
+    for (const { provider, model } of attempts) {
+      try {
+        return await provider.chat({ ...req, model });
+      } catch (e) {
+        // Solo se cae al siguiente proveedor si el actual está AGOTADO (429/cuota); otros errores se lanzan.
+        if (!isProviderRateLimited(e)) throw e;
+        lastErr = e;
+      }
+    }
+    throw lastErr ?? new Error('No hay proveedores LLM disponibles.');
   }
 }

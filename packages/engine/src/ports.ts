@@ -411,3 +411,17 @@ export interface IApiKeyRepository {
   /** Best-effort: sella el último uso (no debe bloquear la petición si falla). */
   touchLastUsed(id: string): Promise<void>;
 }
+
+// --------- Puerto de uso/cuota por workspace (M33) ---------
+
+/**
+ * Contador de tokens LLM por workspace en una VENTANA DIARIA (se resetea cada día). Sirve para que un
+ * workspace no agote el presupuesto común: se consulta antes de una operación de IA y se suma después.
+ * El adaptador Redis usa una clave por día con TTL (auto-reset); el InMemory, un Map por día.
+ */
+export interface IWorkspaceUsageRepository {
+  /** Suma `tokens` al contador de HOY del workspace y devuelve el nuevo total del día. */
+  add(workspaceId: string, tokens: number): Promise<number>;
+  /** Tokens LLM usados HOY por el workspace. */
+  todayTokens(workspaceId: string): Promise<number>;
+}

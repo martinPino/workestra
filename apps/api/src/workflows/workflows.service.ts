@@ -77,7 +77,7 @@ export class WorkflowsService {
    */
   async generate(prompt: string, workspaceId: string): Promise<{ name: string; graph: WorkflowGraph }> {
     const clean = this.cleanPrompt(prompt);
-    return this.runLlmGraph(await this.catalogPrompt(workspaceId), clean);
+    return this.runLlmGraph(await this.catalogPrompt(workspaceId), clean, workspaceId);
   }
 
   /**
@@ -95,7 +95,7 @@ export class WorkflowsService {
       'Aplica este cambio y DEVUELVE EL FLUJO COMPLETO modificado (todos los nodos que deben quedar, con sus posiciones y configs; no solo el cambio):',
       clean,
     ].join('\n');
-    return this.runLlmGraph(await this.catalogPrompt(workspaceId), user);
+    return this.runLlmGraph(await this.catalogPrompt(workspaceId), user, workspaceId);
   }
 
   private cleanPrompt(prompt: string): string {
@@ -118,8 +118,18 @@ export class WorkflowsService {
     );
   }
 
+  /** Límite diario de tokens LLM por workspace (0 = ilimitado). Evita que un usuario agote el común. */
+  private tokenLimit(): number {
+    return Math.max(0, Number(process.env.WORKSPACE_TOKEN_LIMIT ?? 0) || 0);
+  }
+
   /** Bucle común: pide el JSON al LLM, extrae, valida (schema + DAG) y reintenta 1 vez con el error. */
-  private async runLlmGraph(system: string, user: string): Promise<{ name: string; graph: WorkflowGraph }> {
+  private async runLlmGraph(system: string, user: string, workspaceId: string): Promise<{ name: string; graph: WorkflowGraph }> {
+    // Cuota por workspace (M33): si ya superó su presupuesto diario de IA, corta ANTES de gastar más.
+    const limit = this.tokenLimit();
+    if (limit > 0 && (await this.p.usage.todayTokens(workspaceId)) >= limit) {
+      throw new BadRequestException('Has alcanzado el límite diario de IA de tu espacio de trabajo. Inténtalo de nuevo mañana o sube el límite.');
+    }
     const primary = process.env.LLM_MODEL ?? 'llama-3.3-70b-versatile';
     // Fallback de modelo: en Groq los límites son POR MODELO, así que si el grande agota su cuota diaria
     // (429 TPD) probamos con uno más ligero, que tiene su propia cuota. Así «Construir con IA» no muere.
@@ -147,6 +157,9 @@ export class WorkflowsService {
           lastErr = `error del modelo: ${msg}`;
           break;
         }
+        // Contabiliza los tokens consumidos hacia la cuota del workspace (best-effort: no rompe la generación).
+        const used = (res.usage?.inputTokens ?? 0) + (res.usage?.outputTokens ?? 0);
+        if (used > 0) await this.p.usage.add(workspaceId, used).catch(() => undefined);
         const jsonStr = extractJsonObject(res.content ?? '');
         if (!jsonStr) {
           lastErr = 'no se encontró JSON en la respuesta';

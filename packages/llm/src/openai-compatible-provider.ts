@@ -25,13 +25,18 @@ function safeParse(s: string | undefined): Record<string, unknown> {
  *   LLM_MODEL     (el modelo a usar por defecto)
  */
 export class OpenAiCompatibleProvider implements ILlmProvider {
-  readonly id = 'openai-compatible';
+  readonly id: string;
 
   constructor(
     private readonly baseUrl: string,
     private readonly apiKey?: string,
     private readonly timeoutMs = 60_000,
-  ) {}
+    // id configurable: permite registrar VARIOS endpoints compatibles a la vez (Groq='openai-compatible',
+    // OpenAI='openai') para la cadena de fallback entre proveedores.
+    id = 'openai-compatible',
+  ) {
+    this.id = id;
+  }
 
   async chat(req: LlmRequest): Promise<LlmResponse> {
     const messages = req.messages.map((m) => ({

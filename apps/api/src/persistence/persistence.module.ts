@@ -14,6 +14,7 @@ import type {
   IConnectorRepository,
   ITriggerBindingRepository,
   IApiKeyRepository,
+  IWorkspaceUsageRepository,
 } from '@core/engine';
 import type { MemoryEvent } from '@core/contracts';
 import IORedis from 'ioredis';
@@ -47,6 +48,8 @@ import {
   PrismaTriggerBindingRepository,
   InMemoryApiKeyRepository,
   PrismaApiKeyRepository,
+  InMemoryWorkspaceUsageRepository,
+  RedisWorkspaceUsageRepository,
 } from '@core/infra';
 
 export const PERSISTENCE = Symbol('PERSISTENCE');
@@ -74,6 +77,8 @@ export interface PersistenceBundle {
   triggerBindings: ITriggerBindingRepository;
   /** Claves de API por workspace (M32): credencial duradera para MCP / apps externas. */
   apiKeys: IApiKeyRepository;
+  /** Uso/cuota de tokens LLM por workspace (M33): contador diario para no agotar el presupuesto común. */
+  usage: IWorkspaceUsageRepository;
   prisma?: PrismaClient;
 }
 
@@ -170,6 +175,8 @@ async function buildPersistence(): Promise<PersistenceBundle> {
       connectors: new PrismaConnectorRepository(prisma),
       triggerBindings: new PrismaTriggerBindingRepository(prisma),
       apiKeys: new PrismaApiKeyRepository(prisma),
+      // Cuota diaria por workspace en Redis (compartido con el worker; TTL auto-resetea el contador).
+      usage: new RedisWorkspaceUsageRepository(redis),
     };
   }
   return {
@@ -188,6 +195,7 @@ async function buildPersistence(): Promise<PersistenceBundle> {
     connectors: new InMemoryConnectorRepository(),
     triggerBindings: new InMemoryTriggerBindingRepository(),
     apiKeys: new InMemoryApiKeyRepository(),
+    usage: new InMemoryWorkspaceUsageRepository(),
   };
 }
 
