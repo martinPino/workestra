@@ -7,7 +7,7 @@ import type {
   LlmToolDef,
   Role,
 } from '@core/contracts';
-import type { IMemoryStore } from '@core/engine';
+import type { IMemoryStore, IMcpToolResolver, McpTool } from '@core/engine';
 import { type ModelRouter, CostCalculator } from '@core/llm';
 import { ToolRegistry } from './tools';
 import { ToolAuthorizationService } from './tool-authorization';
@@ -18,6 +18,7 @@ export interface AgentRuntimeDeps {
   authz: ToolAuthorizationService;
   cost?: CostCalculator;
   memory?: IMemoryStore;
+  mcp?: IMcpToolResolver; // M40: expande los servidores MCP del agente en herramientas invocables
   maxIterations?: number;
 }
 
@@ -56,11 +57,19 @@ export class AgentRuntime implements IAgentRuntime {
     this.maxIterations = deps.maxIterations ?? 4;
   }
 
-  async invoke(agent: Agent, ctx: ExecutionContext): Promise<AgentResult> {
+  async invoke(agent: Agent, ctx: ExecutionContext, workspaceId?: string): Promise<AgentResult> {
     const role = roleOf(agent);
-    const toolDefs: LlmToolDef[] = agent.tools
-      .filter((t) => this.deps.tools.get(t))
-      .map((t) => ({ name: t, description: `Tool ${t}`, parameters: {} }));
+    // M40: expande los servidores MCP enganchados al agente en herramientas reales (nombre + esquema). Un
+    // servidor caído devuelve [] (no rompe). Se ofrecen al modelo junto a las tools internas del agente.
+    const mcpTools: McpTool[] =
+      this.deps.mcp && workspaceId && agent.mcpServers?.length
+        ? await this.deps.mcp.resolve(workspaceId, agent.mcpServers).catch(() => [])
+        : [];
+    const mcpByName = new Map(mcpTools.map((tt) => [tt.name, tt]));
+    const toolDefs: LlmToolDef[] = [
+      ...agent.tools.filter((t) => this.deps.tools.get(t)).map((t) => ({ name: t, description: `Tool ${t}`, parameters: {} })),
+      ...mcpTools.map((tt) => ({ name: tt.name, description: tt.description, parameters: tt.parameters })),
+    ];
 
     const messages: LlmMessage[] = [
       { role: 'system', content: composeSystemPrompt(agent) },
@@ -94,15 +103,28 @@ export class AgentRuntime implements IAgentRuntime {
       }
 
       for (const call of res.toolCalls) {
-        const authz = this.deps.authz.authorize({ role, agentTools: agent.tools, toolKey: call.name });
         let result: unknown;
-        if (!authz.allowed) {
-          result = { error: 'tool no autorizada', reason: authz.reason };
+        let allowed = true;
+        const mcpTool = mcpByName.get(call.name);
+        if (mcpTool) {
+          // Herramienta de un servidor MCP enganchado al agente: autorizada por estar enganchada (el
+          // servidor lo añadió el workspace). Un fallo de red devuelve un error legible, no rompe el bucle.
+          try {
+            result = await mcpTool.invoke(call.arguments);
+          } catch (e) {
+            result = { error: 'fallo del servidor MCP', reason: e instanceof Error ? e.message : String(e) };
+          }
         } else {
-          const tool = this.deps.tools.get(call.name);
-          result = tool ? await tool.invoke(call.arguments, {}) : { error: 'tool inexistente' };
+          const authz = this.deps.authz.authorize({ role, agentTools: agent.tools, toolKey: call.name });
+          allowed = authz.allowed;
+          if (!authz.allowed) {
+            result = { error: 'tool no autorizada', reason: authz.reason };
+          } else {
+            const tool = this.deps.tools.get(call.name);
+            result = tool ? await tool.invoke(call.arguments, {}) : { error: 'tool inexistente' };
+          }
         }
-        toolLog.push({ tool: call.name, allowed: authz.allowed, result });
+        toolLog.push({ tool: call.name, allowed, result });
         messages.push({ role: 'assistant', content: `tool_call:${call.name}` });
         messages.push({ role: 'tool', name: call.name, content: JSON.stringify(result).slice(0, 500), toolCallId: call.id });
       }

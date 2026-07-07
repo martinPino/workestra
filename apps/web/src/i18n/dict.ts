@@ -251,6 +251,12 @@ export const EN: Record<string, string> = {
   'Llama a una API por HTTP.': 'Call an API over HTTP.',
   'Eco de prueba': 'Test echo',
   'Devuelve lo que recibe (para pruebas).': 'Returns what it receives (for testing).',
+  // --- M40 · Servidores MCP por agente ---
+  'Servidor MCP': 'MCP server',
+  'Nombre (p. ej. GitHub)': 'Name (e.g. GitHub)',
+  'Añadir servidor MCP': 'Add MCP server',
+  'Si el servidor necesita clave, inclúyela en la URL. Sus herramientas quedarán disponibles para el agente.':
+    "If the server needs a key, include it in the URL. Its tools will be available to the agent.",
   // --- M36 · Chat del editor consciente del contexto ---
   'Pregúntame sobre este flujo o dime qué cambiar. Ej.: «¿qué hace este flujo?» o «añade un aviso a Slack al final».':
     'Ask me about this flow or tell me what to change. E.g. "what does this flow do?" or "add a Slack alert at the end".',

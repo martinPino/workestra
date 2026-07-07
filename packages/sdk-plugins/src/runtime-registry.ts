@@ -1,4 +1,4 @@
-import type { IAgentRepository, IMemoryStore, IPendingReviewRepository, IConnectorRepository, ISecretStore } from '@core/engine';
+import type { IAgentRepository, IMemoryStore, IPendingReviewRepository, IConnectorRepository, ISecretStore, IMcpToolResolver } from '@core/engine';
 import type { ModelRouter } from '@core/llm';
 import { NodeExecutorRegistry } from './registry';
 import { createDefaultNodeRegistry, WorkNodeExecutor, WaitNodeExecutor } from './executors';
@@ -25,6 +25,8 @@ export interface RuntimeRegistryDeps {
   /** URL de la propia API (donde vive el proveedor `dev`), para resolver el baseUrl del conector. */
   selfBase?: string;
   httpAllowlist?: string[];
+  /** M40: resuelve los servidores MCP de un agente en herramientas invocables. Sin él, no hay tools MCP. */
+  mcp?: IMcpToolResolver;
   stepDelayMs?: number;
   plannerModel?: string;
 }
@@ -46,6 +48,7 @@ export function createRuntimeRegistry(deps: RuntimeRegistryDeps): NodeExecutorRe
     tools: new ToolRegistry().register(new MockTool()).register(new HttpTool(deps.httpAllowlist ?? [])),
     authz: new ToolAuthorizationService(),
     memory: deps.memory,
+    mcp: deps.mcp,
   });
   const orchestrator = new Orchestrator({
     planner: new LlmPlanner(deps.llmRouter, deps.plannerModel ?? 'mock-1'),

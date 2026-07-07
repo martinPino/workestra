@@ -84,6 +84,12 @@ export interface ExecutionDetailDto {
   events: ExecutionEvent[];
 }
 
+export interface McpServerRef {
+  id: string;
+  name: string;
+  url: string;
+}
+
 export interface AgentDto {
   id: string;
   name: string;
@@ -91,6 +97,7 @@ export interface AgentDto {
   systemPrompt?: string;
   model: string;
   tools: string[];
+  mcpServers?: McpServerRef[] | null;
   isOrchestrator: boolean;
   permissions?: { role?: string } | null;
 }
@@ -102,6 +109,7 @@ export interface AgentInput {
   systemPrompt?: string;
   model?: string;
   tools?: string[];
+  mcpServers?: Array<{ id?: string; name: string; url: string }>;
   isOrchestrator?: boolean;
 }
 

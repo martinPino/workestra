@@ -280,6 +280,7 @@ model Agent {
   systemPrompt   String
   model          String
   tools          String[]
+  mcpServers     Json?
   memoryScope    String?
   variables      Json?
   limits         Json?

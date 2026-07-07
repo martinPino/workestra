@@ -18,3 +18,5 @@ export * from './adapters/connector-repo';
 export * from './adapters/trigger-binding-repo';
 export * from './adapters/api-key-repo';
 export * from './adapters/workspace-usage-repo';
+export * from './adapters/mcp-http-client';
+export * from './adapters/mcp-tool-resolver';

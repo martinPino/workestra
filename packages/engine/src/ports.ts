@@ -7,9 +7,30 @@ import type {
   INodeExecutor,
   WorkflowGraph,
   Agent,
+  McpServerRef,
   MemoryScope,
   Role,
 } from '@core/contracts';
+
+/**
+ * Herramienta expuesta por un servidor MCP externo (M40): nombre + descripción + esquema de parámetros y una
+ * función para invocarla. El AgentRuntime la ofrece al modelo y enruta las llamadas a través de `invoke`.
+ */
+export interface McpTool {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+  invoke(args: Record<string, unknown>): Promise<unknown>;
+}
+
+/**
+ * Resuelve los servidores MCP enganchados a un agente en herramientas invocables (M40). Se conecta a cada
+ * servidor, lista sus tools y devuelve adaptadores `McpTool`. Un servidor inalcanzable no rompe la ejecución:
+ * sus tools simplemente se omiten. Puerto puro: la implementación (cliente MCP) vive en infra.
+ */
+export interface IMcpToolResolver {
+  resolve(workspaceId: string, servers: McpServerRef[]): Promise<McpTool[]>;
+}
 
 /**
  * Puertos hexagonales del motor. El `WorkflowRunner` depende SOLO de estas interfaces;

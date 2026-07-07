@@ -15,6 +15,7 @@ function normalize(input: NewAgent, id: string): Agent & { workspaceId: string }
     systemPrompt: input.systemPrompt,
     model: input.model,
     tools: input.tools ?? [],
+    mcpServers: input.mcpServers ?? null,
     memoryScope: input.memoryScope ?? null,
     variables: input.variables ?? null,
     limits: input.limits ?? null,
@@ -82,6 +83,7 @@ function toAgent(r: any): Agent {
     systemPrompt: r.systemPrompt,
     model: r.model,
     tools: r.tools ?? [],
+    mcpServers: r.mcpServers ?? null,
     memoryScope: r.memoryScope,
     variables: r.variables,
     limits: r.limits,
@@ -116,6 +118,7 @@ export class PrismaAgentRepository implements IAgentRepository {
         systemPrompt: input.systemPrompt,
         model: input.model,
         tools: input.tools ?? [],
+        mcpServers: (input.mcpServers ?? undefined) as any,
         memoryScope: input.memoryScope ?? null,
 
         variables: (input.variables ?? undefined) as any,
@@ -132,7 +135,7 @@ export class PrismaAgentRepository implements IAgentRepository {
   async update(id: string, workspaceId: string, patch: Partial<Omit<Agent, 'id'>>): Promise<Agent | null> {
     // updateMany con workspaceId en el WHERE = tenant-safe (no puede tocar agentes de otro workspace).
     const data: Record<string, unknown> = {};
-    for (const k of ['name', 'description', 'systemPrompt', 'model', 'tools', 'memoryScope', 'variables', 'limits', 'permissions', 'isOrchestrator'] as const) {
+    for (const k of ['name', 'description', 'systemPrompt', 'model', 'tools', 'mcpServers', 'memoryScope', 'variables', 'limits', 'permissions', 'isOrchestrator'] as const) {
       if (patch[k] !== undefined) data[k] = patch[k];
     }
     const res = await this.prisma.agent.updateMany({ where: { id, workspaceId }, data: data as any });

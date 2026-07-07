@@ -1,5 +1,6 @@
-import { Injectable, Inject, NotFoundException } from '@nestjs/common';
-import type { Role } from '@core/contracts';
+import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
+import { type Role, type McpServerRef, McpServerRefSchema } from '@core/contracts';
+import { z } from 'zod';
 import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
 
 interface CreateAgentBody {
@@ -8,10 +9,18 @@ interface CreateAgentBody {
   systemPrompt?: string;
   model?: string;
   tools?: string[];
+  mcpServers?: McpServerRef[];
   memoryScope?: string;
   limits?: Record<string, unknown>;
   permissions?: { role?: Role };
   isOrchestrator?: boolean;
+}
+
+/** Valida y normaliza los servidores MCP (M40): URL válida obligatoria; asegura un id estable por servidor. */
+function normalizeMcpServers(raw: unknown): McpServerRef[] {
+  const parsed = z.array(McpServerRefSchema.partial({ id: true })).safeParse(raw ?? []);
+  if (!parsed.success) throw new BadRequestException('Servidor MCP inválido: revisa el nombre y la URL (http/https).');
+  return parsed.data.map((s, i) => ({ id: s.id?.trim() || `mcp_${Date.now().toString(36)}_${i}`, name: s.name, url: s.url }));
 }
 
 @Injectable()
@@ -36,6 +45,7 @@ export class AgentsService {
       systemPrompt: body.systemPrompt ?? 'Eres un asistente útil.',
       model: body.model ?? 'mock-1',
       tools: body.tools ?? [],
+      mcpServers: body.mcpServers ? normalizeMcpServers(body.mcpServers) : null,
       memoryScope: body.memoryScope ?? 'shared',
       variables: null,
       limits: body.limits ?? null,
@@ -52,6 +62,7 @@ export class AgentsService {
     if (body.systemPrompt !== undefined) patch.systemPrompt = body.systemPrompt;
     if (body.model !== undefined) patch.model = body.model;
     if (body.tools !== undefined) patch.tools = body.tools;
+    if (body.mcpServers !== undefined) patch.mcpServers = normalizeMcpServers(body.mcpServers);
     if (body.memoryScope !== undefined) patch.memoryScope = body.memoryScope;
     if (body.limits !== undefined) patch.limits = body.limits;
     if (body.permissions !== undefined) patch.permissions = body.permissions;

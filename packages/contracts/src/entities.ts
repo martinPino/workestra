@@ -32,6 +32,14 @@ export const WorkflowGraphSchema = z.object({
 });
 export type WorkflowGraph = z.infer<typeof WorkflowGraphSchema>;
 
+/** Servidor MCP externo enganchado a un agente (M40). La URL puede llevar la clave embebida (no hay token aparte). */
+export const McpServerRefSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  url: z.string().url(),
+});
+export type McpServerRef = z.infer<typeof McpServerRefSchema>;
+
 export const AgentSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
@@ -39,6 +47,8 @@ export const AgentSchema = z.object({
   systemPrompt: z.string(),
   model: z.string(),
   tools: z.array(z.string()).default([]),
+  // M40: servidores MCP enganchados a este agente; sus herramientas quedan disponibles al ejecutar.
+  mcpServers: z.array(McpServerRefSchema).nullish(),
   memoryScope: z.string().nullish(),
   variables: z.record(z.unknown()).nullish(),
   limits: z.record(z.unknown()).nullish(),

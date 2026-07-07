@@ -166,8 +166,8 @@ export function AfNode({ id, data, selected }: NodeProps<AfNodeData>) {
 
       {/* Puerto «Herramientas» (M39): en un nodo Agente con agente resuelto, cuelga bajo la tarjeta los tools
           del agente + un «+» para añadir/quitar (edita el agente; su runtime las usa). Oculto si está apagado. */}
-      {agent && !disabled && (data.editable || (agent.tools?.length ?? 0) > 0) && (
-        <AgentToolsPort agentId={agent.id} tools={agent.tools ?? []} editable={!!data.editable} />
+      {agent && !disabled && (data.editable || (agent.tools?.length ?? 0) > 0 || (agent.mcpServers?.length ?? 0) > 0) && (
+        <AgentToolsPort agentId={agent.id} tools={agent.tools ?? []} mcpServers={agent.mcpServers ?? []} editable={!!data.editable} />
       )}
     </div>
   );

@@ -58,6 +58,37 @@ describe('AgentRuntime', () => {
     expect(log[0].allowed).toBe(false);
   });
 
+  it('expone y ejecuta las herramientas de un servidor MCP enganchado al agente (M40)', async () => {
+    let resolvedWith: { ws: string; count: number } | null = null;
+    let invoked = false;
+    const mcp: AgentRuntimeDeps['mcp'] = {
+      async resolve(ws, servers) {
+        resolvedWith = { ws, count: servers.length };
+        return [
+          {
+            name: 'GitHub_crear_issue',
+            description: '[GitHub] crea un issue',
+            parameters: {},
+            invoke: async () => {
+              invoked = true;
+              return { ok: true };
+            },
+          },
+        ];
+      },
+    };
+    const a = agent({ tools: [], mcpServers: [{ id: 's1', name: 'GitHub', url: 'https://mcp.example/mcp' }] });
+    const res = await new AgentRuntime({ ...deps(), mcp }).invoke(
+      a,
+      { ...emptyContext(), variables: { task: 'usa la herramienta para crear un issue' } },
+      'ws1',
+    );
+    expect(resolvedWith).toEqual({ ws: 'ws1', count: 1 }); // se resolvió con el workspace + los servidores del agente
+    expect(invoked).toBe(true); // el modelo pidió la tool MCP y se enrutó a su invoke
+    const log = toolLog(res);
+    expect(log.find((l) => l.tool === 'GitHub_crear_issue')?.allowed).toBe(true);
+  });
+
   it('escribe en memoria compartida tras responder', async () => {
     const writes: Array<{ scope: MemoryScope; key: string }> = [];
     const memory: AgentRuntimeDeps['memory'] = {

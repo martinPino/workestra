@@ -52,7 +52,7 @@ export class AgentNodeExecutor implements INodeExecutor {
     const result =
       agent.isOrchestrator && this.orchestrator
         ? await this.orchestrator.run(agent, context, ctx.emit, ctx.workspaceId)
-        : await this.runtime.invoke(agent, context);
+        : await this.runtime.invoke(agent, context, ctx.workspaceId);
 
     // Saneamiento del contexto de salida (fixes revisión M13):
     // 1) El `task` derivado del `input` de ESTE nodo NO debe filtrarse aguas abajo: se restaura el

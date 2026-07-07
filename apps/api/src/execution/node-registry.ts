@@ -1,6 +1,7 @@
 import type { IAgentRepository, IMemoryStore, IPendingReviewRepository, IConnectorRepository, ISecretStore } from '@core/engine';
 import { createRuntimeRegistry, type NodeExecutorRegistry } from '@core/sdk-plugins';
 import { createLlmRouter } from '@core/llm';
+import { McpToolResolver } from '@core/infra';
 
 export const NODE_REGISTRY = Symbol('NODE_REGISTRY');
 
@@ -26,6 +27,7 @@ export function buildNodeRegistry(deps: {
     selfBase: SELF_BASE,
     llmRouter: createLlmRouter(),
     httpAllowlist: HTTP_ALLOWLIST,
+    mcp: new McpToolResolver(), // M40: herramientas de servidores MCP enganchados a los agentes
     stepDelayMs: stepDelay,
   });
 }
