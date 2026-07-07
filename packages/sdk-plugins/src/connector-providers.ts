@@ -127,6 +127,31 @@ export function connectorProviders(selfBase = 'http://localhost:3001'): Record<s
       extraAuthorizeParams: { access_type: 'offline', prompt: 'consent' },
       configProvider: 'google',
     },
+    'google-drive': {
+      provider: 'google-drive',
+      label: 'Google Drive',
+      authorizeUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+      tokenUrl: 'https://oauth2.googleapis.com/token',
+      baseUrl: 'https://www.googleapis.com',
+      scopes: ['https://www.googleapis.com/auth/drive'],
+      requiresConfig: true,
+      tokenExchange: 'form',
+      tokenPath: 'access_token',
+      extraAuthorizeParams: { access_type: 'offline', prompt: 'consent' },
+      configProvider: 'google', // comparte el cliente OAuth de Google (hay que añadir el scope de Drive + reconsentir)
+    },
+    salesforce: {
+      provider: 'salesforce',
+      label: 'Salesforce',
+      authorizeUrl: 'https://login.salesforce.com/services/oauth2/authorize',
+      tokenUrl: 'https://login.salesforce.com/services/oauth2/token',
+      // La API vive en la URL del org (`instance_url` que devuelve el OAuth); el dispatch la usa en runtime (M47).
+      baseUrl: 'https://login.salesforce.com',
+      scopes: ['api', 'refresh_token'],
+      requiresConfig: true, // Connected App con SALESFORCE_CLIENT_ID/SECRET
+      tokenExchange: 'form',
+      tokenPath: 'access_token',
+    },
   };
 }
 

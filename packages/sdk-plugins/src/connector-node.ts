@@ -132,7 +132,10 @@ export class ConnectorNodeExecutor implements INodeExecutor {
       resolvedPath = resolvedPath.split('{cloudid}').join(cloudId);
     }
 
-    const url = provider.baseUrl.replace(/\/$/, '') + (resolvedPath.startsWith('/') ? resolvedPath : `/${resolvedPath}`);
+    // Salesforce (M47): la API vive en la URL del org que devolvió el OAuth (`instance_url`), no en una base
+    // fija. Si el conector la guardó en el blob, se usa como base; si no, cae a la base del proveedor.
+    const base = connector.provider === 'salesforce' && blob.instance_url ? blob.instance_url : provider.baseUrl;
+    const url = base.replace(/\/$/, '') + (resolvedPath.startsWith('/') ? resolvedPath : `/${resolvedPath}`);
     const headers: Record<string, string> = { authorization: `Bearer ${token}` };
     let body: string | undefined;
     if (method !== 'GET' && method !== 'HEAD' && rawBody != null) {

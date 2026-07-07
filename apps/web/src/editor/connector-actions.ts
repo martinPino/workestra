@@ -173,6 +173,54 @@ export const CONNECTOR_ACTIONS: Record<string, ConnectorAction[]> = {
       }),
     },
   ],
+  salesforce: [
+    {
+      id: 'query',
+      label: 'Consultar registros (SOQL)',
+      fields: [{ key: 'soql', label: 'Consulta SOQL', placeholder: 'SELECT Id, Name FROM Account LIMIT 10', multiline: true }],
+      build: (p) => ({ method: 'GET', path: `/services/data/v60.0/query?q=${encodeURIComponent(p.soql ?? '')}` }),
+    },
+    {
+      id: 'create-record',
+      label: 'Crear un registro',
+      fields: [
+        { key: 'object', label: 'Objeto', placeholder: 'Account · Contact · Opportunity · Lead', default: 'Account' },
+        { key: 'fields', label: 'Campos (JSON · admite {{variables}})', placeholder: '{"Name":"{{code:datos.output.name}}"}', multiline: true },
+      ],
+      build: (p) => ({ method: 'POST', path: `/services/data/v60.0/sobjects/${p.object || 'Account'}`, body: p.fields || '{}' }),
+    },
+    {
+      id: 'update-record',
+      label: 'Actualizar un registro',
+      fields: [
+        { key: 'object', label: 'Objeto', placeholder: 'Opportunity', default: 'Account' },
+        { key: 'id', label: 'Id del registro', placeholder: '006XXXXXXXXXXXX' },
+        { key: 'fields', label: 'Campos a cambiar (JSON · admite {{variables}})', placeholder: '{"StageName":"Closed Won"}', multiline: true },
+      ],
+      build: (p) => ({ method: 'PATCH', path: `/services/data/v60.0/sobjects/${p.object || 'Account'}/${p.id}`, body: p.fields || '{}' }),
+    },
+  ],
+  'google-drive': [
+    {
+      id: 'list-files',
+      label: 'Listar ficheros',
+      fields: [{ key: 'query', label: 'Filtro (opcional · sintaxis Drive)', placeholder: "'FOLDER_ID' in parents and mimeType='application/pdf'" }],
+      build: (p) => ({ method: 'GET', path: `/drive/v3/files${p.query ? `?q=${encodeURIComponent(p.query)}` : ''}` }),
+    },
+    {
+      id: 'create-folder',
+      label: 'Crear una carpeta',
+      fields: [
+        { key: 'name', label: 'Nombre', placeholder: 'Facturas procesadas' },
+        { key: 'parentId', label: 'Carpeta padre (Id, opcional)', placeholder: '1AbC…' },
+      ],
+      build: (p) => ({
+        method: 'POST',
+        path: '/drive/v3/files',
+        body: JSON.stringify({ name: p.name, mimeType: 'application/vnd.google-apps.folder', ...(p.parentId ? { parents: [p.parentId] } : {}) }),
+      }),
+    },
+  ],
   dev: [
     { id: 'whoami', label: 'Quién soy (prueba)', fields: [], build: () => ({ method: 'GET', path: '/whoami' }) },
   ],

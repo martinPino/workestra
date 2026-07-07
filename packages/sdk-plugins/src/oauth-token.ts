@@ -12,6 +12,8 @@ export interface TokenBlob {
   refresh_token?: string;
   /** Epoch en ms en el que caduca el access token (undefined = no caduca / desconocido). */
   expires_at?: number;
+  /** M47: base de API por-org que devuelve algún proveedor (Salesforce `instance_url`). */
+  instance_url?: string;
 }
 
 /** Fetch mínimo (para inyectar el global o un mock en tests). */
@@ -34,6 +36,7 @@ export function parseTokenBlob(raw: string): TokenBlob {
         access_token: o.access_token,
         refresh_token: typeof o.refresh_token === 'string' ? o.refresh_token : undefined,
         expires_at: typeof o.expires_at === 'number' ? o.expires_at : undefined,
+        instance_url: typeof o.instance_url === 'string' ? o.instance_url : undefined,
       };
     }
   }
@@ -42,15 +45,16 @@ export function parseTokenBlob(raw: string): TokenBlob {
 
 /** Serializa para persistir. Sin refresh ni expiry, guarda el string suelto (compat con lectores legacy). */
 export function serializeTokenBlob(b: TokenBlob): string {
-  if (!b.refresh_token && !b.expires_at) return b.access_token;
-  return JSON.stringify({ access_token: b.access_token, refresh_token: b.refresh_token, expires_at: b.expires_at });
+  if (!b.refresh_token && !b.expires_at && !b.instance_url) return b.access_token;
+  return JSON.stringify({ access_token: b.access_token, refresh_token: b.refresh_token, expires_at: b.expires_at, instance_url: b.instance_url });
 }
 
 /** Construye el blob desde la respuesta del token endpoint. `nowMs` para calcular `expires_at`. */
 export function tokenBlobFromResponse(tok: Record<string, unknown>, accessToken: string, nowMs: number): TokenBlob {
   const refresh = typeof tok.refresh_token === 'string' ? tok.refresh_token : undefined;
   const expiresIn = typeof tok.expires_in === 'number' ? tok.expires_in : undefined;
-  return { access_token: accessToken, refresh_token: refresh, expires_at: expiresIn ? nowMs + expiresIn * 1000 : undefined };
+  const instance = typeof tok.instance_url === 'string' ? tok.instance_url : undefined; // Salesforce (M47)
+  return { access_token: accessToken, refresh_token: refresh, expires_at: expiresIn ? nowMs + expiresIn * 1000 : undefined, instance_url: instance };
 }
 
 /** Credenciales del cliente OAuth desde env (resolviendo `configProvider`). `null` si no están configuradas. */
@@ -100,8 +104,12 @@ export async function refreshAccessToken(providerKey: string, blob: TokenBlob, n
     const tok = asRecord(await res.json().catch(() => ({})));
     const access = typeof tok.access_token === 'string' ? tok.access_token : '';
     if (!access) return null;
-    // El endpoint de refresh normalmente NO devuelve un refresh nuevo: conservamos el anterior.
-    return tokenBlobFromResponse({ ...tok, refresh_token: tok.refresh_token ?? blob.refresh_token }, access, nowMs);
+    // El endpoint de refresh normalmente NO devuelve un refresh nuevo (ni el instance_url): conservamos los previos.
+    return tokenBlobFromResponse(
+      { ...tok, refresh_token: tok.refresh_token ?? blob.refresh_token, instance_url: tok.instance_url ?? blob.instance_url },
+      access,
+      nowMs,
+    );
   } catch {
     return null;
   }
