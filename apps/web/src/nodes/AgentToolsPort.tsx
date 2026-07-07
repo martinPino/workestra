@@ -58,6 +58,7 @@ export function AgentToolsPort({
     if (!name || !/^https?:\/\//i.test(url)) return;
     save.mutate({ mcpServers: [...mcpServers, { id: `mcp_${Date.now().toString(36)}`, name, url }] });
     setForm({ name: '', url: '' });
+    setOpen(false); // cerrar el menú al añadir el servidor
   };
 
   const items: Item[] = [
@@ -141,7 +142,20 @@ export function AgentToolsPort({
       {/* menú de añadir: tools internas + servidor MCP */}
       {open && (
         <div className="absolute top-8 z-30 w-64 rounded-lg border border-border bg-elevated p-2 shadow-pop">
-          <p className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-txt-disabled">{t('Herramientas')}</p>
+          <div className="flex items-center justify-between px-1 pb-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-txt-disabled">{t('Herramientas')}</span>
+            <button
+              type="button"
+              aria-label={t('Cerrar')}
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpen(false);
+              }}
+              className="flex h-5 w-5 items-center justify-center rounded text-txt-disabled transition-colors hover:text-txt-primary"
+            >
+              <X size={12} />
+            </button>
+          </div>
           {TOOL_CATALOG.map((c) => {
             const on = tools.includes(c.key);
             return (
