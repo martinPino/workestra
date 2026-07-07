@@ -70,6 +70,14 @@ export class ConnectorsController {
     return this.svc.connect(id, workspaceId);
   }
 
+  /** Carpetas del Google Drive del conector (M54): pobla el desplegable «Carpeta de Drive» del trigger. */
+  @Get(':id/drive-folders')
+  @UseGuards(ScopesGuard)
+  @RequireScopes('workflow:read')
+  driveFolders(@Param('id') id: string, @Workspace() workspaceId: string) {
+    return this.svc.driveFolders(id, workspaceId);
+  }
+
   @Delete(':id')
   @UseGuards(ScopesGuard)
   @RequireScopes('workflow:write')

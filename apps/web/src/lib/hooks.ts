@@ -50,6 +50,16 @@ export const useTriggerBindings = (workflowId: string | null) =>
     retry: false,
   });
 
+/** Carpetas del Google Drive de un conector conectado (M54): pobla el desplegable del trigger. */
+export const useDriveFolders = (connectorId: string | null) =>
+  useQuery({
+    queryKey: ['driveFolders', connectorId],
+    queryFn: () => api.driveFolders(connectorId as string),
+    enabled: !!connectorId,
+    retry: false,
+    staleTime: 60_000,
+  });
+
 /** Catálogo de proveedores de conectores (M11). */
 export const useConnectorProviders = () =>
   useQuery({ queryKey: ['connector-providers'], queryFn: api.listConnectorProviders, retry: false });

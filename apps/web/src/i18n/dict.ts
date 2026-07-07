@@ -649,4 +649,9 @@ export const EN: Record<string, string> = {
   'No se pudo abrir la ventana de autorización (¿bloqueador de popups?).': 'Could not open the authorization window (popup blocker?).',
   'Este flujo tiene varios pasos «Disparador»; manda el primero del lienzo. Configura el disparo en ese nodo (o borra este).':
     'This flow has several "Trigger" steps; the first one on the canvas governs. Configure the trigger on that node (or delete this one).',
+  // --- M54: desplegable de carpetas de Google Drive ---
+  'Cargando carpetas…': 'Loading folders…',
+  'Pegar un ID manualmente': 'Paste an ID manually',
+  'Elegir de la lista': 'Choose from the list',
+  'No pudimos listar tus carpetas; pega el ID de la carpeta.': "We couldn't list your folders; paste the folder ID.",
 };

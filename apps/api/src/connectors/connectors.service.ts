@@ -2,7 +2,7 @@ import { Injectable, Inject, BadRequestException, NotFoundException } from '@nes
 import { JwtService } from '@nestjs/jwt';
 import { randomBytes } from 'node:crypto';
 import type { ConnectorRecord } from '@core/engine';
-import { getConnectorProvider, providerEnvKeys, tokenBlobFromResponse, serializeTokenBlob } from '@core/sdk-plugins';
+import { getConnectorProvider, providerEnvKeys, tokenBlobFromResponse, serializeTokenBlob, resolveConnectorToken, listDriveFolders } from '@core/sdk-plugins';
 import { setCurrentWorkspace } from '@core/infra';
 import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
 import { assertInWorkspace } from '../tenant/tenant.util';
@@ -84,6 +84,20 @@ export class ConnectorsService {
 
   async list(workspaceId: string): Promise<ConnectorRecord[]> {
     return this.p.connectors.listByWorkspace(workspaceId);
+  }
+
+  /**
+   * Lista las carpetas del Google Drive del conector (M54): resuelve el token OAuth vigente (con refresh) y
+   * consulta la Drive API. Para poblar el desplegable «Carpeta de Drive» del trigger, sin que el usuario
+   * tenga que pegar un ID a mano. Aislado por tenant (deny-by-default).
+   */
+  async driveFolders(connectorId: string, workspaceId: string): Promise<{ folders: Array<{ id: string; name: string }> }> {
+    const c = await this.p.connectors.getInWorkspace(connectorId, workspaceId);
+    if (!c) throw new NotFoundException('Conector no encontrado.');
+    if (c.provider !== 'google-drive') throw new BadRequestException('El conector no es de Google Drive.');
+    const resolved = await resolveConnectorToken(this.p.connectors, this.p.secrets, connectorId, workspaceId);
+    if (!resolved) throw new BadRequestException('El conector de Google Drive no está conectado (vuelve a conectarlo).');
+    return listDriveFolders({ token: resolved.token });
   }
 
   /** Inicia el flujo OAuth: devuelve la URL de autorización con un `state` firmado (10 min). */

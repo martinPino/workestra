@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { driveQuery, pollDriveFiles, fetchDriveFileBytes, isNativeGoogleDoc, type DriveFile } from './drive-poll';
+import { driveQuery, pollDriveFiles, fetchDriveFileBytes, isNativeGoogleDoc, listDriveFolders, type DriveFile } from './drive-poll';
 
 describe('driveQuery', () => {
   it('filtra por modificación posterior y no papelera', () => {
@@ -71,6 +71,28 @@ describe('pollDriveFiles', () => {
       }),
     });
     expect(res.files.map((f) => f.id)).toEqual(['a']);
+  });
+});
+
+describe('listDriveFolders', () => {
+  it('consulta solo carpetas no papelera y devuelve id+nombre', async () => {
+    const res = await listDriveFolders({
+      token: 'tok',
+      fetchFn: async (url, init) => {
+        expect(decodeURIComponent(url)).toContain("mimeType = 'application/vnd.google-apps.folder'");
+        expect(decodeURIComponent(url)).toContain('trashed = false');
+        expect(init?.headers?.authorization).toBe('Bearer tok');
+        return { ok: true, json: async () => ({ files: [{ id: 'f1', name: 'Facturas' }, { id: 'f2', name: 'Recibos' }] }) };
+      },
+    });
+    expect(res.folders).toEqual([{ id: 'f1', name: 'Facturas' }, { id: 'f2', name: 'Recibos' }]);
+  });
+
+  it('descarta filas sin id o sin nombre, y devuelve [] en error', async () => {
+    const bad = await listDriveFolders({ token: 't', fetchFn: async () => ({ ok: true, json: async () => ({ files: [{ id: '', name: 'x' }, { id: 'ok', name: 'Buena' }] }) }) });
+    expect(bad.folders).toEqual([{ id: 'ok', name: 'Buena' }]);
+    const err = await listDriveFolders({ token: 't', fetchFn: async () => ({ ok: false, json: async () => ({}) }) });
+    expect(err.folders).toEqual([]);
   });
 });
 

@@ -42,6 +42,26 @@ export function driveQuery(folderId: string | undefined, sinceIso: string): stri
   return [`modifiedTime > '${sinceIso}'`, folderId ? `'${folderId}' in parents` : '', 'trashed = false'].filter(Boolean).join(' and ');
 }
 
+export interface DriveFolder {
+  id: string;
+  name: string;
+}
+
+/**
+ * Lista las CARPETAS del Drive del usuario (para poblar el desplegable del trigger, M54). Devuelve hasta 100
+ * carpetas no papelera, ordenadas por nombre. Puro con `fetch` inyectable → testeable; en error devuelve [].
+ */
+export async function listDriveFolders(opts: { token: string; fetchFn?: Fetchish }): Promise<{ folders: DriveFolder[] }> {
+  const fetchFn = opts.fetchFn ?? (globalThis.fetch as unknown as Fetchish);
+  const q = encodeURIComponent("mimeType = 'application/vnd.google-apps.folder' and trashed = false");
+  const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&orderBy=name&pageSize=100`;
+  const res = await fetchFn(url, { headers: { authorization: `Bearer ${opts.token}` } });
+  if (!res.ok) return { folders: [] };
+  const data = (await res.json().catch(() => ({}))) as { files?: DriveFolder[] }; // cuerpo no-JSON con 2xx → []
+  const folders = (data.files ?? []).filter((f) => f && f.id && typeof f.name === 'string');
+  return { folders };
+}
+
 /**
  * Devuelve los ficheros nuevos y el `newSince` a persistir (el `modifiedTime` máximo visto, o el `sinceIso` si
  * no hubo ninguno). Ordenados por `modifiedTime` ascendente para disparar en orden.
@@ -57,7 +77,7 @@ export async function pollDriveFiles(opts: {
   const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,mimeType,modifiedTime)&orderBy=modifiedTime&pageSize=25`;
   const res = await fetchFn(url, { headers: { authorization: `Bearer ${opts.token}` } });
   if (!res.ok) return { files: [], newSince: opts.sinceIso }; // 401/red: no avanzamos el cursor, se reintenta
-  const data = (await res.json()) as { files?: DriveFile[] };
+  const data = (await res.json().catch(() => ({}))) as { files?: DriveFile[] }; // cuerpo no-JSON con 2xx → no dispara
   const files = (data.files ?? []).filter((f) => f && f.id && f.modifiedTime);
   const newSince = files.reduce((max, f) => (f.modifiedTime > max ? f.modifiedTime : max), opts.sinceIso);
   return { files, newSince };

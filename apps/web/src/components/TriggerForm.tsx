@@ -3,7 +3,7 @@ import { Zap, Plus, Trash2, Plug, Copy, Check, KeyRound, TriangleAlert, Play } f
 import { useQueryClient } from '@tanstack/react-query';
 import { Badge, Button } from '../ui';
 import { api } from '../lib/api';
-import { useWebhooks, useSchedules, useConnectors, useTriggerBindings } from '../lib/hooks';
+import { useWebhooks, useSchedules, useConnectors, useTriggerBindings, useDriveFolders } from '../lib/hooks';
 import { useAuth, canApprove } from '../lib/auth';
 import { useEditorStore } from '../editor/store';
 import { docToWorkflowGraph } from '../graph';
@@ -556,11 +556,15 @@ function DriveSection({ wfId }: { wfId: string }) {
   const qc = useQueryClient();
   const { connected: drive, busy: connBusy, connect } = useProviderConnection('google-drive');
   const { data: schedules } = useSchedules(wfId);
+  const { data: folderData, isLoading: foldersLoading, isError: foldersError } = useDriveFolders(drive?.id ?? null);
   const [folderId, setFolderId] = useState('');
+  const [manual, setManual] = useState(false); // pegar el ID a mano (subcarpetas no listadas)
   const [everyMin, setEveryMin] = useState(5);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  const folders = folderData?.folders ?? [];
+  const folderName = (id?: string) => (id ? folders.find((f) => f.id === id)?.name ?? id : t('Toda tu unidad'));
   const polls = (schedules ?? []).filter((s) => s.poll?.provider === 'google-drive');
 
   const doConnect = async () => {
@@ -610,12 +614,52 @@ function DriveSection({ wfId }: { wfId: string }) {
         <>
           <label className="flex flex-col gap-1.5">
             <span className="text-[11px] font-medium text-txt-secondary">{t('Carpeta de Drive')}</span>
-            <input
-              value={folderId}
-              onChange={(e) => setFolderId(e.target.value)}
-              placeholder={t('ID de la carpeta (vacío = toda tu unidad)')}
-              className="h-8 w-full rounded-lg border border-border bg-surface px-2 font-mono text-xs text-txt-primary outline-none placeholder:font-sans placeholder:text-txt-disabled focus:border-primary/60"
-            />
+            {foldersError ? (
+              <>
+                <input
+                  value={folderId}
+                  onChange={(e) => setFolderId(e.target.value)}
+                  placeholder={t('ID de la carpeta (vacío = toda tu unidad)')}
+                  className="h-8 w-full rounded-lg border border-border bg-surface px-2 font-mono text-xs text-txt-primary outline-none placeholder:font-sans placeholder:text-txt-disabled focus:border-primary/60"
+                />
+                <span className="text-[11px] text-txt-disabled">{t('No pudimos listar tus carpetas; pega el ID de la carpeta.')}</span>
+              </>
+            ) : manual ? (
+              <>
+                <input
+                  value={folderId}
+                  onChange={(e) => setFolderId(e.target.value)}
+                  placeholder={t('ID de la carpeta (vacío = toda tu unidad)')}
+                  className="h-8 w-full rounded-lg border border-border bg-surface px-2 font-mono text-xs text-txt-primary outline-none placeholder:font-sans placeholder:text-txt-disabled focus:border-primary/60"
+                />
+                <button
+                  type="button"
+                  // Reconcilia: si el ID escrito a mano NO es una carpeta de la lista, el <select> mostraría
+                  // «Toda tu unidad» pero el estado seguiría con el ID (WYSIWYG roto) → lo limpiamos al volver.
+                  onClick={() => {
+                    if (folderId && !folders.some((f) => f.id === folderId)) setFolderId('');
+                    setManual(false);
+                  }}
+                  className="self-start text-[11px] text-primary underline"
+                >
+                  {t('Elegir de la lista')}
+                </button>
+              </>
+            ) : (
+              <>
+                <select value={folderId} onChange={(e) => setFolderId(e.target.value)} className={SEL} disabled={foldersLoading}>
+                  <option value="">{foldersLoading ? t('Cargando carpetas…') : t('Toda tu unidad')}</option>
+                  {folders.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" onClick={() => setManual(true)} className="self-start text-[11px] text-primary underline">
+                  {t('Pegar un ID manualmente')}
+                </button>
+              </>
+            )}
           </label>
           <label className="flex items-center gap-2 text-xs text-txt-secondary">
             {t('Comprobar cada')}
@@ -644,7 +688,7 @@ function DriveSection({ wfId }: { wfId: string }) {
                 <ProviderLogo provider="google-drive" size={13} />
               </span>
               <span className="min-w-0 flex-1 truncate text-txt-secondary">
-                {s.poll?.folderId ? `${t('Carpeta')} ${s.poll.folderId}` : t('Toda tu unidad')} · {humanEvery(s.everyMs ?? 0)}
+                {s.poll?.folderId ? `${t('Carpeta')} ${folderName(s.poll.folderId)}` : t('Toda tu unidad')} · {humanEvery(s.everyMs ?? 0)}
               </span>
               <button onClick={() => remove(s.id)} className={DEL} disabled={!canApprove(role)} aria-label={t('Eliminar')}>
                 <Trash2 size={13} />

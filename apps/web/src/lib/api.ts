@@ -264,6 +264,9 @@ export const api = {
   connectConnector: (id: string) =>
     fetch(`${API}/connectors/${id}/connect`, { method: 'POST', headers: authHeaders() }).then((r) => json<{ authorizeUrl: string }>(r)),
   deleteConnector: (id: string) => fetch(`${API}/connectors/${id}`, { method: 'DELETE', headers: authHeaders() }).then((r) => json<unknown>(r)),
+  /** Carpetas del Google Drive del conector (M54): pobla el desplegable «Carpeta de Drive» del trigger. */
+  driveFolders: (connectorId: string) =>
+    fetch(`${API}/connectors/${connectorId}/drive-folders`, { headers: authHeaders() }).then((r) => json<{ folders: Array<{ id: string; name: string }> }>(r)),
 
   // --- Triggers sin código (recetas + auto-registro en el proveedor, M19) ---
   /** Proyectos de Jira accesibles con un conector (para el desplegable del picker). */
