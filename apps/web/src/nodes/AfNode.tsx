@@ -7,6 +7,7 @@ import { ProviderLogo, hasProviderLogo } from '../lib/provider-logos';
 import { useAgents, useConnectors } from '../lib/hooks';
 import { agentGradient, agentInitial } from '../lib/agent-avatar';
 import { useEditorStore } from '../editor/store';
+import { AgentToolsPort } from './AgentToolsPort';
 import { useT } from '../i18n';
 
 const STATUS_RING: Record<string, string> = {
@@ -62,7 +63,7 @@ export function AfNode({ id, data, selected }: NodeProps<AfNodeData>) {
 
   return (
     <div
-      className={`group relative min-w-[156px] max-w-[220px] rounded-xl border border-border bg-card px-2.5 py-2 text-xs text-txt-primary shadow-card transition-all duration-150 hover:border-border-strong ${disabled ? 'opacity-50' : ''} ${statusRing} ${selectedRing}`}
+      className={`group relative min-w-[156px] max-w-[220px] rounded-xl border border-border bg-elevated px-2.5 py-2 text-xs text-txt-primary shadow-card transition-all duration-150 hover:border-border-strong ${disabled ? 'opacity-50' : ''} ${statusRing} ${selectedRing}`}
     >
       {/* Barra flotante de controles (M38, estilo n8n): aparece SOLO al pasar el ratón, y solo en el editor.
           El `pb-1.5` del contenedor externo hace de puente sin hueco entre el nodo y la barra. */}
@@ -153,7 +154,7 @@ export function AfNode({ id, data, selected }: NodeProps<AfNodeData>) {
         <div className="flex items-center gap-2.5">
           <span
             className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border ${
-              showLogo ? 'bg-white text-neutral-900' : `bg-elevated ${def?.color ?? 'text-txt-primary'}`
+              showLogo ? 'bg-white text-neutral-900' : `bg-card ${def?.color ?? 'text-txt-primary'}`
             }`}
           >
             {showLogo ? <ProviderLogo provider={connectorProvider} size={16} /> : <Icon size={15} strokeWidth={2} />}
@@ -162,6 +163,12 @@ export function AfNode({ id, data, selected }: NodeProps<AfNodeData>) {
         </div>
       )}
       <Handle type="source" position={Position.Right} className={HANDLE_CLASS} />
+
+      {/* Puerto «Herramientas» (M39): en un nodo Agente con agente resuelto, cuelga bajo la tarjeta los tools
+          del agente + un «+» para añadir/quitar (edita el agente; su runtime las usa). Oculto si está apagado. */}
+      {agent && !disabled && (data.editable || (agent.tools?.length ?? 0) > 0) && (
+        <AgentToolsPort agentId={agent.id} tools={agent.tools ?? []} editable={!!data.editable} />
+      )}
     </div>
   );
 }

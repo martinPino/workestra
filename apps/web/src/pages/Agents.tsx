@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Bot, Crown, Wrench, Cpu, Plus, Pencil, Trash2, X } from 'lucide-react';
+import { Bot, Crown, Wrench, Cpu, Plus, Pencil, Trash2, X, Check } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Page } from '../app/AppShell';
 import { Card, Badge, PageHeader, Button, EmptyState, Skeleton, Input, Textarea, Switch, IconButton } from '../ui';
 import { useAgents } from '../lib/hooks';
+import { TOOL_CATALOG } from '../lib/tools';
 import { api, type AgentDto, type AgentInput } from '../lib/api';
 import { ROLE_PRESETS, AGENT_MODELS } from './agent-roles';
 import { agentGradient } from '../lib/agent-avatar';
@@ -78,7 +79,7 @@ function AgentForm({ initial, onDone, onCancel }: { initial: AgentDto | null; on
   const [goal, setGoal] = useState(initial?.description ?? '');
   const [model, setModel] = useState(initial?.model ?? 'llama-3.3-70b-versatile');
   const [instructions, setInstructions] = useState(initial?.systemPrompt ?? '');
-  const [tools, setTools] = useState((initial?.tools ?? []).join(', '));
+  const [tools, setTools] = useState<string[]>(initial?.tools ?? []);
   const [isOrchestrator, setIsOrchestrator] = useState(initial?.isOrchestrator ?? false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
@@ -89,7 +90,7 @@ function AgentForm({ initial, onDone, onCancel }: { initial: AgentDto | null; on
     setRole(p.role);
     setGoal(p.goal);
     setInstructions(p.instructions);
-    setTools(p.tools.join(', '));
+    setTools(p.tools);
     setIsOrchestrator(p.isOrchestrator ?? false);
   };
 
@@ -105,7 +106,7 @@ function AgentForm({ initial, onDone, onCancel }: { initial: AgentDto | null; on
       description: goal.trim() || null,
       systemPrompt: instructions.trim() || 'Eres un asistente útil.',
       model,
-      tools: tools.split(',').map((t) => t.trim()).filter(Boolean),
+      tools,
       isOrchestrator,
     };
     try {
@@ -166,8 +167,25 @@ function AgentForm({ initial, onDone, onCancel }: { initial: AgentDto | null; on
         <Field label={t('Instrucciones (system prompt)')} hint={t('Cómo se comporta')} className="md:col-span-2">
           <Textarea rows={4} value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder={t('Eres un investigador meticuloso. Cita fuentes, sé conciso…')} />
         </Field>
-        <Field label={t('Herramientas')} hint={t('Opcional, separadas por comas')} className="md:col-span-2">
-          <Input value={tools} onChange={(e) => setTools(e.target.value)} placeholder="tool:http, tool:mock" />
+        <Field label={t('Herramientas')} hint={t('Lo que el agente puede usar mientras trabaja')} className="md:col-span-2">
+          <div className="flex flex-wrap gap-2">
+            {TOOL_CATALOG.map((c) => {
+              const on = tools.includes(c.key);
+              return (
+                <button
+                  key={c.key}
+                  type="button"
+                  onClick={() => setTools((cur) => (cur.includes(c.key) ? cur.filter((x) => x !== c.key) : [...cur, c.key]))}
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${
+                    on ? 'border-primary/60 bg-primary/10 text-txt-primary' : 'border-border bg-surface text-txt-secondary hover:border-border-strong'
+                  }`}
+                >
+                  <c.icon size={13} /> {t(c.label)}
+                  {on && <Check size={12} className="text-primary" />}
+                </button>
+              );
+            })}
+          </div>
         </Field>
       </div>
 

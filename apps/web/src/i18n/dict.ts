@@ -244,6 +244,13 @@ export const EN: Record<string, string> = {
   'Desactivar paso': 'Disable step',
   'Activar paso': 'Enable step',
   Desactivado: 'Disabled',
+  // --- M39 · Herramientas del agente (puerto Tools) ---
+  'Añadir herramienta': 'Add tool',
+  'Herramientas disponibles': 'Available tools',
+  'Petición web': 'Web request',
+  'Llama a una API por HTTP.': 'Call an API over HTTP.',
+  'Eco de prueba': 'Test echo',
+  'Devuelve lo que recibe (para pruebas).': 'Returns what it receives (for testing).',
   // --- M36 · Chat del editor consciente del contexto ---
   'Pregúntame sobre este flujo o dime qué cambiar. Ej.: «¿qué hace este flujo?» o «añade un aviso a Slack al final».':
     'Ask me about this flow or tell me what to change. E.g. "what does this flow do?" or "add a Slack alert at the end".',
