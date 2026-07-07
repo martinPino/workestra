@@ -41,6 +41,15 @@ export const useSchedules = (workflowId: string | null) =>
     retry: false,
   });
 
+/** Disparadores de apps conectadas (M19, p. ej. eventos de Jira) de un workflow. */
+export const useTriggerBindings = (workflowId: string | null) =>
+  useQuery({
+    queryKey: ['triggerBindings', workflowId],
+    queryFn: () => api.listTriggerBindings(workflowId as string),
+    enabled: !!workflowId,
+    retry: false,
+  });
+
 /** Catálogo de proveedores de conectores (M11). */
 export const useConnectorProviders = () =>
   useQuery({ queryKey: ['connector-providers'], queryFn: api.listConnectorProviders, retry: false });

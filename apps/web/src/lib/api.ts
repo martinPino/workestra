@@ -236,7 +236,7 @@ export const api = {
   // --- Triggers programados (cron/intervalo, M7-B) ---
   listSchedules: (workflowId: string) =>
     fetch(`${API}/workflows/${workflowId}/schedules`, { headers: authHeaders() }).then((r) =>
-      json<Array<{ id: string; cron: string | null; everyMs: number | null; active: boolean }>>(r),
+      json<Array<{ id: string; cron: string | null; everyMs: number | null; active: boolean; poll?: { provider: string; connectorId: string; folderId?: string } | null }>>(r),
     ),
   createSchedule: (
     workflowId: string,

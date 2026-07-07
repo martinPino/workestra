@@ -620,4 +620,33 @@ export const EN: Record<string, string> = {
   '— elige una acción para rellenar ruta + cuerpo —': '— choose an action to fill in path + body —',
   '— sin conectar': '— not connected',
   '✓ — las ejecuciones se anclan a esta versión': '✓ — executions are pinned to this version',
+
+  // --- M53: disparadores en el nodo Trigger del editor ---
+  'Manualmente (yo lo ejecuto)': 'Manually (I run it)',
+  'Cuando llega un fichero nuevo a Google Drive': 'When a new file arrives in Google Drive',
+  'Cuando llega un webhook (avanzado)': 'When a webhook arrives (advanced)',
+  'Este flujo arranca cuando pulses «Ejecutar».': 'This flow starts when you press "Run".',
+  'Guarda el workflow para poder activar disparadores.': 'Save the workflow to activate triggers.',
+  'Proyecto de Jira': 'Jira project',
+  'Conectar Google Drive': 'Connect Google Drive',
+  'AgentFlow vigilará la carpeta y arrancará el flujo por cada fichero nuevo, con el fichero listo para usar.':
+    'AgentFlow will watch the folder and start the flow for every new file, with the file ready to use.',
+  'Carpeta de Drive': 'Drive folder',
+  'ID de la carpeta (vacío = toda tu unidad)': 'Folder ID (empty = your whole drive)',
+  'Comprobar cada': 'Check every',
+  'Vigilar la carpeta': 'Watch the folder',
+  'Carpeta': 'Folder',
+  'Toda tu unidad': 'Your whole drive',
+  'Este flujo aún no vigila ninguna carpeta.': 'This flow is not watching any folder yet.',
+  'Este flujo aún tiene disparadores de otro tipo — seguirán ejecutándolo hasta que los quites.':
+    'This flow still has triggers of another type — they will keep running it until you remove them.',
+  'Conecta las apps de tu equipo una vez; tus flujos las usan desde el editor.':
+    'Connect your team apps once; your flows use them from the editor.',
+  '¿Cuándo se ejecuta un flujo? Ábrelo y toca su paso «Disparador»: ahí eliges horario, evento de Jira, webhook o carpeta de Google Drive.':
+    'When does a flow run? Open it and tap its "Trigger" step: choose a schedule, a Jira event, a webhook or a Google Drive folder there.',
+  'Ir a mis workflows': 'Go to my workflows',
+  'Error al eliminar': 'Error deleting',
+  'No se pudo abrir la ventana de autorización (¿bloqueador de popups?).': 'Could not open the authorization window (popup blocker?).',
+  'Este flujo tiene varios pasos «Disparador»; manda el primero del lienzo. Configura el disparo en ese nodo (o borra este).':
+    'This flow has several "Trigger" steps; the first one on the canvas governs. Configure the trigger on that node (or delete this one).',
 };

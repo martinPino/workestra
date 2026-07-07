@@ -6,6 +6,7 @@ import { useAgents, useConnectors } from '../lib/hooks';
 import { SchemaForm } from './SchemaForm';
 import { ConnectorForm } from './ConnectorForm';
 import { ConditionForm } from './ConditionForm';
+import { TriggerForm } from './TriggerForm';
 import { useT } from '../i18n';
 
 /** Panel de propiedades: se genera desde el config schema del tipo del nodo seleccionado. */
@@ -68,7 +69,10 @@ export function PropertiesPanel() {
       {/* key={node.id}: remonta el formulario al cambiar de nodo para que los campos con estado local
           (unidad del campo `duration`, cloudId/avanzado del conector) se re-inicialicen desde el nodo
           recién seleccionado en vez de heredar el estado del anterior. Editar el MISMO nodo no remonta. */}
-      {node.kind === 'connector' ? (
+      {node.kind === 'trigger' ? (
+        // El nodo Trigger configura y ACTIVA el disparador aquí mismo (M53): horario, Jira, webhook, Drive.
+        <TriggerForm key={node.id} nodeId={node.id} value={node.config} onChange={(config) => updateConfig(node.id, config)} />
+      ) : node.kind === 'connector' ? (
         // El nodo Conector usa un editor por ACCIONES (M20): sin method/path/JSON a la vista.
         <ConnectorForm key={node.id} value={node.config} onChange={(config) => updateConfig(node.id, config)} />
       ) : node.kind === 'condition' ? (
