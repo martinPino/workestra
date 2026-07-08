@@ -1,5 +1,5 @@
 import type { NodeType } from '@core/contracts';
-import { Zap, Wrench, GitBranch, Globe, BrainCircuit, Sparkles, Timer, UserCheck, Plug, Flag, Split, Braces, Download, FileText, type LucideIcon } from 'lucide-react';
+import { Zap, NotebookPen, GitBranch, Globe, BrainCircuit, Sparkles, Timer, UserCheck, Plug, Flag, Split, Braces, Download, FileText, type LucideIcon } from 'lucide-react';
 
 /** Subconjunto de JSON Schema que entiende el NodePropertiesPanel. */
 export interface FieldSchema {
@@ -84,7 +84,7 @@ registerNodeType({
   kind: 'tool',
   label: 'Anotar',
   help: 'Deja una anotación o mensaje en el flujo. Útil para pruebas o para registrar un paso.',
-  icon: Wrench,
+  icon: NotebookPen,
   color: 'text-sky-400',
   category: 'logic',
   configSchema: {
