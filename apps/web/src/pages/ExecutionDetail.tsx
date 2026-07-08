@@ -17,6 +17,7 @@ import {
   Loader2,
   CircleX,
   AlertTriangle,
+  FileDown,
 } from 'lucide-react';
 import type { ExecutionEvent } from '@core/contracts';
 import { reduceExecution, type NodeRunStatus } from '@core/domain';
@@ -198,14 +199,29 @@ function BrowserShot({ execId, fileId }: { execId: string; fileId: string }) {
       </div>
     );
   }
+  // Solo las imágenes se pintan como miniatura; un PDF/descarga (u otro binario) en un <img> daría el icono
+  // de imagen rota, así que se muestra como una «pastilla» de fichero. En ambos casos el clic abre el original.
+  const isImage = data.mimeType.startsWith('image/');
   return (
     <div className="px-3 pb-2">
-      <a href={data.dataUrl} target="_blank" rel="noreferrer" title={t('Ver captura a tamaño completo')} className="inline-block">
-        <img
-          src={data.dataUrl}
-          alt={t('Captura de pantalla del navegador')}
-          className="max-h-28 w-auto rounded-md border border-border shadow-subtle transition-shadow hover:shadow-card"
-        />
+      <a
+        href={data.dataUrl}
+        target="_blank"
+        rel="noreferrer"
+        title={isImage ? t('Ver captura a tamaño completo') : t('Abrir fichero')}
+        className="inline-block"
+      >
+        {isImage ? (
+          <img
+            src={data.dataUrl}
+            alt={t('Captura de pantalla del navegador')}
+            className="max-h-28 w-auto rounded-md border border-border shadow-subtle transition-shadow hover:shadow-card"
+          />
+        ) : (
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-elevated px-2 py-1 text-[11px] text-txt-secondary transition-colors hover:text-txt-primary">
+            <FileDown size={12} /> {data.name} <span className="text-txt-disabled">({data.mimeType})</span>
+          </span>
+        )}
       </a>
     </div>
   );

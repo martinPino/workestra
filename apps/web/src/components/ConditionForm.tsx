@@ -17,14 +17,21 @@ const OPS: { key: string; label: string }[] = [
   { key: '~', label: 'contiene' },
 ];
 
+// Mismo patrón de cláusula que el evaluador del motor (executors-io.ts): el `dato` admite «:» porque las
+// salidas de otros nodos se guardan con clave compuesta (`agent:qa.output`, `connector:c.status`). Si el
+// front no lo aceptara, abrir el nodo Condición de una plantilla que use esa sintaxis (p. ej. «Equipo QA»)
+// y tocar cualquier campo colapsaría la expresión a «true» → la rama de fallo se dispararía SIEMPRE.
+const CLAUSE_RE = /^\s*([\w.:]+)\s*(==|!=|>=|<=|>|<|~)\s*(.+?)\s*$/;
+
 /** Descompone la expresión guardada en reglas para poblar el builder. */
-function parseExpr(expr: string): { rules: Rule[]; combinator: Combinator } {
+export function parseExpr(expr: string): { rules: Rule[]; combinator: Combinator } {
   const trimmed = (expr ?? '').trim();
   const empty: Rule = { field: '', op: '==', value: '' };
   if (!trimmed || trimmed === 'true') return { rules: [empty], combinator: '&&' };
   const combinator: Combinator = trimmed.includes('||') ? '||' : '&&';
   const rules = trimmed.split(combinator).map((p) => {
-    const m = p.match(/^\s*([\w.]+)\s*(==|!=|>=|<=|>|<|~)\s*(.+?)\s*$/);
+    const m = p.match(CLAUSE_RE);
+    // Si no la sabemos descomponer, guardamos la cláusula ENTERA en `field` y compileExpr la conserva verbatim.
     return m ? { field: m[1], op: m[2], value: m[3].replace(/^["']|["']$/g, '') } : { ...empty, field: p.trim() };
   });
   return { rules: rules.length ? rules : [empty], combinator };
@@ -32,7 +39,7 @@ function parseExpr(expr: string): { rules: Rule[]; combinator: Combinator } {
 
 /** Compila las reglas a la expresión que evalúa el motor (`campo op valor && …`). Solo reglas COMPLETAS
  * (campo Y valor): una regla a medias no se guarda ni corrompe la expresión (evita `a == ` sin valor). */
-function compileExpr(rules: Rule[], combinator: Combinator): string {
+export function compileExpr(rules: Rule[], combinator: Combinator): string {
   const clauses = rules.filter((r) => r.field.trim() && r.value.trim()).map((r) => `${r.field.trim()} ${r.op} ${r.value.trim()}`);
   return clauses.length ? clauses.join(` ${combinator} `) : 'true';
 }
