@@ -1,6 +1,7 @@
 import type { BrowserEngine, BrowserEngineName } from '../types';
 import { MockBrowserEngine } from './mock-engine';
 import { PlaywrightBrowserEngine } from './playwright-engine';
+import { BrowserbaseBrowserEngine } from './browserbase-engine';
 
 /**
  * Fábrica de MOTORES (M71) — el ÚNICO punto donde se decide qué motor se usa. Añadir Browserbase, Puppeteer,
@@ -10,9 +11,9 @@ import { PlaywrightBrowserEngine } from './playwright-engine';
  */
 const REGISTRY: Partial<Record<BrowserEngineName, () => BrowserEngine>> = {
   mock: () => new MockBrowserEngine(),
-  playwright: () => new PlaywrightBrowserEngine(),
-  // browserbase: () => new BrowserbaseEngine(),   ← futuros motores, sin tocar el resto
-  // puppeteer: () => new PuppeteerEngine(),
+  playwright: () => new PlaywrightBrowserEngine(), // Chromium local (fase de infra propia)
+  browserbase: () => new BrowserbaseBrowserEngine(), // navegador remoto hospedado (sin Chromium propio)
+  // puppeteer: () => new PuppeteerEngine(),          ← futuros motores, sin tocar el resto del sistema
   // 'chrome-devtools': () => new ChromeDevtoolsEngine(),
   // 'browser-use': () => new BrowserUseEngine(),
 };

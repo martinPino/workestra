@@ -23,13 +23,29 @@ function ok<T = Record<string, unknown>>(r: unknown): T {
 }
 
 describe('Browser Automation — motor intercambiable (M71)', () => {
-  it('la fábrica devuelve mock por defecto y registra playwright', () => {
+  it('la fábrica devuelve mock por defecto y registra playwright + browserbase', () => {
     expect(defaultEngineName()).toBe('mock');
     expect(createBrowserEngine().name).toBe('mock');
     expect(createBrowserEngine('mock').live).toBe(false);
     // Motor desconocido → degradación segura a mock (nunca rompe).
     expect(createBrowserEngine('inexistente' as never).name).toBe('mock');
-    expect(registeredEngines()).toEqual(expect.arrayContaining(['mock', 'playwright']));
+    expect(registeredEngines()).toEqual(expect.arrayContaining(['mock', 'playwright', 'browserbase']));
+    // Los motores reales existen y se marcan `live`; el mock no.
+    expect(createBrowserEngine('browserbase').name).toBe('browserbase');
+    expect(createBrowserEngine('browserbase').live).toBe(true);
+    expect(createBrowserEngine('playwright').live).toBe(true);
+  });
+
+  it('Browserbase falla claro si no está configurado (sin tocar la red)', async () => {
+    const prev = { k: process.env.BROWSERBASE_API_KEY, p: process.env.BROWSERBASE_PROJECT_ID };
+    delete process.env.BROWSERBASE_API_KEY;
+    delete process.env.BROWSERBASE_PROJECT_ID;
+    try {
+      await expect(createBrowserEngine('browserbase').launch({})).rejects.toThrow(/no está configurado/i);
+    } finally {
+      if (prev.k) process.env.BROWSERBASE_API_KEY = prev.k;
+      if (prev.p) process.env.BROWSERBASE_PROJECT_ID = prev.p;
+    }
   });
 
   it('MockBrowserEngine exige abrir antes de actuar y registra las acciones', async () => {

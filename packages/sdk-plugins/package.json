@@ -24,6 +24,7 @@
     "@core/engine": "workspace:*",
     "@core/llm": "workspace:*",
     "pdf-parse": "1.1.1",
+    "playwright-core": "^1.48.0",
     "tesseract.js": "^7.0.0",
     "zod": "^3.23.8"
   },

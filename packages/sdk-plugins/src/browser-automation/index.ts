@@ -9,4 +9,5 @@ export * from './session-manager';
 export * from './service';
 export { MockBrowserEngine } from './engines/mock-engine';
 export { PlaywrightBrowserEngine } from './engines/playwright-engine';
+export { BrowserbaseBrowserEngine } from './engines/browserbase-engine';
 export { createBrowserEngine, defaultEngineName, registeredEngines } from './engines/factory';
