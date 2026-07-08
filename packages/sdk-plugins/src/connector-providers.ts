@@ -54,7 +54,7 @@ export function connectorProviders(selfBase = 'http://localhost:3001'): Record<s
       authorizeUrl: 'https://slack.com/oauth/v2/authorize',
       tokenUrl: 'https://slack.com/api/oauth.v2.access',
       baseUrl: 'https://slack.com/api',
-      scopes: ['chat:write', 'channels:read'],
+      scopes: ['chat:write', 'channels:read', 'groups:read'], // groups:read → listar también canales privados
       requiresConfig: true,
       tokenExchange: 'form', // Slack exige application/x-www-form-urlencoded en oauth.v2.access
       tokenPath: 'access_token', // token de bot (top-level)
