@@ -58,6 +58,33 @@ export interface IFileStore {
 }
 
 /**
+ * Cuenta de usuario resuelta con su pertenencia PRIMARIA (M73): el usuario + el workspace/rol con el que
+ * inicia sesión. En v1 cada registro crea su propia organización+workspace y el usuario es OWNER de él, así
+ * que la pertenencia primaria es única. `role`/`workspaceId` salen de Membership, NO del cuerpo de la petición.
+ */
+export interface AuthAccount {
+  id: string;
+  email: string;
+  name: string;
+  passwordHash: string;
+  workspaceId: string;
+  organizationId: string;
+  role: Role;
+}
+
+/**
+ * Acceso a usuarios/pertenencias para login+registro con email+contraseña (M73). Adaptadores en infra
+ * (Prisma para postgres, en memoria para dev/tests). `createAccount` crea User+Organization+Workspace+
+ * Membership(OWNER) de forma ATÓMICA y devuelve la cuenta lista para firmar el JWT de sesión.
+ */
+export interface IAuthRepository {
+  /** Cuenta por email (con su pertenencia primaria), o null si no existe. El email se compara en minúsculas. */
+  findByEmail(email: string): Promise<AuthAccount | null>;
+  /** Alta atómica: usuario + org + workspace propio + membership OWNER. Lanza si el email ya existe. */
+  createAccount(input: { email: string; passwordHash: string; name: string }): Promise<AuthAccount>;
+}
+
+/**
  * Puertos hexagonales del motor. El `WorkflowRunner` depende SOLO de estas interfaces;
  * los adaptadores concretos (Prisma/Redis/BullMQ) viven en `@core/infra` y se inyectan.
  */

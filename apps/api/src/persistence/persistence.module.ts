@@ -16,6 +16,7 @@ import type {
   IApiKeyRepository,
   IWorkspaceUsageRepository,
   IFileStore,
+  IAuthRepository,
 } from '@core/engine';
 import type { MemoryEvent } from '@core/contracts';
 import IORedis from 'ioredis';
@@ -53,6 +54,9 @@ import {
   RedisWorkspaceUsageRepository,
   InMemoryFileStore,
   RedisFileStore,
+  InMemoryAuthRepository,
+  PrismaAuthRepository,
+  hashPassword,
 } from '@core/infra';
 
 export const PERSISTENCE = Symbol('PERSISTENCE');
@@ -83,6 +87,8 @@ export interface PersistenceBundle {
   /** Uso/cuota de tokens LLM por workspace (M33): contador diario para no agotar el presupuesto común. */
   usage: IWorkspaceUsageRepository;
   files: IFileStore;
+  /** Usuarios/pertenencias para login+registro con email+contraseña (M73). */
+  auth: IAuthRepository;
   prisma?: PrismaClient;
 }
 
@@ -183,6 +189,8 @@ async function buildPersistence(): Promise<PersistenceBundle> {
       usage: new RedisWorkspaceUsageRepository(redis),
       // Ficheros efímeros en Redis (compartido con el worker; TTL 48h). M48.
       files: new RedisFileStore(redis),
+      // Usuarios/pertenencias durables para login+registro (M73).
+      auth: new PrismaAuthRepository(prisma),
     };
   }
   return {
@@ -203,6 +211,11 @@ async function buildPersistence(): Promise<PersistenceBundle> {
     apiKeys: new InMemoryApiKeyRepository(),
     usage: new InMemoryWorkspaceUsageRepository(),
     files: new InMemoryFileStore(),
+    // Auth in-memory (dev/tests): siembra owner@acme.dev (contraseña = su email) en ws_dev para poder
+    // probar login/registro sin Postgres. En dev, además, sigue disponible el minter tras AUTH_MODE.
+    auth: new InMemoryAuthRepository([
+      { email: 'owner@acme.dev', name: 'Owner', passwordHash: await hashPassword('owner@acme.dev'), workspaceId: DEFAULT_WORKSPACE, organizationId: 'org_dev', role: 'OWNER' },
+    ]),
   };
 }
 

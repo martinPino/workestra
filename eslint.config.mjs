@@ -10,6 +10,9 @@ export default tseslint.config(
       '**/.turbo/**',
       '**/*.d.ts',
       'packages/infra/prisma/generated/**',
+      // Scripts de workflows (Workflow tool): su cuerpo corre con globals inyectados por el harness
+      // (agent/parallel/phase/log/args), no son código del proyecto → fuera del lint.
+      '.claude/**',
     ],
   },
   js.configs.recommended,

@@ -33,3 +33,18 @@ export const CreateExecutionSchema = z.object({
   context: ExecutionContextSchema.partial().optional(),
 });
 export type CreateExecutionDto = z.infer<typeof CreateExecutionSchema>;
+
+/** Registro con email+contraseña (M73). El email se normaliza a minúsculas; la contraseña mínima 8. */
+export const RegisterSchema = z.object({
+  email: z.string().trim().toLowerCase().email(),
+  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres.').max(200),
+  name: z.string().trim().min(1).max(80),
+});
+export type RegisterDto = z.infer<typeof RegisterSchema>;
+
+/** Inicio de sesión con email+contraseña (M73). */
+export const LoginSchema = z.object({
+  email: z.string().trim().toLowerCase().email(),
+  password: z.string().min(1).max(200),
+});
+export type LoginDto = z.infer<typeof LoginSchema>;

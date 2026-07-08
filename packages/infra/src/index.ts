@@ -21,3 +21,5 @@ export * from './adapters/workspace-usage-repo';
 export * from './adapters/mcp-http-client';
 export * from './adapters/mcp-tool-resolver';
 export * from './adapters/file-store';
+export * from './adapters/auth-repo';
+export * from './password';

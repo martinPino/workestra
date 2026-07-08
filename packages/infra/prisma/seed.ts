@@ -1,16 +1,19 @@
 import { PrismaClient } from '@prisma/client';
-import { createHash } from 'node:crypto';
+import { hashPassword } from '../src/password';
 
 const prisma = new PrismaClient();
-
-// Hash placeholder (M0). El auth real usa OIDC/JWT + argon2 (apps/api).
-const devHash = (s: string) => createHash('sha256').update(s).digest('hex');
 
 // IDs fijos alineados con el workspace por defecto de la API (DEFAULT_WORKSPACE = 'ws_dev').
 const ORG_ID = 'org_dev';
 const WS_ID = 'ws_dev';
 
+// Contraseña del owner sembrado (M73). En prod se pasa por env (SEED_OWNER_PASSWORD) para no dejar una
+// credencial conocida; en dev cae al propio email como conveniencia. Se re-hashea en cada seed (upsert
+// actualiza passwordHash) para migrar desde el sha256 legado sin romper el login.
+const OWNER_PASSWORD = process.env.SEED_OWNER_PASSWORD ?? 'owner@acme.dev';
+
 async function main() {
+  const passwordHash = await hashPassword(OWNER_PASSWORD);
   const org = await prisma.organization.upsert({
     where: { slug: 'acme' },
     update: {},
@@ -25,8 +28,8 @@ async function main() {
 
   const user = await prisma.user.upsert({
     where: { email: 'owner@acme.dev' },
-    update: {},
-    create: { email: 'owner@acme.dev', name: 'Owner', passwordHash: devHash('owner@acme.dev') },
+    update: { passwordHash }, // re-hashea en cada seed → migra el sha256 legado a scrypt
+    create: { email: 'owner@acme.dev', name: 'Owner', passwordHash },
   });
 
   await prisma.membership.upsert({

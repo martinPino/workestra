@@ -1,5 +1,5 @@
 import type { WorkflowGraph, ExecutionEvent } from '@core/contracts';
-import { currentToken, ensureDevSession, type Role } from './auth';
+import { currentToken, ensureDevSession, AUTH_MODE, useAuth, type Role, type SessionUser } from './auth';
 
 // Normaliza: quita barra(s) final(es) para no generar `//ruta` (que en Nest da 404).
 const API = (import.meta.env.VITE_API_URL ?? 'http://localhost:3001').replace(/\/+$/, '');
@@ -158,8 +158,16 @@ async function afetch(input: string, init: RequestInit = {}): Promise<Response> 
   const withAuth = (): RequestInit => ({ ...init, headers: { ...(init.headers as Record<string, string>), ...authHeaders() } });
   let res = await rawFetch(input, withAuth());
   if (res.status === 401) {
-    await ensureDevSession(API);
-    res = await rawFetch(input, withAuth());
+    if (AUTH_MODE === 'dev') {
+      // Dev: re-acuña un token del minter y reintenta UNA vez (token caducado a mitad de sesión).
+      await ensureDevSession(API);
+      res = await rawFetch(input, withAuth());
+    } else {
+      // Auth real: la sesión ya no vale → límpiala y manda a /login (sin bucle si ya estamos ahí).
+      useAuth.getState().clear();
+      const path = window.location.pathname;
+      if (path !== '/login' && path !== '/register') window.location.assign('/login');
+    }
   }
   return res;
 }
@@ -339,6 +347,18 @@ export const api = {
     fetch(`${API}/agents/${id}`, { method: 'PATCH', headers: authHeaders(), body: JSON.stringify(body) }).then((r) => json<AgentDto>(r)),
   deleteAgent: (id: string) =>
     fetch(`${API}/agents/${id}`, { method: 'DELETE', headers: authHeaders() }).then((r) => json<{ deleted: boolean }>(r)),
+
+  // --- Autenticación real: email+contraseña (M73). login/register son públicos → usan rawFetch (sin el
+  // wrapper de recuperación 401, que aquí solo daría un bucle). Devuelven la sesión: token + perfil. ---
+  register: (input: { name: string; email: string; password: string }) =>
+    rawFetch(`${API}/auth/register`, { method: 'POST', headers, body: JSON.stringify(input) }).then((r) =>
+      json<{ accessToken: string; user: SessionUser }>(r),
+    ),
+  login: (input: { email: string; password: string }) =>
+    rawFetch(`${API}/auth/login`, { method: 'POST', headers, body: JSON.stringify(input) }).then((r) =>
+      json<{ accessToken: string; user: SessionUser }>(r),
+    ),
+  me: () => fetch(`${API}/auth/me`, { headers: authHeaders() }).then((r) => json<{ sub: string; email: string; role: Role; workspaceId: string }>(r)),
 
   // --- Escalado humano (M5-B) ---
   devToken: (role: Role, sub = `dev_${role.toLowerCase()}`) =>

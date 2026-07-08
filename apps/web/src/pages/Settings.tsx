@@ -5,7 +5,7 @@ import { Card, PageHeader, Switch, Input, Button, Badge } from '../ui';
 import { useUI } from '../app/ui-store';
 import { cn } from '../lib/cn';
 import { api } from '../lib/api';
-import { useAuth, canApprove, type Role } from '../lib/auth';
+import { useAuth, canApprove, AUTH_MODE, type Role } from '../lib/auth';
 import { useT } from '../i18n';
 
 const ROLES: Role[] = ['OWNER', 'ADMIN', 'EDITOR', 'VIEWER'];
@@ -94,7 +94,8 @@ export function SettingsPage() {
     <Page className="max-w-3xl space-y-6">
       <PageHeader title={t('Configuración')} subtitle={t('Apariencia, notificaciones y preferencias de la cuenta.')} />
 
-      <SessionCard />
+      {/* El minter de tokens de dev solo tiene sentido en modo 'dev'; con auth real (login) se oculta. */}
+      {AUTH_MODE === 'dev' && <SessionCard />}
 
       <Section icon={<Monitor size={16} />} title={t('Apariencia')} description={t('Personaliza cómo se ve AgentFlow.')}>
         <div className="flex gap-2">

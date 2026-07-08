@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppShell } from './app/AppShell';
 import { initTheme } from './app/ui-store';
@@ -13,22 +13,42 @@ import { ExecutionDetail } from './pages/ExecutionDetail';
 import { Marketplace } from './pages/Marketplace';
 import { Integrations } from './pages/Integrations';
 import { SettingsPage } from './pages/Settings';
-import { ensureDevSession } from './lib/auth';
+import { Login, Register } from './pages/Auth';
+import { ensureDevSession, useAuth, isExpired } from './lib/auth';
 import { api } from './lib/api';
 import './index.css';
 
 initTheme();
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } } });
 
-// Garantiza una sesión autenticada ANTES de renderizar (el backend exige JWT en M8). En producción
-// esto lo sustituye el login OIDC; en dev acuña un token OWNER (o re-acuña uno caducado).
+/**
+ * Guarda de rutas (M73): exige una sesión válida para entrar a la app. Suscrita al store para reaccionar
+ * a login/logout/expiración. Sin sesión → redirige a /login. En modo 'dev' el arranque ya acuñó un token,
+ * así que esta guarda pasa sola.
+ */
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const token = useAuth((s) => s.token);
+  if (!token || isExpired(token)) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
+// En 'dev' garantiza una sesión ANTES de renderizar (auto-login del minter). En 'local' es un no-op y la
+// app renderiza directa: la ProtectedRoute mandará a /login si no hay sesión.
 void ensureDevSession(api.base).finally(() => {
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <Routes>
-            <Route element={<AppShell />}>
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route
+              element={
+                <ProtectedRoute>
+                  <AppShell />
+                </ProtectedRoute>
+              }
+            >
               <Route path="/" element={<Dashboard />} />
               <Route path="/workflows" element={<Workflows />} />
               <Route path="/workflows/:id" element={<Editor />} />
