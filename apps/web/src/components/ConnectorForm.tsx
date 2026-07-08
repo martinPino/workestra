@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { CONNECTOR_ACTIONS, type ConnectorAction } from '../editor/connector-actions';
 import { ProviderLogo, hasProviderLogo } from '../lib/provider-logos';
-import { useConnectors } from '../lib/hooks';
+import { useConnectors, useSlackChannels } from '../lib/hooks';
 import { VarField, useAvailableVars } from './VarField';
 import { useT } from '../i18n';
 
@@ -13,6 +13,40 @@ function defaultsFor(a?: ConnectorAction): Record<string, string> {
   const o: Record<string, string> = {};
   if (a) for (const f of a.fields) if (f.default !== undefined) o[f.key] = f.default;
   return o;
+}
+
+/**
+ * Desplegable de canales REALES del Slack conectado (M57): igual que el picker de proyectos de Jira. El
+ * valor guardado es el id del canal (robusto). Preserva un valor previo aunque no esté en la lista y cae a
+ * un input de texto si el listado falla (sin scope/desconectado) para no bloquear.
+ */
+function SlackChannelSelect({ connectorId, value, onChange }: { connectorId: string; value: string; onChange: (v: string) => void }) {
+  const t = useT();
+  const { data, isLoading, isError } = useSlackChannels(connectorId || null);
+  const channels = data?.channels ?? [];
+  const inputCls = `${inputBase} font-mono`;
+
+  if (isError) {
+    return (
+      <>
+        <input type="text" value={value} placeholder="#general" onChange={(e) => onChange(e.target.value)} className={inputCls} />
+        <span className="text-[11px] text-txt-disabled">{t('No pudimos listar tus canales; escribe el nombre o el ID.')}</span>
+      </>
+    );
+  }
+  // Preserva el valor guardado aunque no esté en la lista (p. ej. un «#nombre» legacy).
+  const known = channels.some((c) => c.id === value);
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)} className={inputBase} disabled={isLoading}>
+      <option value="">{isLoading ? t('Cargando canales…') : t('— elige un canal —')}</option>
+      {!known && value && <option value={value}>{value}</option>}
+      {channels.map((c) => (
+        <option key={c.id} value={c.id}>
+          #{c.name}
+        </option>
+      ))}
+    </select>
+  );
 }
 
 /**
@@ -98,7 +132,11 @@ export function ConnectorForm({ value, onChange }: { value: Record<string, unkno
         action.fields.map((f) => (
           <label key={f.key} className="flex flex-col gap-1">
             <span className="text-[11px] font-medium text-txt-secondary">{t(f.label)}</span>
-            <VarField value={params[f.key] ?? ''} onChange={(v) => onField(f.key, v)} vars={vars} multiline={f.multiline} placeholder={f.placeholder} />
+            {f.source === 'slack-channel' ? (
+              <SlackChannelSelect connectorId={connectorId} value={params[f.key] ?? ''} onChange={(v) => onField(f.key, v)} />
+            ) : (
+              <VarField value={params[f.key] ?? ''} onChange={(v) => onField(f.key, v)} vars={vars} multiline={f.multiline} placeholder={f.placeholder} />
+            )}
           </label>
         ))}
       {action && action.fields.length > 0 && (

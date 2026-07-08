@@ -65,6 +65,16 @@ export const useDriveFolders = (connectorId: string | null) =>
     staleTime: 60_000,
   });
 
+/** Canales del Slack de un conector conectado (M57): pobla el desplegable «Canal» del nodo conector. */
+export const useSlackChannels = (connectorId: string | null) =>
+  useQuery({
+    queryKey: ['slackChannels', connectorId],
+    queryFn: () => api.slackChannels(connectorId as string),
+    enabled: !!connectorId,
+    retry: false,
+    staleTime: 60_000,
+  });
+
 /** Catálogo de proveedores de conectores (M11). */
 export const useConnectorProviders = () =>
   useQuery({ queryKey: ['connector-providers'], queryFn: api.listConnectorProviders, retry: false });

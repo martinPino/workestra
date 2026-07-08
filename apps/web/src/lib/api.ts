@@ -270,6 +270,9 @@ export const api = {
   /** Carpetas del Google Drive del conector (M54): pobla el desplegable «Carpeta de Drive» del trigger. */
   driveFolders: (connectorId: string) =>
     fetch(`${API}/connectors/${connectorId}/drive-folders`, { headers: authHeaders() }).then((r) => json<{ folders: Array<{ id: string; name: string }> }>(r)),
+  /** Canales del Slack del conector (M57): pobla el desplegable «Canal» del nodo conector. */
+  slackChannels: (connectorId: string) =>
+    fetch(`${API}/connectors/${connectorId}/slack-channels`, { headers: authHeaders() }).then((r) => json<{ channels: Array<{ id: string; name: string }> }>(r)),
 
   // --- Triggers sin código (recetas + auto-registro en el proveedor, M19) ---
   /** Proyectos de Jira accesibles con un conector (para el desplegable del picker). */

@@ -78,6 +78,14 @@ export class ConnectorsController {
     return this.svc.driveFolders(id, workspaceId);
   }
 
+  /** Canales del Slack del conector (M57): pobla el desplegable «Canal» del nodo conector. */
+  @Get(':id/slack-channels')
+  @UseGuards(ScopesGuard)
+  @RequireScopes('workflow:read')
+  slackChannels(@Param('id') id: string, @Workspace() workspaceId: string) {
+    return this.svc.slackChannels(id, workspaceId);
+  }
+
   @Delete(':id')
   @UseGuards(ScopesGuard)
   @RequireScopes('workflow:write')

@@ -8,6 +8,11 @@ export interface ActionField {
   placeholder?: string;
   multiline?: boolean;
   default?: string;
+  /**
+   * Fuente de un DESPLEGABLE con datos reales del proveedor (M57), en vez de un campo de texto/insertor de
+   * variables. `slack-channel` → lista los canales del Slack conectado (como los proyectos de Jira).
+   */
+  source?: 'slack-channel';
 }
 
 export interface ConnectorAction {
@@ -32,7 +37,7 @@ export const CONNECTOR_ACTIONS: Record<string, ConnectorAction[]> = {
       id: 'post-message',
       label: 'Enviar un mensaje a un canal',
       fields: [
-        { key: 'channel', label: 'Canal', placeholder: '#general', default: '#general' },
+        { key: 'channel', label: 'Canal', placeholder: '#general', source: 'slack-channel' },
         { key: 'text', label: 'Mensaje', placeholder: 'Escribe el mensaje…', multiline: true },
       ],
       build: (p) => ({ method: 'POST', path: '/chat.postMessage', body: JSON.stringify({ channel: p.channel, text: p.text }) }),

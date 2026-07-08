@@ -678,4 +678,8 @@ export const EN: Record<string, string> = {
   'Asunto del evento (webhook/Jira)': 'Event subject (webhook/Jira)',
   'Descripción del evento (webhook/Jira)': 'Event description (webhook/Jira)',
   'Clave del ticket (Jira)': 'Ticket key (Jira)',
+  // --- M57: desplegable de canales de Slack ---
+  'Cargando canales…': 'Loading channels…',
+  '— elige un canal —': '— choose a channel —',
+  'No pudimos listar tus canales; escribe el nombre o el ID.': "We couldn't list your channels; type the name or ID.",
 };

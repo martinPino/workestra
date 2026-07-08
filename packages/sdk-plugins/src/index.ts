@@ -18,6 +18,7 @@ export * from './oauth-token';
 export * from './jira-webhooks';
 export * from './trigger-events';
 export * from './drive-poll';
+export * from './slack-api';
 export * from './interpolate';
 export * from './handoff';
 export * from './runtime-registry';

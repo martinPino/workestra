@@ -2,7 +2,7 @@ import { Injectable, Inject, BadRequestException, NotFoundException } from '@nes
 import { JwtService } from '@nestjs/jwt';
 import { randomBytes } from 'node:crypto';
 import type { ConnectorRecord } from '@core/engine';
-import { getConnectorProvider, providerEnvKeys, tokenBlobFromResponse, serializeTokenBlob, resolveConnectorToken, listDriveFolders } from '@core/sdk-plugins';
+import { getConnectorProvider, providerEnvKeys, tokenBlobFromResponse, serializeTokenBlob, resolveConnectorToken, listDriveFolders, listSlackChannels } from '@core/sdk-plugins';
 import { setCurrentWorkspace } from '@core/infra';
 import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
 import { assertInWorkspace } from '../tenant/tenant.util';
@@ -98,6 +98,19 @@ export class ConnectorsService {
     const resolved = await resolveConnectorToken(this.p.connectors, this.p.secrets, connectorId, workspaceId);
     if (!resolved) throw new BadRequestException('El conector de Google Drive no está conectado (vuelve a conectarlo).');
     return listDriveFolders({ token: resolved.token });
+  }
+
+  /**
+   * Lista los canales del Slack del conector (M57): para poblar el desplegable «Canal» del nodo conector,
+   * sin escribir `#general` a mano. Mismo patrón que `driveFolders`; aislado por tenant.
+   */
+  async slackChannels(connectorId: string, workspaceId: string): Promise<{ channels: Array<{ id: string; name: string }> }> {
+    const c = await this.p.connectors.getInWorkspace(connectorId, workspaceId);
+    if (!c) throw new NotFoundException('Conector no encontrado.');
+    if (c.provider !== 'slack') throw new BadRequestException('El conector no es de Slack.');
+    const resolved = await resolveConnectorToken(this.p.connectors, this.p.secrets, connectorId, workspaceId);
+    if (!resolved) throw new BadRequestException('El conector de Slack no está conectado (vuelve a conectarlo).');
+    return listSlackChannels({ token: resolved.token });
   }
 
   /** Inicia el flujo OAuth: devuelve la URL de autorización con un `state` firmado (10 min). */
