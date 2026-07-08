@@ -37,6 +37,13 @@ export function Agents() {
     setEditing('new');
   };
 
+  // Abre el formulario para EDITAR un agente y desplaza la vista hasta él (M70): al pulsar el lápiz de
+  // una tarjeta, el editor aparece arriba, así que subimos hasta ahí (mismo `draftNonce` que dispara el scroll).
+  const openEdit = (agent: AgentDto) => {
+    setEditing(agent);
+    setDraftNonce((n) => n + 1);
+  };
+
   // Al recibir un borrador: rellena el formulario y, en móvil, cierra el chat (el panel flotante taparía
   // el botón «Crear agente»); en escritorio el chat queda abierto a la derecha para poder iterar.
   const onDraft = (d: AgentDraft) => {
@@ -97,7 +104,7 @@ export function Agents() {
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {data.map((agent, i) => (
-            <AgentCard key={agent.id} agent={agent} index={i} onEdit={() => setEditing(agent)} />
+            <AgentCard key={agent.id} agent={agent} index={i} onEdit={() => openEdit(agent)} />
           ))}
         </div>
       )}
