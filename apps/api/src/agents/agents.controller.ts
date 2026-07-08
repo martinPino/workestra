@@ -1,5 +1,7 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { Workspace } from '../auth/workspace.decorator';
+import { ScopesGuard } from '../rbac/scopes.guard';
+import { RequireScopes } from '../rbac/scopes.decorator';
 import { AgentsService } from './agents.service';
 
 @Controller('agents')
@@ -9,6 +11,15 @@ export class AgentsController {
   @Get()
   list(@Workspace() workspaceId: string) {
     return this.svc.list(workspaceId);
+  }
+
+  // «Crear asistente con IA» (M68): la persona describe el asistente y la IA devuelve un borrador
+  // {kind:'create', agent} para rellenar el formulario, o {kind:'answer', text} si solo pregunta.
+  @Post('chat')
+  @UseGuards(ScopesGuard)
+  @RequireScopes('agent:write')
+  chat(@Body() body: { message: string; model?: string }, @Workspace() workspaceId: string) {
+    return this.svc.chatDraft(body?.message ?? '', workspaceId, { model: body?.model });
   }
 
   @Get(':id')

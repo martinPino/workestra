@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Bot, Crown, Wrench, Cpu, Plus, Pencil, Trash2, X, Check } from 'lucide-react';
+import { Bot, Crown, Wrench, Cpu, Plus, Pencil, Trash2, X, Check, Sparkles } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Page } from '../app/AppShell';
 import { Card, Badge, PageHeader, Button, EmptyState, Skeleton, Input, Textarea, Switch, IconButton } from '../ui';
 import { useAgents } from '../lib/hooks';
+import { useMediaQuery } from '../lib/useMediaQuery';
 import { TOOL_CATALOG } from '../lib/tools';
-import { api, type AgentDto, type AgentInput } from '../lib/api';
+import { api, type AgentDto, type AgentInput, type AgentDraft } from '../lib/api';
+import { AgentChatPanel } from '../components/AgentChatPanel';
 import { ROLE_PRESETS, AGENT_MODELS } from './agent-roles';
 import { agentGradient } from '../lib/agent-avatar';
 import { useT } from '../i18n';
@@ -18,6 +20,30 @@ export function Agents() {
   const t = useT();
   const { data, isLoading } = useAgents();
   const [editing, setEditing] = useState<AgentDto | 'new' | null>(null);
+  const [chatOpen, setChatOpen] = useState(false); // M68: chat flotante «crear asistente con IA»
+  const [draft, setDraft] = useState<AgentDraft | null>(null); // borrador de la IA que rellena el formulario
+  const [draftNonce, setDraftNonce] = useState(0); // fuerza el remontaje del formulario para re-sembrarlo
+  const formWrapRef = useRef<HTMLDivElement>(null);
+  const isDesktop = useMediaQuery('(min-width: 768px)');
+
+  // Abre el formulario «Nuevo agente», opcionalmente sembrado con un borrador de la IA (M68).
+  const openNew = (seed: AgentDraft | null) => {
+    setDraft(seed);
+    setDraftNonce((n) => n + 1);
+    setEditing('new');
+  };
+
+  // Al recibir un borrador: rellena el formulario y, en móvil, cierra el chat (el panel flotante taparía
+  // el botón «Crear agente»); en escritorio el chat queda abierto a la derecha para poder iterar.
+  const onDraft = (d: AgentDraft) => {
+    openNew(d);
+    if (!isDesktop) setChatOpen(false);
+  };
+
+  // Al recibir un borrador de la IA, lo aplicamos y llevamos la vista al formulario para revisarlo.
+  useEffect(() => {
+    if (draftNonce > 0) formWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [draftNonce]);
 
   return (
     <Page className="space-y-6">
@@ -26,20 +52,24 @@ export function Agents() {
         subtitle={t('Especialistas de IA: define su Rol, objetivo, instrucciones y modelo.')}
         actions={
           !editing && (
-            <Button variant="primary" onClick={() => setEditing('new')}>
+            <Button variant="primary" onClick={() => openNew(null)}>
               <Plus size={15} /> {t('Nuevo agente')}
             </Button>
           )
         }
       />
 
-      {editing && (
-        <AgentForm
-          initial={editing === 'new' ? null : editing}
-          onDone={() => setEditing(null)}
-          onCancel={() => setEditing(null)}
-        />
-      )}
+      <div ref={formWrapRef}>
+        {editing && (
+          <AgentForm
+            key={editing === 'new' ? `new-${draftNonce}` : editing.id}
+            initial={editing === 'new' ? null : editing}
+            seed={editing === 'new' ? draft ?? undefined : undefined}
+            onDone={() => setEditing(null)}
+            onCancel={() => setEditing(null)}
+          />
+        )}
+      </div>
 
       {isLoading ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -54,7 +84,7 @@ export function Agents() {
             title={t('Sin agentes')}
             description={t('Crea agentes especializados con un Rol para tus workflows.')}
             action={
-              <Button variant="primary" onClick={() => setEditing('new')}>
+              <Button variant="primary" onClick={() => openNew(null)}>
                 <Plus size={15} /> {t('Nuevo agente')}
               </Button>
             }
@@ -67,20 +97,39 @@ export function Agents() {
           ))}
         </div>
       )}
+
+      {/* Chat «crear asistente con IA» (M68): burbuja flotante abajo a la derecha, como en el editor. */}
+      {!chatOpen && (
+        <button
+          type="button"
+          onClick={() => setChatOpen(true)}
+          aria-label={t('Crear asistente con IA')}
+          title={t('Crear asistente con IA')}
+          className="group fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full brand-gradient text-white shadow-pop ring-1 ring-white/15 transition-transform hover:scale-105 active:scale-95"
+        >
+          <Sparkles size={22} className="transition-transform duration-200 group-hover:rotate-12" />
+        </button>
+      )}
+      {chatOpen && <AgentChatPanel onClose={() => setChatOpen(false)} onDraft={onDraft} />}
     </Page>
   );
 }
 
-/** Formulario de crear/editar agente. Rol→name, Objetivo→description, Instrucciones→systemPrompt. */
-function AgentForm({ initial, onDone, onCancel }: { initial: AgentDto | null; onDone: () => void; onCancel: () => void }) {
+/**
+ * Formulario de crear/editar agente. Rol→name, Objetivo→description, Instrucciones→systemPrompt.
+ * `seed` (M68): borrador de la IA con el que arranca un agente NUEVO (la persona lo revisa y confirma);
+ * los campos se siembran de `initial` (edición) o, si no, de `seed`. El padre remonta el form (key) por
+ * cada borrador nuevo, así los `useState` se re-inicializan.
+ */
+function AgentForm({ initial, seed, onDone, onCancel }: { initial: AgentDto | null; seed?: AgentDraft; onDone: () => void; onCancel: () => void }) {
   const t = useT();
   const qc = useQueryClient();
-  const [role, setRole] = useState(initial?.name ?? '');
-  const [goal, setGoal] = useState(initial?.description ?? '');
-  const [model, setModel] = useState(initial?.model ?? 'llama-3.3-70b-versatile');
-  const [instructions, setInstructions] = useState(initial?.systemPrompt ?? '');
-  const [tools, setTools] = useState<string[]>(initial?.tools ?? []);
-  const [isOrchestrator, setIsOrchestrator] = useState(initial?.isOrchestrator ?? false);
+  const [role, setRole] = useState(initial?.name ?? seed?.name ?? '');
+  const [goal, setGoal] = useState(initial?.description ?? seed?.description ?? '');
+  const [model, setModel] = useState(initial?.model ?? seed?.model ?? 'llama-3.3-70b-versatile');
+  const [instructions, setInstructions] = useState(initial?.systemPrompt ?? seed?.systemPrompt ?? '');
+  const [tools, setTools] = useState<string[]>(initial?.tools ?? seed?.tools ?? []);
+  const [isOrchestrator, setIsOrchestrator] = useState(initial?.isOrchestrator ?? seed?.isOrchestrator ?? false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
 

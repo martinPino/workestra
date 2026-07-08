@@ -8,9 +8,10 @@ import { useT } from '../i18n';
  * los nodos, conectarlos y validar el DAG) animadas para que la espera sea legible y se entienda qué está
  * pasando, como en n8n/ChatGPT. Al terminar (`done`), todos los pasos quedan marcados.
  */
-export function ThinkingSteps({ done = false }: { done?: boolean }) {
+export function ThinkingSteps({ done = false, steps: stepsProp }: { done?: boolean; steps?: string[] }) {
   const t = useT();
-  const steps = [
+  // Fases por defecto (montar un flujo). `steps` permite adaptarlas a otro contexto (p. ej. crear un asistente).
+  const steps = stepsProp ?? [
     t('Analizando tu petición'),
     t('Eligiendo los nodos adecuados'),
     t('Conectando los pasos'),

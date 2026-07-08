@@ -116,6 +116,16 @@ export interface AgentInput {
   isOrchestrator?: boolean;
 }
 
+/** Borrador de agente que propone la IA (M68) para rellenar el formulario. Forma canónica del agente. */
+export interface AgentDraft {
+  name: string;
+  description?: string | null;
+  systemPrompt: string;
+  model: string;
+  tools: string[];
+  isOrchestrator: boolean;
+}
+
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let detail = '';
@@ -301,6 +311,12 @@ export const api = {
   listAgents: () => fetch(`${API}/agents`, { headers: authHeaders() }).then((r) => json<AgentDto[]>(r)),
   createAgent: (body: AgentInput) =>
     fetch(`${API}/agents`, { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) }).then((r) => json<AgentDto>(r)),
+  // «Crear asistente con IA» (M68): la persona lo describe; la IA devuelve un borrador para rellenar el
+  // formulario (kind:'create') o una respuesta si solo pregunta (kind:'answer').
+  chatAgent: (message: string, ctx: { model?: string } = {}) =>
+    fetch(`${API}/agents/chat`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ message, ...ctx }) }).then((r) =>
+      json<{ kind: 'create'; agent: AgentDraft } | { kind: 'answer'; text: string }>(r),
+    ),
   // Verifica un servidor MCP (M43/M45): prueba la conexión (con su credencial si está conectado) y avisa si
   // faltan credenciales o no responde.
   verifyMcp: (url: string, serverId?: string) =>
