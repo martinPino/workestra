@@ -1,17 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Bot, Crown, Wrench, Cpu, Plus, Pencil, Trash2, X, Check, Sparkles } from 'lucide-react';
+import { Bot, Crown, Wrench, Cpu, Plus, Pencil, Trash2, X, Check, Sparkles, Boxes } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Page } from '../app/AppShell';
 import { Card, Badge, PageHeader, Button, EmptyState, Skeleton, Input, Textarea, Switch, IconButton } from '../ui';
 import { useAgents } from '../lib/hooks';
 import { useMediaQuery } from '../lib/useMediaQuery';
-import { TOOL_CATALOG } from '../lib/tools';
-import { api, type AgentDto, type AgentInput, type AgentDraft } from '../lib/api';
+import { TOOL_CATALOG, MCP_PRESETS, toolLabel, type McpPreset } from '../lib/tools';
+import { McpLogo } from '../lib/mcp-logos';
+import { api, type AgentDto, type AgentInput, type AgentDraft, type McpServerRef } from '../lib/api';
 import { AgentChatPanel } from '../components/AgentChatPanel';
 import { ROLE_PRESETS, AGENT_MODELS } from './agent-roles';
 import { agentGradient } from '../lib/agent-avatar';
 import { useT } from '../i18n';
+
+let mcpCounter = 0;
+const newMcpId = () => `mcp_${(++mcpCounter).toString(36)}${Math.floor(Math.random() * 1e4).toString(36)}`;
 
 const selectCls =
   'h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm text-txt-primary outline-none transition-colors focus:border-primary/60 focus:ring-2 focus:ring-primary/20';
@@ -129,6 +133,9 @@ function AgentForm({ initial, seed, onDone, onCancel }: { initial: AgentDto | nu
   const [model, setModel] = useState(initial?.model ?? seed?.model ?? 'llama-3.3-70b-versatile');
   const [instructions, setInstructions] = useState(initial?.systemPrompt ?? seed?.systemPrompt ?? '');
   const [tools, setTools] = useState<string[]>(initial?.tools ?? seed?.tools ?? []);
+  // Servidores MCP / conectores del agente (M69): antes solo se podían asignar desde el nodo del editor.
+  const [mcpServers, setMcpServers] = useState<McpServerRef[]>(initial?.mcpServers ?? []);
+  const [mcpForm, setMcpForm] = useState({ name: '', url: '' });
   const [isOrchestrator, setIsOrchestrator] = useState(initial?.isOrchestrator ?? seed?.isOrchestrator ?? false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
@@ -143,6 +150,21 @@ function AgentForm({ initial, seed, onDone, onCancel }: { initial: AgentDto | nu
     setIsOrchestrator(p.isOrchestrator ?? false);
   };
 
+  const toggleMcpPreset = (p: McpPreset) =>
+    setMcpServers((cur) =>
+      cur.some((s) => s.url === p.url) ? cur.filter((s) => s.url !== p.url) : [...cur, { id: newMcpId(), name: p.name, url: p.url }],
+    );
+  const removeMcp = (id: string) => setMcpServers((cur) => cur.filter((s) => s.id !== id));
+  const addCustomMcp = () => {
+    const name = mcpForm.name.trim();
+    const url = mcpForm.url.trim();
+    if (!name || !/^https?:\/\//i.test(url) || mcpServers.some((s) => s.url === url)) return;
+    setMcpServers((cur) => [...cur, { id: newMcpId(), name, url }]);
+    setMcpForm({ name: '', url: '' });
+  };
+  // Servidores propios (no de la lista de populares) para pintarlos como chips con «quitar».
+  const customMcp = mcpServers.filter((s) => !MCP_PRESETS.some((p) => p.url === s.url));
+
   const submit = async () => {
     if (!role.trim()) {
       setErr(t('El Rol es obligatorio.'));
@@ -156,6 +178,7 @@ function AgentForm({ initial, seed, onDone, onCancel }: { initial: AgentDto | nu
       systemPrompt: instructions.trim() || 'Eres un asistente útil.',
       model,
       tools,
+      mcpServers,
       isOrchestrator,
     };
     try {
@@ -234,6 +257,83 @@ function AgentForm({ initial, seed, onDone, onCancel }: { initial: AgentDto | nu
                 </button>
               );
             })}
+          </div>
+        </Field>
+
+        {/* Conectores / servidores MCP (M69): servicios externos (GitHub, Notion, Salesforce…) que el
+            agente puede usar. Antes solo se asignaban desde el nodo del agente en el editor. */}
+        <Field
+          label={t('Conectores (MCP)')}
+          hint={t('Servicios externos que el agente puede usar. Si el servidor necesita clave, conéctalo desde el nodo del agente en el editor.')}
+          className="md:col-span-2"
+        >
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-txt-disabled">
+              <Boxes size={11} /> {t('Populares')}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {MCP_PRESETS.map((p) => {
+                const on = mcpServers.some((s) => s.url === p.url);
+                return (
+                  <button
+                    key={p.url}
+                    type="button"
+                    onClick={() => toggleMcpPreset(p)}
+                    className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${
+                      on ? 'border-primary/60 bg-primary/10 text-txt-primary' : 'border-border bg-surface text-txt-secondary hover:border-border-strong'
+                    }`}
+                  >
+                    <McpLogo server={{ url: p.url, name: p.name }} box={15} /> {p.name}
+                    {on && <Check size={12} className="text-primary" />}
+                  </button>
+                );
+              })}
+            </div>
+
+            {customMcp.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {customMcp.map((s) => (
+                  <span
+                    key={s.id}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-primary/60 bg-primary/10 px-2.5 py-1.5 text-xs text-txt-primary"
+                  >
+                    <McpLogo server={{ url: s.url, name: s.name }} box={15} /> {s.name}
+                    <button type="button" aria-label={t('Quitar')} onClick={() => removeMcp(s.id)} className="text-txt-secondary transition-colors hover:text-danger">
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              <input
+                value={mcpForm.name}
+                onChange={(e) => setMcpForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder={t('Nombre (p. ej. GitHub)')}
+                className="h-8 w-36 rounded-lg border border-border bg-surface px-2.5 text-xs text-txt-primary outline-none focus:border-primary/60"
+              />
+              <input
+                value={mcpForm.url}
+                onChange={(e) => setMcpForm((f) => ({ ...f, url: e.target.value }))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addCustomMcp();
+                  }
+                }}
+                placeholder="https://…/mcp"
+                className="h-8 min-w-[160px] flex-1 rounded-lg border border-border bg-surface px-2.5 text-xs text-txt-primary outline-none focus:border-primary/60"
+              />
+              <button
+                type="button"
+                onClick={addCustomMcp}
+                disabled={!mcpForm.name.trim() || !/^https?:\/\//i.test(mcpForm.url.trim())}
+                className="inline-flex items-center gap-1 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-txt-secondary transition-colors hover:border-border-strong hover:text-txt-primary disabled:opacity-40"
+              >
+                <Plus size={13} /> {t('Añadir')}
+              </button>
+            </div>
           </div>
         </Field>
       </div>
@@ -329,13 +429,17 @@ function AgentCard({ agent, index, onEdit }: { agent: AgentDto; index: number; o
             <span className="inline-flex items-center gap-1 rounded-md bg-elevated px-2 py-0.5 text-[11px] text-txt-secondary">
               <Cpu size={11} /> {agent.model}
             </span>
-            {agent.tools.length > 0 ? (
-              agent.tools.map((t) => (
-                <span key={t} className="inline-flex items-center gap-1 rounded-md bg-elevated px-2 py-0.5 text-[11px] text-txt-secondary">
-                  <Wrench size={11} /> {t}
-                </span>
-              ))
-            ) : (
+            {agent.tools.map((tk) => (
+              <span key={tk} className="inline-flex items-center gap-1 rounded-md bg-elevated px-2 py-0.5 text-[11px] text-txt-secondary">
+                <Wrench size={11} /> {toolLabel(tk)}
+              </span>
+            ))}
+            {(agent.mcpServers ?? []).map((s) => (
+              <span key={s.id} className="inline-flex items-center gap-1 rounded-md bg-elevated px-2 py-0.5 text-[11px] text-txt-secondary">
+                <McpLogo server={{ url: s.url, name: s.name }} box={13} /> {s.name}
+              </span>
+            ))}
+            {agent.tools.length === 0 && (agent.mcpServers ?? []).length === 0 && (
               <span className="inline-flex items-center gap-1 rounded-md bg-elevated px-2 py-0.5 text-[11px] text-txt-disabled">{t('sin tools')}</span>
             )}
             <Badge tone="default" className="ml-auto">

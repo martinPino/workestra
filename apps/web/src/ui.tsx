@@ -174,7 +174,9 @@ export function Switch({ checked, onChange }: { checked: boolean; onChange: (v: 
     >
       <span
         className={cn(
-          'absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform duration-200',
+          // `left-0` fija el origen; sin él, el `left:auto` del absoluto caía en la posición estática
+          // (~17px) → el círculo aparecía a la derecha en OFF y se salía de la pista en ON.
+          'absolute left-0 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform duration-200',
           checked ? 'translate-x-4' : 'translate-x-0.5',
         )}
       />
