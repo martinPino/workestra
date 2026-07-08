@@ -48,8 +48,10 @@ export function AiChatPanel({ onClose }: { onClose: () => void }) {
       const res = await api.chatWorkflow(current, message, { name: st.workflowName, notes, selected, model, page: 'editor' });
       if (res.kind === 'edit') {
         const newDoc = workflowGraphToDoc(res.graph);
-        // replaceGraph (no loadDoc): conserva las notas del usuario y es REVERSIBLE con ⌘Z.
-        useEditorStore.getState().replaceGraph(newDoc.nodes, newDoc.edges);
+        // replaceGraph (no loadDoc): es REVERSIBLE con ⌘Z. Pasa también las notas que devuelva la IA (M60):
+        // se fusionan por id con las del usuario (upsert), así el asistente puede AÑADIR notas explicativas
+        // sin borrar las existentes.
+        useEditorStore.getState().replaceGraph(newDoc.nodes, newDoc.edges, newDoc.comments);
         setMessages((m) => [...m, { role: 'ai', text: t('Listo, actualicé el flujo. Pulsa ⌘Z para deshacer.') }]);
       } else {
         // Pregunta: la IA respondió con texto usando el contexto del flujo; no tocamos el lienzo.

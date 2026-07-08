@@ -144,14 +144,15 @@ export class WorkflowsService {
       '',
       'MODO CHAT DEL EDITOR: el usuario está VIENDO este flujo en el lienzo y conversa contigo. Puede pedir un CAMBIO o hacer una PREGUNTA sobre el flujo.',
       'Responde SIEMPRE con UN ÚNICO objeto JSON, sin texto alrededor ni ```:',
-      '- Si pide crear, modificar o arreglar el flujo: {"kind":"edit","name":"<nombre corto>","graph":{"nodes":[...],"edges":[...]}} con el flujo COMPLETO resultante (todos los nodos con sus posiciones y configs, no solo el cambio).',
+      '- Si pide crear, modificar o arreglar el flujo: {"kind":"edit","name":"<nombre corto>","graph":{"nodes":[...],"edges":[...],"comments":[...]}} con el flujo COMPLETO resultante (todos los nodos con sus posiciones y configs, no solo el cambio).',
       '- Si pregunta, pide una explicación o solo comenta (no pide cambiar nada): {"kind":"answer","text":"<respuesta clara y breve, en el MISMO idioma del usuario>"}.',
+      'NOTAS ADHESIVAS (post-it del lienzo): para AÑADIR una nota que explique el flujo, devuelve un "edit" incluyendo la nota en "comments". Cada nota es {"id":"note-1","text":"Título\\n- primer punto\\n- segundo punto","position":{"x":<n>,"y":<n>},"color":"amber"}: la 1ª línea es el título y las líneas que empiezan por "- " son viñetas. Colores válidos: amber, slate, sky, emerald, pink, violet. Colócala cerca del flujo sin taparlo (p. ej. encima del disparador, con y unos 120px por encima del nodo más alto). NO afecta a la ejecución. IMPORTANTE: reenvía SIEMPRE las notas existentes junto a las nuevas para no borrarlas.',
       'Apóyate en el CONTEXTO del flujo que te doy para responder. No inventes ids de conectores/agentes: usa solo los del catálogo.',
     ].join('\n');
 
     const ctx: string[] = [];
     if (opts.name?.trim()) ctx.push(`Nombre del flujo: ${opts.name.trim()}`);
-    ctx.push('Flujo ACTUAL (JSON):', JSON.stringify({ nodes: current.nodes, edges: current.edges }));
+    ctx.push('Flujo ACTUAL (JSON):', JSON.stringify({ nodes: current.nodes, edges: current.edges, comments: current.comments ?? [] }));
     const notes = (opts.notes ?? []).map((n) => (n ?? '').trim()).filter(Boolean).slice(0, 20);
     if (notes.length) ctx.push('', 'Notas que el usuario dejó en el lienzo:', ...notes.map((n) => `- ${n}`));
     if (opts.selected?.trim()) ctx.push('', `Ahora mismo el usuario tiene seleccionado el nodo con key «${opts.selected.trim()}» (búscalo en el JSON).`);

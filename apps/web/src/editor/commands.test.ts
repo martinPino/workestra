@@ -110,6 +110,25 @@ describe('CommandBus — apply∘invert = identidad', () => {
     expect(normalizeDoc(cmd.undo(after))).toEqual(normalizeDoc(doc)); // reversible con ⌘Z
   });
 
+  it('replaceGraph fusiona (upsert por id) las notas que devuelve la IA sin borrar las existentes', () => {
+    const doc: GraphDoc = {
+      nodes: [{ id: 'a', kind: 'trigger', position: { x: 0, y: 0 }, config: {} }],
+      edges: [],
+      comments: [{ id: 'c0', text: 'nota del usuario', position: { x: 5, y: 5 } }],
+    };
+    const nodes: EditorNode[] = [{ id: 'a', kind: 'trigger', position: { x: 0, y: 0 }, config: {} }];
+    // La IA reenvía la nota existente (con texto cambiado) + una nota NUEVA explicativa.
+    const aiComments = [
+      { id: 'c0', text: 'nota del usuario editada', position: { x: 5, y: 5 } },
+      { id: 'note-1', text: 'Qué hace este flujo\n- resume el ticket', position: { x: 0, y: -120 }, color: 'amber' },
+    ];
+    const cmd = replaceGraph(doc, nodes, [], aiComments);
+    const after = cmd.redo(doc);
+    expect(after.comments.map((c) => c.id)).toEqual(['c0', 'note-1']); // se conserva c0 y se añade note-1
+    expect(after.comments.find((c) => c.id === 'c0')?.text).toBe('nota del usuario editada'); // upsert: actualiza
+    expect(normalizeDoc(cmd.undo(after))).toEqual(normalizeDoc(doc)); // reversible con ⌘Z
+  });
+
   it('una secuencia de comandos se deshace por completo hasta el estado inicial', () => {
     const r = rng(999);
     const start = genDoc(r);

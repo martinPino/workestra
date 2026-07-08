@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { NodeType } from '@core/contracts';
 import type { NodeRunStatus, PlanState } from '@core/domain';
-import type { GraphDoc, EditorNode, EditorEdge } from './model';
+import type { GraphDoc, EditorNode, EditorEdge, EditorComment } from './model';
 import { emptyDoc } from './model';
 import {
   type History,
@@ -56,7 +56,7 @@ interface EditorState {
   loadDoc(doc: GraphDoc, meta: { id: string; name: string }): void;
   dispatchCmd(cmd: Command): void;
   /** Reemplaza nodos+aristas (edición de IA) conservando comentarios y de forma REVERSIBLE (⌘Z). */
-  replaceGraph(nodes: EditorNode[], edges: EditorEdge[]): void;
+  replaceGraph(nodes: EditorNode[], edges: EditorEdge[], comments?: EditorComment[]): void;
   undo(): void;
   redo(): void;
   setSelection(nodes: string[], edges: string[]): void;
@@ -108,7 +108,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ ...withFlags(createHistory(doc)), workflowId: meta.id, workflowName: meta.name, selection: [], selectedEdges: [] }),
 
   dispatchCmd: (cmd) => set(withFlags(busDispatch(get().history, cmd))),
-  replaceGraph: (nodes, edges) => get().dispatchCmd(replaceGraphCmd(get().history.doc, nodes, edges)),
+  replaceGraph: (nodes, edges, comments) => get().dispatchCmd(replaceGraphCmd(get().history.doc, nodes, edges, comments)),
   undo: () => set(withFlags(busUndo(get().history))),
   redo: () => set(withFlags(busRedo(get().history))),
 

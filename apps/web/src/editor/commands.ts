@@ -24,13 +24,21 @@ export function addNode(node: EditorNode): Command {
  * comentarios/notas (spread `...d`) y es REVERSIBLE con ⌘Z (guarda el grafo previo para invertir), en vez de
  * `loadDoc` que borra las notas y resetea el historial.
  */
-export function replaceGraph(doc: GraphDoc, nodes: EditorNode[], edges: EditorEdge[]): Command {
+export function replaceGraph(doc: GraphDoc, nodes: EditorNode[], edges: EditorEdge[], comments?: EditorComment[]): Command {
   const prevNodes = doc.nodes;
   const prevEdges = doc.edges;
+  const prevComments = doc.comments;
+  // Notas del lienzo (M60): la IA puede devolver notas nuevas/actualizadas. Se fusionan por id (upsert), NO se
+  // reemplaza el array: si el modelo omite alguna nota existente, se conserva igual (nunca se pierden notas del
+  // usuario). Si no devuelve notas, el doc queda intacto.
+  const mergedComments =
+    comments && comments.length
+      ? [...prevComments.filter((c) => !comments.some((n) => n.id === c.id)), ...comments]
+      : prevComments;
   return {
     label: 'Rehacer flujo con IA',
-    redo: (d) => ({ ...d, nodes, edges }),
-    undo: (d) => ({ ...d, nodes: prevNodes, edges: prevEdges }),
+    redo: (d) => ({ ...d, nodes, edges, comments: mergedComments }),
+    undo: (d) => ({ ...d, nodes: prevNodes, edges: prevEdges, comments: prevComments }),
   };
 }
 
