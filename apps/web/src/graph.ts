@@ -16,6 +16,7 @@ export interface AfNodeData {
 export interface CommentNodeData {
   id: string;
   text: string;
+  color?: string;
 }
 
 /** GraphDoc -> nodos/aristas de React Flow (incluye comentarios como nodos tipo `comment`). */
@@ -28,7 +29,7 @@ export function docToReactFlow(
     id: c.id,
     type: 'comment',
     position: c.position,
-    data: { id: c.id, text: c.text } satisfies CommentNodeData,
+    data: { id: c.id, text: c.text, color: c.color } satisfies CommentNodeData,
     zIndex: 0,
   }));
   const graphNodes: RFNode[] = doc.nodes.map((n) => ({
@@ -47,7 +48,7 @@ export function docToReactFlow(
   return { nodes: [...commentNodes, ...graphNodes], edges };
 }
 
-/** GraphDoc -> contrato WorkflowGraph (lo que persiste el backend). Los comentarios son locales. */
+/** GraphDoc -> contrato WorkflowGraph (lo que persiste el backend). Las notas (M60) se persisten aparte. */
 export function docToWorkflowGraph(doc: GraphDoc): WorkflowGraph {
   return {
     nodes: doc.nodes.map((n) => ({
@@ -58,6 +59,13 @@ export function docToWorkflowGraph(doc: GraphDoc): WorkflowGraph {
       ...(n.disabled ? { disabled: true } : {}), // M38: solo se persiste cuando está desactivado
     })),
     edges: doc.edges.map((e) => ({ source: e.source, target: e.target, sourceHandle: e.sourceHandle ?? null })),
+    // Notas del lienzo (M60): se guardan con el grafo para que sobrevivan a recargas.
+    comments: doc.comments.map((c) => ({
+      id: c.id,
+      text: c.text,
+      position: { x: Math.round(c.position.x), y: Math.round(c.position.y) },
+      ...(c.color ? { color: c.color } : {}),
+    })),
   };
 }
 
@@ -77,7 +85,7 @@ export function workflowGraphToDoc(graph: WorkflowGraph): GraphDoc {
       target: e.target,
       sourceHandle: e.sourceHandle ?? null,
     })),
-    comments: [],
+    comments: (graph.comments ?? []).map((c) => ({ id: c.id, text: c.text, position: c.position, color: c.color ?? undefined })),
   };
 }
 

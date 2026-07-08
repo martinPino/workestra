@@ -144,7 +144,9 @@ export function Editor() {
   }, []);
 
   const onNodeDragStop = useCallback((_: unknown, __: unknown, dragged: RFNode[]) => {
-    const ids = new Set(s().history.doc.nodes.map((n) => n.id));
+    // Incluye nodos Y notas (M60): así arrastrar una nota se registra como comando (deshacible).
+    const d = s().history.doc;
+    const ids = new Set([...d.nodes.map((n) => n.id), ...d.comments.map((c) => c.id)]);
     const moves = dragged
       .filter((n) => ids.has(n.id))
       .map((n) => ({ id: n.id, from: dragStart.current[n.id] ?? n.position, to: n.position }))

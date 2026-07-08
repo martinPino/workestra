@@ -26,9 +26,20 @@ export const EdgeSchema = z.object({
 });
 export type WorkflowEdge = z.infer<typeof EdgeSchema>;
 
+/** Nota/sticky del lienzo (M60): anotación visual del editor. NO afecta a la ejecución (el motor la ignora). */
+export const CommentSchema = z.object({
+  id: z.string().min(1),
+  text: z.string(),
+  position: PositionSchema,
+  color: z.string().nullish(),
+});
+export type WorkflowComment = z.infer<typeof CommentSchema>;
+
 export const WorkflowGraphSchema = z.object({
   nodes: z.array(NodeSchema),
   edges: z.array(EdgeSchema),
+  // Notas del lienzo (M60): se PERSISTEN con el grafo pero el motor no las usa. Opcional (grafos previos no las tienen).
+  comments: z.array(CommentSchema).optional(),
 });
 export type WorkflowGraph = z.infer<typeof WorkflowGraphSchema>;
 

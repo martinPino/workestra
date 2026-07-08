@@ -24,6 +24,7 @@ import {
   pasteFragment,
   addComment,
   updateComment,
+  setCommentColor,
   removeComment,
   replaceGraph as replaceGraphCmd,
   type Move,
@@ -70,6 +71,7 @@ interface EditorState {
   paste(): void;
   addCommentAt(position: { x: number; y: number }): void;
   updateCommentText(id: string, text: string): void;
+  setCommentColorById(id: string, color: string): void;
   removeCommentById(id: string): void;
   applyLayout(positions: Record<string, { x: number; y: number }>): void;
   setError(msg: string | null): void;
@@ -203,8 +205,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   addCommentAt: (position) =>
-    get().dispatchCmd(addComment({ id: `c-${uid()}`, text: 'Comentario…', position })),
+    // Plantilla tipo sticky (M60): 1ª línea = título, líneas con «- » = viñetas. El usuario la edita al vuelo.
+    get().dispatchCmd(addComment({ id: `c-${uid()}`, text: 'Nueva nota\n- Escribe aquí un punto', position, color: 'amber' })),
   updateCommentText: (id, text) => get().dispatchCmd(updateComment(get().history.doc, id, text)),
+  setCommentColorById: (id, color) => get().dispatchCmd(setCommentColor(get().history.doc, id, color)),
   removeCommentById: (id) => get().dispatchCmd(removeComment(get().history.doc, id)),
 
   applyLayout: (positions) => {

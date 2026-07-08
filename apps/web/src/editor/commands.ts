@@ -57,10 +57,19 @@ export interface Move {
 
 export function moveNodes(moves: Move[]): Command {
   const map = new Map(moves.map((m) => [m.id, m]));
+  // Mueve nodos Y notas del lienzo (M60): el arrastre de una nota también es deshacible/rehacible.
   return {
-    label: 'Mover nodos',
-    redo: (d) => ({ ...d, nodes: d.nodes.map((n) => (map.has(n.id) ? { ...n, position: map.get(n.id)!.to } : n)) }),
-    undo: (d) => ({ ...d, nodes: d.nodes.map((n) => (map.has(n.id) ? { ...n, position: map.get(n.id)!.from } : n)) }),
+    label: 'Mover',
+    redo: (d) => ({
+      ...d,
+      nodes: d.nodes.map((n) => (map.has(n.id) ? { ...n, position: map.get(n.id)!.to } : n)),
+      comments: d.comments.map((c) => (map.has(c.id) ? { ...c, position: map.get(c.id)!.to } : c)),
+    }),
+    undo: (d) => ({
+      ...d,
+      nodes: d.nodes.map((n) => (map.has(n.id) ? { ...n, position: map.get(n.id)!.from } : n)),
+      comments: d.comments.map((c) => (map.has(c.id) ? { ...c, position: map.get(c.id)!.from } : c)),
+    }),
   };
 }
 
@@ -129,6 +138,15 @@ export function updateComment(doc: GraphDoc, id: string, text: string): Command 
     label: 'Editar comentario',
     redo: (d) => ({ ...d, comments: d.comments.map((c) => (c.id === id ? { ...c, text } : c)) }),
     undo: (d) => ({ ...d, comments: d.comments.map((c) => (c.id === id ? { ...c, text: prev } : c)) }),
+  };
+}
+
+export function setCommentColor(doc: GraphDoc, id: string, color: string): Command {
+  const prev = doc.comments.find((c) => c.id === id)?.color;
+  return {
+    label: 'Color de la nota',
+    redo: (d) => ({ ...d, comments: d.comments.map((c) => (c.id === id ? { ...c, color } : c)) }),
+    undo: (d) => ({ ...d, comments: d.comments.map((c) => (c.id === id ? { ...c, color: prev } : c)) }),
   };
 }
 
