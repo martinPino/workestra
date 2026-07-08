@@ -8,9 +8,15 @@ import { createBrowserEngine } from './engines/factory';
 /** Resultado de una acción: siempre serializable y compacto (el agente lo lee resumido). */
 export type ActionResult = { ok: true; [k: string]: unknown } | { ok: false; error: string };
 
-/** Cómo el servicio persiste artefactos (capturas, PDF, descargas). Fase 2 inyecta un sink real (IFileStore). */
+/** Cómo el servicio persiste artefactos (capturas, PDF, descargas) — se inyecta un IFileStore real. */
 export interface ArtifactSink {
   put(kind: 'screenshot' | 'pdf' | 'download', bytes: Uint8Array, meta: { name: string; mimeType: string; owner: SessionOwner }): Promise<{ id: string }>;
+}
+
+/** Hooks por invocación (M72): publica cada acción en el stream de la ejecución para verla en el replay. */
+export interface ActionHooks {
+  emit?: (event: unknown) => void;
+  nodeKey?: string;
 }
 /** Resuelve una referencia de fichero del workspace a bytes (para subidas). Fase 2 inyecta uno real. */
 export interface UploadResolver {
@@ -44,17 +50,51 @@ export class BrowserAutomationService {
   }
 
   /** Ejecuta una acción del navegador. Nunca lanza: los errores vuelven como `{ ok:false, error }`. */
-  async run(action: BrowserActionName, rawParams: unknown, owner: SessionOwner = {}): Promise<ActionResult> {
+  async run(action: BrowserActionName, rawParams: unknown, owner: SessionOwner = {}, hooks?: ActionHooks): Promise<ActionResult> {
     const schema = ACTION_PARAM_SCHEMAS[action] as z.ZodTypeAny | undefined;
-    if (!schema) return { ok: false, error: `Acción de navegador desconocida: ${action}` };
+    if (!schema) {
+      const r: ActionResult = { ok: false, error: `Acción de navegador desconocida: ${action}` };
+      this.emitAction(hooks, action, undefined, r);
+      return r;
+    }
     const parsed = schema.safeParse(rawParams ?? {});
-    if (!parsed.success) return { ok: false, error: `Parámetros inválidos para ${action}: ${parsed.error.issues.map((i) => i.message).join('; ')}` };
+    if (!parsed.success) {
+      const r: ActionResult = { ok: false, error: `Parámetros inválidos para ${action}: ${parsed.error.issues.map((i) => i.message).join('; ')}` };
+      this.emitAction(hooks, action, rawParams as Record<string, unknown> | undefined, r);
+      return r;
+    }
     const p = parsed.data as Record<string, unknown>;
 
+    let result: ActionResult;
     try {
-      return await this.dispatch(action, p, owner);
+      result = await this.dispatch(action, p, owner);
     } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+      result = { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+    this.emitAction(hooks, action, p, result);
+    return result;
+  }
+
+  /** Publica la acción como evento `browser.action` (best-effort; nunca rompe la ejecución). */
+  private emitAction(hooks: ActionHooks | undefined, action: BrowserActionName, p: Record<string, unknown> | undefined, result: ActionResult): void {
+    if (!hooks?.emit) return;
+    const r = result as Record<string, unknown>;
+    const target = p ? (p.url ?? p.selector ?? p.key ?? p.from) : undefined;
+    try {
+      // OJO: en el runner, `emitNode` inyecta el `nodeKey` correcto y luego hace `...body`, así que un
+      // `nodeKey` en el body lo sobrescribiría. Solo lo incluimos si de verdad lo tenemos (nunca '').
+      hooks.emit({
+        type: 'browser.action',
+        ...(hooks.nodeKey ? { nodeKey: hooks.nodeKey } : {}),
+        action,
+        target: target != null ? String(target).slice(0, 200) : undefined,
+        ok: result.ok,
+        sessionId: (r.sessionId ?? p?.sessionId) as string | undefined,
+        screenshotFileId: (r.screenshotFileId ?? r.pdfFileId ?? r.downloadFileId) as string | undefined,
+        error: result.ok ? undefined : (r.error as string | undefined),
+      });
+    } catch {
+      // un fallo al emitir no debe afectar a la acción del navegador
     }
   }
 

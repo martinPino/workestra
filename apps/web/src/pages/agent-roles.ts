@@ -77,6 +77,15 @@ export const ROLE_PRESETS: RolePreset[] = [
     tools: [],
   },
   {
+    id: 'qa-browser',
+    emoji: '🧪',
+    role: 'QA de navegador',
+    goal: 'Probar la web como un usuario real y reportar fallos con evidencias',
+    instructions:
+      'Eres un ingeniero de QA. Usa la herramienta Browser Automation para abrir la web y ejecutar la prueba paso a paso (login, formularios, checkout, CRUD…): navega, rellena, pulsa y espera a los elementos. Valida el resultado; si algo falla, captura pantalla y describe el paso, lo esperado y lo obtenido. Empieza tu respuesta con «PASA» o «FALLA» y luego el detalle.',
+    tools: ['browser'],
+  },
+  {
     id: 'orchestrator',
     emoji: '👑',
     role: 'Coordinador',

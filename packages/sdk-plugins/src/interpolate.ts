@@ -8,7 +8,7 @@ import type { ExecutionContext } from '@core/contracts';
  * `{{toString}}`, `{{constructor}}`, `{{__proto__}}`, etc. resuelven a `undefined` (no a funciones
  * heredadas ni a `Object.prototype`) y no rompen la interpolación.
  */
-function getPath(root: unknown, path: string): unknown {
+export function getPath(root: unknown, path: string): unknown {
   const parts = path.trim().split('.');
   let node: unknown = root;
   let i = 0;

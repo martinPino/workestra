@@ -31,4 +31,16 @@ export class ExecutionsController {
   events(@Param('id') id: string, @Workspace() workspaceId: string, @Query('since') since?: string) {
     return this.svc.listEvents(id, workspaceId, since != null ? Number(since) : -1);
   }
+
+  /**
+   * Artefacto de la ejecución (M72): una captura/PDF/descarga que una tool guardó en el almacén de ficheros
+   * durante el run. Se devuelve como data URL en JSON (no binario) porque el endpoint va autenticado con
+   * Bearer y un `<img src>` directo no llevaría la cabecera; así el front lo pinta con un simple `src`.
+   */
+  @Get(':id/files/:fileId')
+  async file(@Param('id') id: string, @Param('fileId') fileId: string, @Workspace() workspaceId: string) {
+    const f = await this.svc.getFile(id, workspaceId, fileId);
+    const base64 = Buffer.from(f.bytes).toString('base64');
+    return { name: f.name, mimeType: f.mimeType, dataUrl: `data:${f.mimeType};base64,${base64}` };
+  }
 }

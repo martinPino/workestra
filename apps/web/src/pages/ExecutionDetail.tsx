@@ -50,6 +50,7 @@ const EVENT_TONE: Record<string, Tone> = {
   'node.started': 'primary',
   'node.succeeded': 'success',
   'node.failed': 'danger',
+  'browser.action': 'accent',
   'execution.succeeded': 'success',
   'execution.failed': 'danger',
   'plan.created': 'accent',
@@ -64,7 +65,44 @@ const EVENT_TONE: Record<string, Tone> = {
   'human.resolved': 'warning',
 };
 
+/** Nombre humano de cada acción del navegador (M72) para el historial: `browser_goto` → «Navegar a». */
+const BROWSER_ACTION_LABEL: Record<string, string> = {
+  browser_open: 'Abrir navegador',
+  browser_close: 'Cerrar navegador',
+  browser_goto: 'Navegar a',
+  browser_click: 'Clic en',
+  browser_double_click: 'Doble clic en',
+  browser_fill: 'Rellenar',
+  browser_type: 'Escribir en',
+  browser_press_key: 'Pulsar tecla',
+  browser_hover: 'Pasar el cursor por',
+  browser_drag_drop: 'Arrastrar',
+  browser_scroll: 'Desplazar',
+  browser_wait: 'Esperar',
+  browser_wait_for_selector: 'Esperar elemento',
+  browser_take_screenshot: 'Captura de pantalla',
+  browser_generate_pdf: 'Generar PDF',
+  browser_extract_text: 'Extraer texto',
+  browser_get_html: 'Leer HTML',
+  browser_execute_javascript: 'Ejecutar JavaScript',
+  browser_get_cookies: 'Leer cookies',
+  browser_set_cookies: 'Poner cookies',
+  browser_get_console_logs: 'Leer consola',
+  browser_get_network_requests: 'Leer red',
+  browser_take_snapshot: 'Instantánea de página',
+  browser_upload_file: 'Subir fichero',
+  browser_download_file: 'Descargar fichero',
+};
+
 function eventDetail(e: ExecutionEvent): string {
+  // Acción del navegador (M72): «Navegar a → https://…» o «Clic en → button.buy», y el error si falló.
+  if (e.type === 'browser.action') {
+    const label = BROWSER_ACTION_LABEL[e.action] ?? e.action;
+    const parts = [label];
+    if (e.target) parts.push(`→ ${e.target}`);
+    if (!e.ok && e.error) parts.push(`· ${e.error}`);
+    return parts.join(' ');
+  }
   if ('nodeKey' in e && e.nodeKey) return String(e.nodeKey);
   return '';
 }
@@ -78,6 +116,7 @@ const EVENT_LABEL: Record<string, string> = {
   'node.succeeded': 'Paso completado',
   'node.failed': 'Paso con error',
   'node.skipped': 'Paso omitido',
+  'browser.action': 'Navegador',
   'execution.succeeded': 'Completado',
   'execution.failed': 'Con error',
   'plan.created': 'Plan del asistente creado',
@@ -134,6 +173,43 @@ function connectorWarnings(context: Record<string, unknown> | undefined): Connec
 
 const fmtCost = (c: number) => (c === 0 ? '—' : `$${c.toFixed(c < 0.01 ? 4 : 3)}`);
 const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString('es-ES', { hour12: false });
+
+/**
+ * Miniatura de una captura del navegador (M72): carga perezosa del artefacto (data URL) que la tool
+ * «Browser Automation» guardó durante el run, y la muestra bajo su evento en el historial. Al hacer clic
+ * se abre a tamaño completo en otra pestaña. Silenciosa: si el fichero caducó (TTL) o falla, no molesta.
+ */
+function BrowserShot({ execId, fileId }: { execId: string; fileId: string }) {
+  const t = useT();
+  const { data, isError } = useQuery({
+    queryKey: ['execution-file', execId, fileId],
+    queryFn: () => api.getExecutionFile(execId, fileId),
+    enabled: !!execId && !!fileId,
+    retry: false,
+    staleTime: Infinity, // el artefacto es inmutable; no re-pedirlo
+  });
+  if (isError) {
+    return <div className="px-3 pb-1.5 text-[10px] text-txt-disabled">{t('Captura no disponible (pudo caducar).')}</div>;
+  }
+  if (!data) {
+    return (
+      <div className="flex items-center gap-1.5 px-3 pb-1.5 text-[10px] text-txt-disabled">
+        <Loader2 size={11} className="animate-spin" /> {t('Cargando captura…')}
+      </div>
+    );
+  }
+  return (
+    <div className="px-3 pb-2">
+      <a href={data.dataUrl} target="_blank" rel="noreferrer" title={t('Ver captura a tamaño completo')} className="inline-block">
+        <img
+          src={data.dataUrl}
+          alt={t('Captura de pantalla del navegador')}
+          className="max-h-28 w-auto rounded-md border border-border shadow-subtle transition-shadow hover:shadow-card"
+        />
+      </a>
+    </div>
+  );
+}
 
 /**
  * Consola de ejecución (M6). El grafo y la timeline se derivan del stream DURABLE de eventos
@@ -407,6 +483,9 @@ export function ExecutionDetail() {
                 {events.map((e, i) => {
                   const included = i < position;
                   const isCurrent = i === position - 1;
+                  // Una acción del navegador fallida se pinta en rojo aunque su tipo base sea 'accent' (M72).
+                  const tone = e.type === 'browser.action' && !e.ok ? 'danger' : EVENT_TONE[e.type] ?? 'default';
+                  const shotId = e.type === 'browser.action' ? e.screenshotFileId : undefined;
                   return (
                     <li key={`${e.seq}-${i}`} data-current={isCurrent}>
                       <button
@@ -418,10 +497,12 @@ export function ExecutionDetail() {
                         )}
                       >
                         <span className="w-8 shrink-0 text-right font-mono text-[10px] text-txt-disabled">{e.seq}</span>
-                        <Badge tone={EVENT_TONE[e.type] ?? 'default'}><span title={e.type}>{t(eventLabel(e.type))}</span></Badge>
+                        <Badge tone={tone}><span title={e.type}>{t(eventLabel(e.type))}</span></Badge>
                         <span className="min-w-0 flex-1 truncate text-txt-secondary">{eventDetail(e)}</span>
                         <span className="shrink-0 font-mono text-[10px] text-txt-disabled">{fmtTime(e.at)}</span>
                       </button>
+                      {/* Miniatura de la captura (M72): solo se pide/pinta cuando el evento ya entró en el replay. */}
+                      {shotId && included && id && <BrowserShot execId={id} fileId={shotId} />}
                     </li>
                   );
                 })}

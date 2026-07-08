@@ -1,5 +1,5 @@
 import type { INodeExecutor, NodeExecutionContext, NodeResult, NodeType, ExecutionContext } from '@core/contracts';
-import { interpolate } from './interpolate';
+import { interpolate, getPath } from './interpolate';
 
 /**
  * Primeros executors REALES como plugins (Strategy): Condición y HTTP.
@@ -35,9 +35,6 @@ export function parseHeaders(raw: string): Record<string, string> {
   }
 }
 
-function getPath(root: Record<string, unknown>, path: string): unknown {
-  return path.split('.').reduce<unknown>((o, k) => (o == null ? undefined : (o as Record<string, unknown>)[k]), root);
-}
 
 /**
  * Evaluador SEGURO (sin eval). Soporta VARIAS cláusulas `path <op> literal` unidas por `&&` (Y) o `||` (O)
@@ -52,12 +49,15 @@ export function evalCondition(expr: string, ctx: ExecutionContext): boolean {
   return evalClause(trimmed, ctx);
 }
 
-/** Una sola cláusula `path <op> literal`. `~` = «contiene» (subcadena, case-insensitive). */
+/** Una sola cláusula `path <op> literal`. `~` = «contiene» (subcadena, case-insensitive). El `path`
+ *  admite `:` porque las salidas de nodo se guardan con clave compuesta (`agent:qa.output`,
+ *  `connector:c.status`), y se resuelve con el MISMO buscador que la interpolación (variables en la raíz
+ *  + prefijo más largo), para poder ramificar según lo que respondió un agente u otro nodo. */
 function evalClause(expr: string, ctx: ExecutionContext): boolean {
-  const m = expr.match(/^\s*([\w.]+)\s*(==|!=|>=|<=|>|<|~)\s*(.+?)\s*$/);
+  const m = expr.match(/^\s*([\w.:]+)\s*(==|!=|>=|<=|>|<|~)\s*(.+?)\s*$/);
   if (!m) return expr.trim() === 'true';
   const [, path, op, rawRight] = m;
-  const left = getPath({ variables: ctx.variables, ticket: ctx.ticket, repository: ctx.repository }, path);
+  const left = getPath({ ...(ctx.variables as Record<string, unknown>), ticket: ctx.ticket, repository: ctx.repository, variables: ctx.variables }, path);
   let right: unknown = rawRight;
   if (/^-?\d+(\.\d+)?$/.test(rawRight)) right = Number(rawRight);
   else if (rawRight === 'true') right = true;

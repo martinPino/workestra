@@ -37,6 +37,18 @@ export const ExecutionEventSchema = z.discriminatedUnion('type', [
   // El nodo no se ejecuta porque ninguna de sus aristas entrantes quedó ACTIVA (una rama/router
   // aguas arriba no lo eligió, o un predecesor fue saltado). Terminal, propaga skip a sus sucesores.
   base.extend({ type: z.literal('node.skipped'), nodeKey: z.string() }),
+
+  // --- Browser Automation (M72): cada acción del navegador se emite para verla en el replay ---
+  base.extend({
+    type: z.literal('browser.action'),
+    nodeKey: z.string(),
+    action: z.string(), // p. ej. 'browser_goto', 'browser_click'
+    target: z.string().optional(), // resumen del objetivo (url o selector)
+    ok: z.boolean(),
+    sessionId: z.string().optional(),
+    screenshotFileId: z.string().optional(), // id en el IFileStore para mostrar la captura
+    error: z.string().optional(),
+  }),
   base.extend({ type: z.literal('execution.succeeded') }),
   base.extend({ type: z.literal('execution.failed'), error: z.string() }),
 

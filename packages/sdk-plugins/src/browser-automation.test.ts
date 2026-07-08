@@ -186,4 +186,45 @@ describe('Browser Automation — tool de agente', () => {
     // No está en el allowlist del agente → denegada aunque el rol pudiera.
     expect(authz.authorize({ role: 'EDITOR', agentTools: ['http'], toolKey: 'browser' }).allowed).toBe(false);
   });
+
+  it('emite un evento browser.action por acción para el replay (M72)', async () => {
+    let i = 0;
+    const svc = new BrowserAutomationService({ createEngine: () => new MockBrowserEngine(), policy: perm, genId: () => `s${++i}` });
+    const events: Array<Record<string, unknown>> = [];
+    const hooks = { emit: (e: unknown) => events.push(e as Record<string, unknown>), nodeKey: 'qa' };
+
+    const open = ok<{ sessionId: string }>(await svc.run('browser_open', { url: 'https://example.com' }, {}, hooks));
+    await svc.run('browser_click', { sessionId: open.sessionId, selector: '#buy' }, {}, hooks);
+    await svc.run('browser_goto', { sessionId: open.sessionId, url: 'http://localhost/admin' }, {}, hooks); // prohibido → ok:false
+
+    expect(events).toHaveLength(3);
+    expect(events[0]).toMatchObject({ type: 'browser.action', action: 'browser_open', ok: true, nodeKey: 'qa', target: 'https://example.com' });
+    expect(events[1]).toMatchObject({ type: 'browser.action', action: 'browser_click', ok: true, target: '#buy' });
+    expect(events[2]).toMatchObject({ type: 'browser.action', action: 'browser_goto', ok: false });
+    expect(typeof events[2].error).toBe('string');
+  });
+
+  it('sin nodeKey NO emite la clave (para no pisar la del runner en el replay)', async () => {
+    const svc = new BrowserAutomationService({ createEngine: () => new MockBrowserEngine(), policy: perm, genId: () => 'sx' });
+    const events: Array<Record<string, unknown>> = [];
+    await svc.run('browser_open', { url: 'https://example.com' }, {}, { emit: (e) => events.push(e as Record<string, unknown>) });
+    expect(events[0]).not.toHaveProperty('nodeKey');
+  });
+
+  it('persiste la captura en el IFileStore inyectado y expone su id (M72)', async () => {
+    let i = 0;
+    const store: Array<{ ws: string; name: string; bytes: number }> = [];
+    const artifacts = {
+      put: async (kind: string, bytes: Uint8Array, meta: { name: string; owner: { workspaceId?: string } }) => {
+        store.push({ ws: meta.owner.workspaceId ?? '', name: `${kind}:${meta.name}`, bytes: bytes.length });
+        return { id: `f${store.length}` };
+      },
+    };
+    const svc = new BrowserAutomationService({ createEngine: () => new MockBrowserEngine(), policy: perm, genId: () => `s${++i}`, artifacts });
+    const open = ok<{ sessionId: string }>(await svc.run('browser_open', { url: 'https://example.com' }, { workspaceId: 'ws1' }));
+    const shot = ok<{ screenshotFileId: string }>(await svc.run('browser_take_screenshot', { sessionId: open.sessionId }, { workspaceId: 'ws1' }));
+    expect(shot.screenshotFileId).toBe('f1');
+    expect(store[0]).toMatchObject({ ws: 'ws1', bytes: expect.any(Number) });
+    expect(store[0].bytes).toBeGreaterThan(0);
+  });
 });

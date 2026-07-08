@@ -25,6 +25,19 @@ describe('Condition executor (evaluador seguro)', () => {
     expect(evalCondition('variables.name ~ xyz', ctx)).toBe(false);
   });
 
+  it('ramifica según la SALIDA de un agente u otro nodo (clave con «:», M72)', () => {
+    // Las salidas de nodo se guardan con clave compuesta en variables: `agent:qa` = { output, tools }.
+    const ctx = {
+      ...emptyContext(),
+      variables: { 'agent:qa': { output: 'FALLA: el botón de comprar no responde' }, 'connector:c': { status: 200 } },
+    };
+    expect(evalCondition('agent:qa.output ~ FALLA', ctx)).toBe(true); // la plantilla «Equipo QA» depende de esto
+    expect(evalCondition('agent:qa.output ~ falla', ctx)).toBe(true); // case-insensitive
+    expect(evalCondition('agent:qa.output ~ PASA', ctx)).toBe(false);
+    expect(evalCondition('connector:c.status == 200', ctx)).toBe(true);
+    expect(evalCondition('agent:inexistente.output ~ x', ctx)).toBe(false); // referencia ausente → falso, no rompe
+  });
+
   it('el executor devuelve la rama y anota el resultado en el contexto', async () => {
     const exec = new ConditionNodeExecutor();
     const res = await exec.execute({

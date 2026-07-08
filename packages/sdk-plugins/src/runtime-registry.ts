@@ -57,7 +57,7 @@ export function createRuntimeRegistry(deps: RuntimeRegistryDeps): NodeExecutorRe
     tools: new ToolRegistry()
       .register(new MockTool())
       .register(new HttpTool(deps.httpAllowlist ?? []))
-      .register(new BrowserTool()), // M71: «Browser Automation» — motor intercambiable (por defecto mock)
+      .register(new BrowserTool({ files: deps.files })), // M71/M72: «Browser Automation» — motor intercambiable + capturas persistidas (replay)
     authz: new ToolAuthorizationService(),
     memory: deps.memory,
     mcp: deps.mcp,

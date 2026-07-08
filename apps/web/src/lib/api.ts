@@ -234,6 +234,11 @@ export const api = {
   /** Delta del stream (M9): solo los eventos con `seq > since`, para el poll incremental de la consola. */
   getExecutionEvents: (id: string, since: number) =>
     fetch(`${API}/executions/${id}/events?since=${since}`, { headers: authHeaders() }).then((r) => json<{ events: ExecutionEvent[] }>(r)),
+  /** Artefacto de una ejecución (M72): captura/PDF que guardó una tool; llega como data URL listo para `<img src>`. */
+  getExecutionFile: (id: string, fileId: string) =>
+    fetch(`${API}/executions/${id}/files/${fileId}`, { headers: authHeaders() }).then((r) =>
+      json<{ name: string; mimeType: string; dataUrl: string }>(r),
+    ),
 
   // --- Webhooks / triggers entrantes (M7) ---
   listWebhooks: (workflowId: string) =>

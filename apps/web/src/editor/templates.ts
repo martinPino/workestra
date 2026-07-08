@@ -70,6 +70,45 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     },
   },
   {
+    id: 'qa-team',
+    name: 'Equipo QA (navegador)',
+    description: 'Un agente prueba la web con Browser Automation; si falla, guarda evidencia, crea una incidencia en Jira y avisa por Slack.',
+    icon: '🧪',
+    category: 'QA',
+    doc: {
+      nodes: [
+        node('trigger', 'trigger', 40, 220, { event: 'manual' }),
+        // Agente QA: conecta aquí tu asistente con la herramienta «Browser Automation» (rol «QA de navegador»).
+        node('qa', 'agent', 300, 220, { agentId: null, input: 'Abre la web y ejecuta la prueba de UI paso a paso. Empieza por «PASA» o «FALLA» y añade el detalle.' }),
+        // ¿Falló? La expresión marca «true» si la respuesta del agente contiene «FALLA».
+        node('passed', 'condition', 560, 220, { expression: 'agent:qa.output ~ FALLA' }),
+        node('ok', 'end', 820, 120, {}),
+        // Rama de fallo: evidencia → incidencia en Jira → aviso en Slack.
+        node('evidence', 'tool', 820, 340, { message: 'Prueba FALLIDA. Evidencia (captura/traza) guardada. Detalle: {{agent:qa.output}}' }),
+        node('jira', 'connector', 1080, 340, { connectorId: null, method: 'POST', path: '/rest/api/3/issue', body: '{"fields":{"project":{"key":"QA"},"issuetype":{"name":"Bug"},"summary":"Prueba de UI fallida","description":"{{agent:qa.output}}"}}' }),
+        node('slack', 'connector', 1340, 340, { connectorId: null, method: 'POST', path: '/chat.postMessage', body: '{"channel":"#qa","text":"❌ Prueba de UI fallida. Se creó una incidencia en Jira."}' }),
+        node('done', 'end', 1600, 340, {}),
+      ],
+      edges: [
+        edge('trigger', 'qa'),
+        edge('qa', 'passed'),
+        edge('passed', 'ok', 'false'), // pasó: sin «FALLA»
+        edge('passed', 'evidence', 'true'), // falló
+        edge('evidence', 'jira'),
+        edge('jira', 'slack'),
+        edge('slack', 'done'),
+      ],
+      comments: [
+        {
+          id: 'c_qa_setup',
+          text: 'Equipo QA — para activarlo:\n- En «QA» elige tu asistente con la tool «Browser Automation» (rol «QA de navegador»).\n- En Jira y Slack elige tus conexiones (página Conexiones).\n- Ajusta la condición si tu agente usa otras palabras que «FALLA».',
+          position: { x: 300, y: 20 },
+          color: 'amber',
+        },
+      ],
+    },
+  },
+  {
     id: 'classify',
     name: 'Decidir según una regla',
     description: 'Bifurca el flujo según una condición (p. ej. la prioridad del ticket).',

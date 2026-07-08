@@ -220,6 +220,19 @@ export class ExecutionsService {
     return { events: await this.p.events.list(id, since) };
   }
 
+  /**
+   * Sirve un artefacto de la ejecución (M72): una captura/PDF/descarga que una tool (p. ej. Browser
+   * Automation) guardó en el IFileStore durante el run. Aislado por tenant: primero se comprueba que la
+   * ejecución es del workspace, y el propio `files.get(workspaceId, ...)` está scoped a ese workspace, así
+   * que no se puede leer un fichero de otro espacio ni aunque se acierte el id. 404 si no existe.
+   */
+  async getFile(id: string, workspaceId: string, fileId: string): Promise<{ name: string; mimeType: string; bytes: Uint8Array }> {
+    await this.assertOwned(id, workspaceId);
+    const file = await this.p.files.get(workspaceId, fileId);
+    if (!file) throw new NotFoundException(`Fichero no encontrado: ${fileId}`);
+    return file;
+  }
+
   async get(id: string, workspaceId: string) {
     const execution = await this.p.executions.get(id);
     assertInWorkspace(execution?.workspaceId, workspaceId, 'Ejecución');

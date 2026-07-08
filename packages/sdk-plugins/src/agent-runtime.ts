@@ -22,6 +22,16 @@ export interface AgentRuntimeDeps {
   maxIterations?: number;
 }
 
+/**
+ * Contexto de ejecución que el runtime pasa a las TOOLS (M72): id de ejecución, nodo y un `emit` para
+ * publicar eventos en el stream (p. ej. las acciones del navegador se ven paso a paso en el replay).
+ */
+export interface AgentExecMeta {
+  executionId?: string;
+  nodeKey?: string;
+  emit?: (event: unknown) => void;
+}
+
 function roleOf(agent: Agent): Role {
   const r = (agent.permissions as { role?: string } | null)?.role;
   return r === 'OWNER' || r === 'ADMIN' || r === 'EDITOR' || r === 'VIEWER' ? r : 'EDITOR';
@@ -57,7 +67,7 @@ export class AgentRuntime implements IAgentRuntime {
     this.maxIterations = deps.maxIterations ?? 4;
   }
 
-  async invoke(agent: Agent, ctx: ExecutionContext, workspaceId?: string): Promise<AgentResult> {
+  async invoke(agent: Agent, ctx: ExecutionContext, workspaceId?: string, exec?: AgentExecMeta): Promise<AgentResult> {
     const role = roleOf(agent);
     // M40: expande los servidores MCP enganchados al agente en herramientas reales (nombre + esquema). Un
     // servidor caído devuelve [] (no rompe). Se ofrecen al modelo junto a las tools internas del agente.
@@ -130,7 +140,10 @@ export class AgentRuntime implements IAgentRuntime {
             result = { error: 'tool no autorizada', reason: authz.reason };
           } else {
             const tool = this.deps.tools.get(call.name);
-            result = tool ? await tool.invoke(call.arguments, {}) : { error: 'tool inexistente' };
+            // Pasa el contexto de ejecución a la tool (M72): workspace (persistir artefactos), execución/nodo
+            // y `emit` (publicar eventos en el stream, p. ej. acciones del navegador para el replay).
+            const auth = { workspaceId, executionId: exec?.executionId, nodeKey: exec?.nodeKey, emit: exec?.emit };
+            result = tool ? await tool.invoke(call.arguments, auth) : { error: 'tool inexistente' };
           }
         }
         toolLog.push({ tool: call.name, allowed, result });
