@@ -17,7 +17,9 @@ type Fetchish = (url: string, init?: { headers?: Record<string, string> }) => Pr
  */
 export async function listSlackChannels(opts: { token: string; fetchFn?: Fetchish }): Promise<{ channels: SlackChannel[] }> {
   const fetchFn = opts.fetchFn ?? (globalThis.fetch as unknown as Fetchish);
-  const url = 'https://slack.com/api/conversations.list?types=public_channel,private_channel&exclude_archived=true&limit=1000';
+  // Solo canales PÚBLICOS: bastan `channels:read` (los privados exigirían además `groups:read`, que no
+  // pedimos; pedir `private_channel` sin ese scope haría fallar TODA la llamada con `missing_scope`).
+  const url = 'https://slack.com/api/conversations.list?types=public_channel&exclude_archived=true&limit=1000';
   const res = await fetchFn(url, { headers: { authorization: `Bearer ${opts.token}` } });
   if (!res.ok) return { channels: [] };
   const data = (await res.json().catch(() => ({}))) as { ok?: boolean; channels?: Array<{ id?: string; name?: string }> };
