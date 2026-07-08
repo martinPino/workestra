@@ -682,4 +682,33 @@ export const EN: Record<string, string> = {
   'Cargando canales…': 'Loading channels…',
   '— elige un canal —': '— choose a channel —',
   'No pudimos listar tus canales; escribe el nombre o el ID.': "We couldn't list your channels; type the name or ID.",
+
+  // --- M59: ayuda (tooltip) de los bloques de la paleta ---
+  'Arranca el flujo: manualmente, en un horario, con un webhook o al llegar un fichero a Google Drive.':
+    'Starts the flow: manually, on a schedule, from a webhook, or when a file arrives in Google Drive.',
+  'Deja una anotación o mensaje en el flujo. Útil para pruebas o para registrar un paso.':
+    'Leaves a note or message in the flow. Handy for testing or logging a step.',
+  'Bifurca el flujo según una regla (p. ej. si la prioridad es alta): sigue un camino u otro.':
+    'Branches the flow based on a rule (e.g. if priority is high): follows one path or another.',
+  'Llama a cualquier API por HTTP (GET/POST…), para servicios sin conector. Avanzado.':
+    'Calls any API over HTTP (GET/POST…), for services without a connector. Advanced.',
+  'Descarga un fichero desde una URL y lo deja listo para los siguientes pasos (p. ej. un PDF).':
+    'Downloads a file from a URL and makes it ready for the next steps (e.g. a PDF).',
+  'Saca el texto de un fichero (PDF, imagen con OCR, CSV) para que la IA lo pueda procesar.':
+    'Extracts the text from a file (PDF, image via OCR, CSV) so the AI can process it.',
+  'Da forma a los datos con un pequeño script: mapear, filtrar o combinar la salida de pasos previos.':
+    'Shapes data with a small script: map, filter or combine the output of earlier steps.',
+  'Delega en un asistente de IA que ya creaste, con su rol, modelo y herramientas.':
+    'Delegates to an AI assistant you already created, with its role, model and tools.',
+  'Pide a la IA que redacte, resuma o extraiga datos a partir de pasos anteriores.':
+    'Asks the AI to write, summarize or extract data from previous steps.',
+  'Pausa el flujo un tiempo (segundos, minutos, horas…) antes de continuar.':
+    'Pauses the flow for a while (seconds, minutes, hours…) before continuing.',
+  'Pausa y pide a una persona que apruebe o rechace antes de seguir.':
+    'Pauses and asks a person to approve or reject before continuing.',
+  'Reparte el trabajo en varias ramas o entre varios asistentes a la vez.':
+    'Splits the work into several branches or across multiple assistants at once.',
+  'Envía datos a una app conectada (Slack, Jira, Salesforce, Gmail…) con una acción.':
+    'Sends data to a connected app (Slack, Jira, Salesforce, Gmail…) with an action.',
+  'Marca el final del flujo.': 'Marks the end of the flow.',
 };

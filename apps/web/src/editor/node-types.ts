@@ -26,6 +26,8 @@ export interface NodeTypeDef {
   icon: LucideIcon;
   color: string; // clase Tailwind del acento
   category: 'trigger' | 'logic' | 'io' | 'ai' | 'control';
+  /** Explicación breve (1 frase) para el tooltip de ayuda de la paleta (M59). Clave i18n. */
+  help?: string;
   configSchema: NodeConfigSchema;
   // `advanced`: bloque para desarrolladores (p. ej. HTTP crudo). Se oculta de la paleta en producción;
   // sigue registrado para que los flujos que ya lo usan se rendericen. M24 añadirá un toggle "avanzado".
@@ -66,6 +68,7 @@ export function defaultConfig(kind: string): Record<string, unknown> {
 registerNodeType({
   kind: 'trigger',
   label: 'Disparador',
+  help: 'Arranca el flujo: manualmente, en un horario, con un webhook o al llegar un fichero a Google Drive.',
   icon: Zap,
   color: 'text-amber-400',
   category: 'trigger',
@@ -80,6 +83,7 @@ registerNodeType({
 registerNodeType({
   kind: 'tool',
   label: 'Anotar',
+  help: 'Deja una anotación o mensaje en el flujo. Útil para pruebas o para registrar un paso.',
   icon: Wrench,
   color: 'text-sky-400',
   category: 'logic',
@@ -94,6 +98,7 @@ registerNodeType({
 registerNodeType({
   kind: 'condition',
   label: 'Condición',
+  help: 'Bifurca el flujo según una regla (p. ej. si la prioridad es alta): sigue un camino u otro.',
   icon: GitBranch,
   color: 'text-fuchsia-400',
   category: 'control',
@@ -113,6 +118,7 @@ registerNodeType({
 registerNodeType({
   kind: 'api',
   label: 'HTTP',
+  help: 'Llama a cualquier API por HTTP (GET/POST…), para servicios sin conector. Avanzado.',
   icon: Globe,
   color: 'text-emerald-400',
   category: 'io',
@@ -144,6 +150,7 @@ registerNodeType({
 registerNodeType({
   kind: 'download',
   label: 'Descargar fichero',
+  help: 'Descarga un fichero desde una URL y lo deja listo para los siguientes pasos (p. ej. un PDF).',
   icon: Download,
   color: 'text-cyan-400',
   category: 'io',
@@ -165,6 +172,7 @@ registerNodeType({
 registerNodeType({
   kind: 'extract',
   label: 'Extraer texto',
+  help: 'Saca el texto de un fichero (PDF, imagen con OCR, CSV) para que la IA lo pueda procesar.',
   icon: FileText,
   color: 'text-teal-400',
   category: 'io',
@@ -183,6 +191,7 @@ registerNodeType({
 registerNodeType({
   kind: 'code',
   label: 'Transformar datos',
+  help: 'Da forma a los datos con un pequeño script: mapear, filtrar o combinar la salida de pasos previos.',
   icon: Braces,
   color: 'text-sky-400',
   category: 'logic',
@@ -202,6 +211,7 @@ registerNodeType({
 registerNodeType({
   kind: 'agent',
   label: 'Asistente',
+  help: 'Delega en un asistente de IA que ya creaste, con su rol, modelo y herramientas.',
   icon: BrainCircuit,
   color: 'text-indigo-400',
   category: 'ai',
@@ -222,6 +232,7 @@ registerNodeType({
 registerNodeType({
   kind: 'llm',
   label: 'Redactar con IA',
+  help: 'Pide a la IA que redacte, resuma o extraiga datos a partir de pasos anteriores.',
   icon: Sparkles,
   color: 'text-amber-300',
   category: 'ai',
@@ -258,6 +269,7 @@ registerNodeType({
 registerNodeType({
   kind: 'wait',
   label: 'Espera',
+  help: 'Pausa el flujo un tiempo (segundos, minutos, horas…) antes de continuar.',
   icon: Timer,
   color: 'text-teal-400',
   category: 'control',
@@ -270,6 +282,7 @@ registerNodeType({
 registerNodeType({
   kind: 'human',
   label: 'Aprobación',
+  help: 'Pausa y pide a una persona que apruebe o rechace antes de seguir.',
   icon: UserCheck,
   color: 'text-orange-400',
   category: 'control',
@@ -291,6 +304,7 @@ registerNodeType({
 registerNodeType({
   kind: 'router',
   label: 'Repartir',
+  help: 'Reparte el trabajo en varias ramas o entre varios asistentes a la vez.',
   icon: Split,
   color: 'text-teal-400',
   category: 'control',
@@ -315,6 +329,7 @@ registerNodeType({
 registerNodeType({
   kind: 'connector',
   label: 'Enviar a una app',
+  help: 'Envía datos a una app conectada (Slack, Jira, Salesforce, Gmail…) con una acción.',
   icon: Plug,
   color: 'text-fuchsia-400',
   category: 'io',
@@ -339,6 +354,7 @@ registerNodeType({
 registerNodeType({
   kind: 'end',
   label: 'Fin',
+  help: 'Marca el final del flujo.',
   icon: Flag,
   color: 'text-zinc-300',
   category: 'control',

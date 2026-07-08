@@ -27,6 +27,7 @@ import { AiChatPanel } from '../components/AiChatPanel';
 import { SubtaskTree } from '../components/SubtaskTree';
 import { docToReactFlow, docToWorkflowGraph, workflowGraphToDoc, STARTER_DOC } from '../graph';
 import { listNodeTypes } from '../editor/node-types';
+import { HelpTip } from '../components/HelpTip';
 import { graphSetupIssues } from '../editor/node-issues';
 import { useEditorStore } from '../editor/store';
 import { useAgents, useConnectors } from '../lib/hooks';
@@ -375,6 +376,7 @@ export function Editor() {
                     <Icon size={14} strokeWidth={2} />
                   </span>
                   <span className="font-medium">{t(nt.label)}</span>
+                  {nt.help && <HelpTip text={t(nt.help)} />}
                 </button>
               );
             })}
