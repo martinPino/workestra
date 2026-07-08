@@ -21,6 +21,7 @@ export const ROLE_SCOPES: Record<Role, string[]> = {
     'tool:read',
     'tool:mock',
     'tool:http',
+    'tool:browser',
     'connector:read',
   ],
   VIEWER: ['workflow:read', 'agent:read', 'execution:read', 'tool:read', 'connector:read'],

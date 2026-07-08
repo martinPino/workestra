@@ -2,6 +2,8 @@ export * from './registry';
 export * from './executors';
 export * from './executors-io';
 export * from './tools';
+export * from './browser-tool';
+export * from './browser-automation';
 export * from './tool-authorization';
 export * from './agent-runtime';
 export * from './planner';

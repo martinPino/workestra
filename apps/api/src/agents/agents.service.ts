@@ -10,7 +10,7 @@ import { buildAssistantPreamble } from '../workflows/assistant-context';
 
 // Catálogos válidos para el borrador de la IA (M68): claves de herramientas y modelos ofrecibles a un agente.
 // Se saneará contra estas listas; deben coincidir con la UI (lib/tools.ts y pages/agent-roles.ts).
-const AGENT_TOOL_KEYS = ['http', 'mock'];
+const AGENT_TOOL_KEYS = ['http', 'mock', 'browser'];
 const AGENT_MODEL_KEYS = [
   'mock-1',
   'llama-3.3-70b-versatile',

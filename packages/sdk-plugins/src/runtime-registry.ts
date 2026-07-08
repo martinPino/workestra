@@ -7,6 +7,7 @@ import { CodeNodeExecutor } from './code-node';
 import { DownloadFileNodeExecutor } from './download-node';
 import { ExtractTextNodeExecutor } from './extract-node';
 import { ToolRegistry, MockTool, HttpTool } from './tools';
+import { BrowserTool } from './browser-tool';
 import { ToolAuthorizationService } from './tool-authorization';
 import { AgentRuntime } from './agent-runtime';
 import { LlmPlanner } from './planner';
@@ -53,7 +54,10 @@ export function createRuntimeRegistry(deps: RuntimeRegistryDeps): NodeExecutorRe
 
   const runtime = new AgentRuntime({
     router: deps.llmRouter,
-    tools: new ToolRegistry().register(new MockTool()).register(new HttpTool(deps.httpAllowlist ?? [])),
+    tools: new ToolRegistry()
+      .register(new MockTool())
+      .register(new HttpTool(deps.httpAllowlist ?? []))
+      .register(new BrowserTool()), // M71: «Browser Automation» — motor intercambiable (por defecto mock)
     authz: new ToolAuthorizationService(),
     memory: deps.memory,
     mcp: deps.mcp,

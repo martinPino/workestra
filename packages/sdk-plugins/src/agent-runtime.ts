@@ -66,8 +66,17 @@ export class AgentRuntime implements IAgentRuntime {
         ? await this.deps.mcp.resolve(workspaceId, agent.mcpServers).catch(() => [])
         : [];
     const mcpByName = new Map(mcpTools.map((tt) => [tt.name, tt]));
+    // Tools internas: usan su `describe()` (descripción + esquema de parámetros para el LLM) si lo aportan
+    // (p. ej. «browser», con muchas acciones); si no, un genérico. Así el modelo sabe cómo llamarlas.
+    const builtinDefs: LlmToolDef[] = agent.tools
+      .map((t) => ({ key: t, tool: this.deps.tools.get(t) }))
+      .filter((x): x is { key: string; tool: NonNullable<typeof x.tool> } => !!x.tool)
+      .map((x) => {
+        const d = x.tool.describe?.();
+        return { name: x.key, description: d?.description ?? `Tool ${x.key}`, parameters: d?.parameters ?? {} };
+      });
     const toolDefs: LlmToolDef[] = [
-      ...agent.tools.filter((t) => this.deps.tools.get(t)).map((t) => ({ name: t, description: `Tool ${t}`, parameters: {} })),
+      ...builtinDefs,
       ...mcpTools.map((tt) => ({ name: tt.name, description: tt.description, parameters: tt.parameters })),
     ];
 

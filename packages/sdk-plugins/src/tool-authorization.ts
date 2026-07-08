@@ -5,6 +5,7 @@ import { can } from '@core/contracts';
 export const TOOL_SCOPES: Record<string, string> = {
   mock: 'tool:mock',
   http: 'tool:http',
+  browser: 'tool:browser', // M71: «Browser Automation»
 };
 
 export interface AuthzResult {

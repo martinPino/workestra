@@ -1,4 +1,4 @@
-import { Globe, Wrench, type LucideIcon } from 'lucide-react';
+import { Globe, Wrench, AppWindow, type LucideIcon } from 'lucide-react';
 
 /**
  * Catálogo de herramientas que un agente puede usar (M39). Coincide con las tools HABILITADAS del runtime
@@ -13,6 +13,7 @@ export interface ToolDef {
 }
 
 export const TOOL_CATALOG: ToolDef[] = [
+  { key: 'browser', label: 'Browser Automation', desc: 'Controla un navegador como un humano (probar, rellenar, extraer, capturar).', icon: AppWindow },
   { key: 'http', label: 'Petición web', desc: 'Llama a una API por HTTP.', icon: Globe },
   { key: 'mock', label: 'Eco de prueba', desc: 'Devuelve lo que recibe (para pruebas).', icon: Wrench },
 ];

@@ -62,10 +62,21 @@ export interface INodeExecutor {
 
 export type ResolvedAuth = Record<string, unknown>;
 
+/** Descripción de una tool para el LLM (M71): texto + JSON Schema de parámetros. */
+export interface ToolDescription {
+  description: string;
+  parameters: Record<string, unknown>;
+}
+
 export interface ITool {
   readonly key: string;
   readonly idempotent: boolean;
   invoke(input: unknown, auth: ResolvedAuth): Promise<unknown>;
+  /**
+   * Opcional (M71): descripción + esquema de parámetros para el LLM. Si falta, el runtime ofrece la tool con
+   * un esquema genérico vacío. Lo usan tools con vocabulario rico (p. ej. «browser», con muchas acciones).
+   */
+  describe?(): ToolDescription;
 }
 
 export interface ConnectorEvent {
