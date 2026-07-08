@@ -13,6 +13,11 @@ export interface ActionField {
    * variables. `slack-channel` → lista los canales del Slack conectado (como los proyectos de Jira).
    */
   source?: 'slack-channel';
+  /**
+   * Muestra el insertor «+ Insertar dato de un paso» (M58): SOLO en campos de CONTENIDO/referencia (mensaje,
+   * comentario, título…), no en identificadores (canal, ID de hoja, emoji…) donde no tiene sentido.
+   */
+  insert?: boolean;
 }
 
 export interface ConnectorAction {
@@ -38,28 +43,21 @@ export const CONNECTOR_ACTIONS: Record<string, ConnectorAction[]> = {
       label: 'Enviar un mensaje a un canal',
       fields: [
         { key: 'channel', label: 'Canal', placeholder: '#general', source: 'slack-channel' },
-        { key: 'text', label: 'Mensaje', placeholder: 'Escribe el mensaje…', multiline: true },
+        { key: 'text', label: 'Mensaje', placeholder: 'Escribe el mensaje…', multiline: true, insert: true },
       ],
       build: (p) => ({ method: 'POST', path: '/chat.postMessage', body: JSON.stringify({ channel: p.channel, text: p.text }) }),
     },
-    {
-      id: 'add-reaction',
-      label: 'Añadir una reacción a un mensaje',
-      fields: [
-        { key: 'channel', label: 'Canal (ID)', placeholder: 'C0000000000' },
-        { key: 'timestamp', label: 'Marca de tiempo del mensaje', placeholder: '1234567890.123456' },
-        { key: 'name', label: 'Emoji', placeholder: 'thumbsup', default: 'thumbsup' },
-      ],
-      build: (p) => ({ method: 'POST', path: '/reactions.add', body: JSON.stringify({ channel: p.channel, timestamp: p.timestamp, name: p.name }) }),
-    },
+    // «Añadir una reacción» retirada (M58): exige el channel ID y el timestamp del mensaje, datos que un
+    // usuario no-dev no tiene de dónde sacar. Se reintroducirá cuando haya un disparador de Slack que
+    // provea ese `ts` (y entonces el timestamp saldrá de un paso anterior, no a mano).
   ],
   jira: [
     {
       id: 'comment',
       label: 'Comentar en el ticket',
       fields: [
-        { key: 'issueKey', label: 'Ticket', placeholder: 'KAN-123', default: '{{ticket.key}}' },
-        { key: 'comment', label: 'Comentario', placeholder: 'Escribe el comentario…', multiline: true },
+        { key: 'issueKey', label: 'Ticket', placeholder: 'KAN-123', default: '{{ticket.key}}', insert: true },
+        { key: 'comment', label: 'Comentario', placeholder: 'Escribe el comentario…', multiline: true, insert: true },
       ],
       build: (p, { cloudId }) => ({
         method: 'POST',
@@ -71,7 +69,7 @@ export const CONNECTOR_ACTIONS: Record<string, ConnectorAction[]> = {
       id: 'transition',
       label: 'Mover el ticket a otro estado',
       fields: [
-        { key: 'issueKey', label: 'Ticket', placeholder: 'KAN-123', default: '{{ticket.key}}' },
+        { key: 'issueKey', label: 'Ticket', placeholder: 'KAN-123', default: '{{ticket.key}}', insert: true },
         { key: 'transitionId', label: 'ID de la transición', placeholder: '21', default: '21' },
       ],
       build: (p, { cloudId }) => ({
@@ -85,7 +83,7 @@ export const CONNECTOR_ACTIONS: Record<string, ConnectorAction[]> = {
       label: 'Crear una incidencia',
       fields: [
         { key: 'projectKey', label: 'Proyecto', placeholder: 'KAN', default: 'KAN' },
-        { key: 'summary', label: 'Título', placeholder: 'Resumen de la incidencia', default: '{{ticket.summary}}' },
+        { key: 'summary', label: 'Título', placeholder: 'Resumen de la incidencia', default: '{{ticket.summary}}', insert: true },
         { key: 'issueType', label: 'Tipo', placeholder: 'Task', default: 'Task' },
       ],
       build: (p, { cloudId }) => ({
@@ -102,8 +100,8 @@ export const CONNECTOR_ACTIONS: Record<string, ConnectorAction[]> = {
       fields: [
         { key: 'owner', label: 'Propietario', placeholder: 'mi-org' },
         { key: 'repo', label: 'Repositorio', placeholder: 'mi-repo' },
-        { key: 'title', label: 'Título', placeholder: 'Título del issue' },
-        { key: 'body', label: 'Descripción', placeholder: 'Descripción…', multiline: true },
+        { key: 'title', label: 'Título', placeholder: 'Título del issue', insert: true },
+        { key: 'body', label: 'Descripción', placeholder: 'Descripción…', multiline: true, insert: true },
       ],
       build: (p) => ({ method: 'POST', path: `/repos/${p.owner}/${p.repo}/issues`, body: JSON.stringify({ title: p.title, body: p.body }) }),
     },
@@ -115,7 +113,7 @@ export const CONNECTOR_ACTIONS: Record<string, ConnectorAction[]> = {
       fields: [
         { key: 'spreadsheetId', label: 'ID de la hoja de cálculo', placeholder: '1AbC…  (está en la URL de la hoja)' },
         { key: 'range', label: 'Pestaña y celda', placeholder: 'Hoja 1!A1', default: 'A1' },
-        { key: 'values', label: 'Valores de la fila (separa columnas con | )', placeholder: '{{ticket.key}} | {{ticket.summary}} | nuevo', multiline: true },
+        { key: 'values', label: 'Valores de la fila (separa columnas con | )', placeholder: '{{ticket.key}} | {{ticket.summary}} | nuevo', multiline: true, insert: true },
       ],
       build: (p) => ({
         method: 'POST',
@@ -130,9 +128,9 @@ export const CONNECTOR_ACTIONS: Record<string, ConnectorAction[]> = {
       id: 'send-email',
       label: 'Enviar un correo',
       fields: [
-        { key: 'to', label: 'Para', placeholder: 'persona@empresa.com' },
-        { key: 'subject', label: 'Asunto', placeholder: 'Ticket {{ticket.key}}' },
-        { key: 'text', label: 'Mensaje', placeholder: 'Escribe el correo…', multiline: true },
+        { key: 'to', label: 'Para', placeholder: 'persona@empresa.com', insert: true },
+        { key: 'subject', label: 'Asunto', placeholder: 'Ticket {{ticket.key}}', insert: true },
+        { key: 'text', label: 'Mensaje', placeholder: 'Escribe el correo…', multiline: true, insert: true },
       ],
       // El executor de Gmail transforma {to,subject,text} al formato RFC822/base64 que exige la API (M28).
       build: (p) => ({ method: 'POST', path: '/users/me/messages/send', body: JSON.stringify({ to: p.to, subject: p.subject, text: p.text }) }),
@@ -148,7 +146,7 @@ export const CONNECTOR_ACTIONS: Record<string, ConnectorAction[]> = {
     {
       id: 'get-message',
       label: 'Leer un correo (por ID)',
-      fields: [{ key: 'messageId', label: 'ID del correo', placeholder: '{{connector:buscar.json.messages.0.id}}' }],
+      fields: [{ key: 'messageId', label: 'ID del correo', placeholder: '{{connector:buscar.json.messages.0.id}}', insert: true }],
       // format=metadata + cabeceras: devuelve remitente/asunto/fecha + un fragmento del cuerpo (snippet).
       build: (p) => ({
         method: 'GET',
@@ -161,7 +159,7 @@ export const CONNECTOR_ACTIONS: Record<string, ConnectorAction[]> = {
       id: 'create-event',
       label: 'Crear un evento',
       fields: [
-        { key: 'summary', label: 'Título', placeholder: 'Reunión de seguimiento', default: '{{ticket.summary}}' },
+        { key: 'summary', label: 'Título', placeholder: 'Reunión de seguimiento', default: '{{ticket.summary}}', insert: true },
         { key: 'start', label: 'Inicio', placeholder: '2026-01-15T09:00:00', default: '2026-01-15T09:00:00' },
         { key: 'end', label: 'Fin', placeholder: '2026-01-15T10:00:00', default: '2026-01-15T10:00:00' },
         { key: 'timeZone', label: 'Zona horaria', placeholder: 'Europe/Madrid', default: 'UTC' },
@@ -182,7 +180,7 @@ export const CONNECTOR_ACTIONS: Record<string, ConnectorAction[]> = {
     {
       id: 'query',
       label: 'Consultar registros (SOQL)',
-      fields: [{ key: 'soql', label: 'Consulta SOQL', placeholder: 'SELECT Id, Name FROM Account LIMIT 10', multiline: true }],
+      fields: [{ key: 'soql', label: 'Consulta SOQL', placeholder: 'SELECT Id, Name FROM Account LIMIT 10', multiline: true, insert: true }],
       build: (p) => ({ method: 'GET', path: `/services/data/v60.0/query?q=${encodeURIComponent(p.soql ?? '')}` }),
     },
     {
@@ -190,7 +188,7 @@ export const CONNECTOR_ACTIONS: Record<string, ConnectorAction[]> = {
       label: 'Crear un registro',
       fields: [
         { key: 'object', label: 'Objeto', placeholder: 'Account · Contact · Opportunity · Lead', default: 'Account' },
-        { key: 'fields', label: 'Campos (JSON · admite {{variables}})', placeholder: '{"Name":"{{code:datos.output.name}}"}', multiline: true },
+        { key: 'fields', label: 'Campos (JSON · admite {{variables}})', placeholder: '{"Name":"{{code:datos.output.name}}"}', multiline: true, insert: true },
       ],
       build: (p) => ({ method: 'POST', path: `/services/data/v60.0/sobjects/${p.object || 'Account'}`, body: p.fields || '{}' }),
     },
@@ -199,8 +197,8 @@ export const CONNECTOR_ACTIONS: Record<string, ConnectorAction[]> = {
       label: 'Actualizar un registro',
       fields: [
         { key: 'object', label: 'Objeto', placeholder: 'Opportunity', default: 'Account' },
-        { key: 'id', label: 'Id del registro', placeholder: '006XXXXXXXXXXXX' },
-        { key: 'fields', label: 'Campos a cambiar (JSON · admite {{variables}})', placeholder: '{"StageName":"Closed Won"}', multiline: true },
+        { key: 'id', label: 'Id del registro', placeholder: '006XXXXXXXXXXXX', insert: true },
+        { key: 'fields', label: 'Campos a cambiar (JSON · admite {{variables}})', placeholder: '{"StageName":"Closed Won"}', multiline: true, insert: true },
       ],
       build: (p) => ({ method: 'PATCH', path: `/services/data/v60.0/sobjects/${p.object || 'Account'}/${p.id}`, body: p.fields || '{}' }),
     },
@@ -216,7 +214,7 @@ export const CONNECTOR_ACTIONS: Record<string, ConnectorAction[]> = {
       id: 'create-folder',
       label: 'Crear una carpeta',
       fields: [
-        { key: 'name', label: 'Nombre', placeholder: 'Facturas procesadas' },
+        { key: 'name', label: 'Nombre', placeholder: 'Facturas procesadas', insert: true },
         { key: 'parentId', label: 'Carpeta padre (Id, opcional)', placeholder: '1AbC…' },
       ],
       build: (p) => ({

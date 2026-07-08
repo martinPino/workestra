@@ -133,9 +133,16 @@ export function ConnectorForm({ value, onChange }: { value: Record<string, unkno
           <label key={f.key} className="flex flex-col gap-1">
             <span className="text-[11px] font-medium text-txt-secondary">{t(f.label)}</span>
             {f.source === 'slack-channel' ? (
+              // Desplegable de canales reales (M57).
               <SlackChannelSelect connectorId={connectorId} value={params[f.key] ?? ''} onChange={(v) => onField(f.key, v)} />
-            ) : (
+            ) : f.insert ? (
+              // Solo los campos de CONTENIDO/referencia llevan el insertor «+ Insertar dato de un paso» (M58).
               <VarField value={params[f.key] ?? ''} onChange={(v) => onField(f.key, v)} vars={vars} multiline={f.multiline} placeholder={f.placeholder} />
+            ) : f.multiline ? (
+              // Identificadores: campo plano, sin insertor (no tiene sentido «insertar un dato de un paso»).
+              <textarea value={params[f.key] ?? ''} placeholder={f.placeholder} onChange={(e) => onField(f.key, e.target.value)} rows={3} className={`${inputBase} resize-none`} />
+            ) : (
+              <input type="text" value={params[f.key] ?? ''} placeholder={f.placeholder} onChange={(e) => onField(f.key, e.target.value)} className={inputBase} />
             )}
           </label>
         ))}
