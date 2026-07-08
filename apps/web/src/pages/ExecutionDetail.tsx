@@ -224,10 +224,16 @@ export function ExecutionDetail() {
     return map;
   }, [state.nodes]);
 
+  const errorMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const [k, v] of Object.entries(state.nodes)) if (v.error) map[k] = v.error;
+    return map;
+  }, [state.nodes]);
+
   const { nodes, edges } = useMemo(() => {
     if (!data?.version?.graph) return { nodes: [], edges: [] };
-    return docToReactFlow(workflowGraphToDoc(data.version.graph), statusMap);
-  }, [data?.version?.graph, statusMap]);
+    return docToReactFlow(workflowGraphToDoc(data.version.graph), statusMap, false, errorMap);
+  }, [data?.version?.graph, statusMap, errorMap]);
 
   if (isLoading) {
     return (

@@ -45,6 +45,8 @@ interface EditorState {
   clipboard: { nodes: EditorNode[]; edges: EditorEdge[] } | null;
   execStatus: string;
   nodeStatus: Record<string, NodeRunStatus>;
+  /** M66: mensaje de error por nodo (para el tooltip del sello ✗). */
+  nodeErrors: Record<string, string>;
   plan?: PlanState;
   lastError: string | null;
 
@@ -82,7 +84,7 @@ interface EditorState {
   setError(msg: string | null): void;
 
   beginExec(): void;
-  applyExec(status: string, nodeStatus: Record<string, NodeRunStatus>, plan?: PlanState): void;
+  applyExec(status: string, nodeStatus: Record<string, NodeRunStatus>, nodeErrors: Record<string, string>, plan?: PlanState): void;
   resetExec(): void;
 }
 
@@ -97,6 +99,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   clipboard: null,
   execStatus: 'idle',
   nodeStatus: {},
+  nodeErrors: {},
   lastError: null,
   canUndo: false,
   canRedo: false,
@@ -241,7 +244,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setError: (msg) => set({ lastError: msg }),
 
-  beginExec: () => set({ execStatus: 'RUNNING', nodeStatus: {}, plan: undefined, lastError: null }),
-  applyExec: (status, nodeStatus, plan) => set({ execStatus: status, nodeStatus, plan }),
-  resetExec: () => set({ execStatus: 'idle', nodeStatus: {}, plan: undefined }),
+  beginExec: () => set({ execStatus: 'RUNNING', nodeStatus: {}, nodeErrors: {}, plan: undefined, lastError: null }),
+  applyExec: (status, nodeStatus, nodeErrors, plan) => set({ execStatus: status, nodeStatus, nodeErrors, plan }),
+  resetExec: () => set({ execStatus: 'idle', nodeStatus: {}, nodeErrors: {}, plan: undefined }),
 }));

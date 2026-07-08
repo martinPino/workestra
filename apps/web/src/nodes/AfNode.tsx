@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
-import { Square, Crown, TriangleAlert, Settings2, Power, Copy, Trash2, Check } from 'lucide-react';
+import { Square, Crown, TriangleAlert, Settings2, Power, Copy, Trash2 } from 'lucide-react';
 import type { AfNodeData } from '../graph';
 import { getNodeType } from '../editor/node-types';
 import { nodeSetupIssues } from '../editor/node-issues';
@@ -10,6 +10,7 @@ import { agentGradient, agentInitial } from '../lib/agent-avatar';
 import { useEditorStore } from '../editor/store';
 import { cn } from '../lib/cn';
 import { AgentToolsPort } from './AgentToolsPort';
+import { NodeStatusBadge } from './NodeStatusBadge';
 import { useT } from '../i18n';
 
 // Color de borde + glow por estado de ejecución (M65). El aro de energía giratorio, el pulso de
@@ -109,16 +110,9 @@ export function AfNode({ id, data, selected }: NodeProps<AfNodeData>) {
           {longRun && <span aria-hidden className="af-sonar" />}
         </>
       )}
-      {/* Éxito (M65): check que aparece con un pop. Un nodo que terminó bien no tiene avisos de config,
-          así que no colisiona con la badge de «falta configurar» (misma esquina). */}
-      {status === 'succeeded' && (
-        <span
-          aria-hidden
-          className="af-check absolute -right-2 -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-success text-[#05140e] shadow-[0_0_10px_rgb(var(--success)/0.55)]"
-        >
-          <Check size={12} strokeWidth={3.25} />
-        </span>
-      )}
+      {/* Sello de resultado (M66): tras ejecutarse, ✓ verde (éxito) o ✗ roja (fallo) abajo a la derecha.
+          Si falló, al pasar el cursor abre un globo con el error / lo que falta. */}
+      {(status === 'succeeded' || status === 'failed') && <NodeStatusBadge status={status} error={data.error} />}
 
       {/* Barra flotante de controles (M38, estilo n8n): aparece SOLO al pasar el ratón, y solo en el editor.
           El `pb-1.5` del contenedor externo hace de puente sin hueco entre el nodo y la barra. */}

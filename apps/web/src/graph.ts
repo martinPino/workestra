@@ -6,6 +6,8 @@ import type { GraphDoc, EditorNode } from './editor/model';
 export interface AfNodeData {
   kind: EditorNode['kind'];
   status?: NodeRunStatus;
+  /** M66: mensaje de error del paso (si `status === 'failed'`) → tooltip del sello ✗. */
+  error?: string;
   /** Config del nodo: la carta la usa para resolver identidad (p. ej. el agente elegido). */
   config?: Record<string, unknown>;
   /** M38: paso desactivado (se pinta atenuado; el motor lo salta). */
@@ -31,6 +33,7 @@ export function docToReactFlow(
   doc: GraphDoc,
   nodeStatus: Record<string, NodeRunStatus>,
   editable = false,
+  nodeErrors: Record<string, string> = {},
 ): { nodes: RFNode[]; edges: RFEdge[] } {
   const commentNodes: RFNode[] = doc.comments.map((c) => ({
     id: c.id,
@@ -46,7 +49,7 @@ export function docToReactFlow(
     id: n.id,
     type: 'af',
     position: n.position,
-    data: { kind: n.kind, status: nodeStatus[n.id], config: n.config, disabled: n.disabled, editable } satisfies AfNodeData,
+    data: { kind: n.kind, status: nodeStatus[n.id], error: nodeErrors[n.id], config: n.config, disabled: n.disabled, editable } satisfies AfNodeData,
   }));
   const edges: RFEdge[] = doc.edges.map((e) => {
     // Estado en vivo de la arista (M65). La luz «viaja» SOLO hacia un destino que se está ejecutando

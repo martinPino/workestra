@@ -69,6 +69,7 @@ export function Editor() {
   const { id } = useParams();
   const doc = useEditorStore((s) => s.history.doc);
   const nodeStatus = useEditorStore((s) => s.nodeStatus);
+  const nodeErrors = useEditorStore((s) => s.nodeErrors);
   const selection = useEditorStore((s) => s.selection);
   const execStatus = useEditorStore((s) => s.execStatus);
   const workflowId = useEditorStore((s) => s.workflowId);
@@ -103,7 +104,7 @@ export function Editor() {
   }, []);
   const nodeTypes = useMemo(() => ({ af: AfNode, comment: CommentNode }), []);
   const edgeTypes = useMemo(() => ({ animated: AnimatedEdge }), []); // arista con luz viajera (M65)
-  const base = useMemo(() => docToReactFlow(doc, nodeStatus, true), [doc, nodeStatus]); // editable → barra flotante (M38)
+  const base = useMemo(() => docToReactFlow(doc, nodeStatus, true, nodeErrors), [doc, nodeStatus, nodeErrors]); // editable → barra flotante (M38)
 
   // «Falta configurar» (M26): pasos que aún no funcionarían (app sin conectar, asistente sin elegir…).
   // Se pintan como aviso en cada nodo (AfNode) y bloquean Probar/Activar con un mensaje claro.
@@ -286,8 +287,12 @@ export function Editor() {
         buffer.push(e);
         const state = reduceExecution(buffer);
         const map: Record<string, NodeRunStatus> = {};
-        for (const [k, v] of Object.entries(state.nodes)) map[k] = v.status;
-        s().applyExec(state.status, map, state.plan);
+        const errs: Record<string, string> = {};
+        for (const [k, v] of Object.entries(state.nodes)) {
+          map[k] = v.status;
+          if (v.error) errs[k] = v.error;
+        }
+        s().applyExec(state.status, map, errs, state.plan);
         if (state.status === 'SUCCEEDED' || state.status === 'FAILED') setTimeout(unsub, 400);
       });
     } catch {
