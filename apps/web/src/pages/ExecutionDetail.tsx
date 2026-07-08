@@ -24,6 +24,7 @@ import { api } from '../lib/api';
 import { docToReactFlow, workflowGraphToDoc } from '../graph';
 import { AfNode } from '../nodes/AfNode';
 import { CommentNode } from '../nodes/CommentNode';
+import { AnimatedEdge } from '../edges/AnimatedEdge';
 import { Badge, IconButton, EmptyState } from '../ui';
 import { ReviewActions } from './Executions';
 import { statusLabel } from '../lib/labels';
@@ -157,6 +158,7 @@ export function ExecutionDetail() {
 
   const rf = useRef<ReactFlowInstance | null>(null);
   const nodeTypes = useMemo(() => ({ af: AfNode, comment: CommentNode }), []);
+  const edgeTypes = useMemo(() => ({ animated: AnimatedEdge }), []); // arista con luz viajera (M65)
   const timelineRef = useRef<HTMLDivElement | null>(null);
 
   // Stream ACUMULADO (M9): se siembra con la carga inicial y crece con el delta del poll — nunca se
@@ -277,6 +279,7 @@ export function ExecutionDetail() {
               nodes={nodes}
               edges={edges}
               nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
               onInit={(inst) => {
                 rf.current = inst;
                 setTimeout(() => inst.fitView({ padding: 0.25 }), 0);

@@ -21,6 +21,7 @@
   --primary-strong: 99 102 241; /* indigo-500 */
   --secondary: 45 212 191; /* teal-400 */
   --accent: 217 70 239; /* fuchsia-500 */
+  --flow: 79 140 255; /* azul eléctrico #4F8CFF — estado «en vivo/activo» de la ejecución (M65) */
 
   --success: 52 211 153;
   --warning: 251 191 36;
@@ -47,6 +48,7 @@
   --primary-strong: 79 70 229;
   --secondary: 13 148 136;
   --accent: 192 38 211;
+  --flow: 37 99 235; /* azul-600: mismo rol «en vivo» pero con contraste sobre fondo claro */
 
   --success: 16 185 129;
   --warning: 217 119 6;
@@ -136,12 +138,6 @@ body {
   }
 }
 
-@keyframes dash {
-  to {
-    stroke-dashoffset: -16;
-  }
-}
-
 /* Gradiente de marca reutilizable */
 .brand-gradient {
   background: linear-gradient(135deg, rgb(var(--primary)), rgb(var(--accent)));
@@ -160,11 +156,6 @@ body {
 .react-flow__edge-path {
   stroke: rgb(var(--border-strong));
   stroke-width: 1.5;
-}
-.react-flow__edge.animated .react-flow__edge-path {
-  stroke: rgb(var(--primary) / 0.7);
-  stroke-dasharray: 6;
-  animation: dash 0.6s linear infinite;
 }
 .react-flow__handle {
   border: none;
@@ -194,4 +185,185 @@ body {
   overflow: hidden;
   border: 1px solid rgb(var(--border));
   background: rgb(var(--surface)) !important;
+}
+
+/* ==================== Ejecución en vivo (M65, estilo n8n) ==================== */
+/* La ejecución «viaja» por el flujo. Todo con propiedades compositables (transform/opacity/
+   filter) y SOLO los nodos/aristas ACTIVOS montan animación → escala a +200 nodos. */
+
+/* Ángulo registrado para poder INTERPOLAR el giro del conic-gradient sin rotar la caja
+   (rotar la caja deformaría el anillo redondeado). Fallback: valor estático → anillo sin girar. */
+@property --af-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes af-spin-angle {
+  to {
+    --af-angle: 360deg;
+  }
+}
+
+/* Aro de energía girando alrededor del nodo en ejecución (conic-gradient enmascarado a un anillo). */
+.af-ring {
+  --af-angle: 0deg; /* fallback si @property no está soportado: anillo estático (no gira) */
+  position: absolute;
+  inset: -2px;
+  border-radius: 16px;
+  padding: 2px;
+  pointer-events: none;
+  background: conic-gradient(
+    from var(--af-angle),
+    rgb(var(--flow) / 0) 0deg,
+    rgb(var(--flow) / 0) 205deg,
+    rgb(var(--flow) / 0.12) 250deg,
+    rgb(var(--flow) / 0.85) 322deg,
+    rgb(var(--flow)) 352deg,
+    rgb(var(--flow) / 0) 360deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  filter: drop-shadow(0 0 4px rgb(var(--flow) / 0.65));
+  animation: af-spin-angle 1.15s linear infinite;
+}
+
+/* Glow que «respira» (nodo lento >800ms → «está pensando»). Anima opacity/scale (GPU). */
+@keyframes af-breathe {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(0.99);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.015);
+  }
+}
+.af-glow {
+  position: absolute;
+  inset: -3px;
+  border-radius: 17px;
+  pointer-events: none;
+  box-shadow: 0 0 20px 2px rgb(var(--flow) / 0.4);
+  animation: af-breathe 1.9s ease-in-out infinite;
+}
+
+/* Pulso «sonar» que se expande (refuerza «sigue trabajando» en nodos lentos). */
+@keyframes af-sonar {
+  0% {
+    opacity: 0.5;
+    transform: scale(0.96);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.14);
+  }
+}
+.af-sonar {
+  position: absolute;
+  inset: -2px;
+  border-radius: 16px;
+  pointer-events: none;
+  border: 1.5px solid rgb(var(--flow) / 0.6);
+  animation: af-sonar 1.6s ease-out infinite;
+}
+
+/* Pulso de LLEGADA: al empezar a ejecutarse, un destello sale del borde (una sola vez). */
+@keyframes af-arrival {
+  0% {
+    opacity: 0.9;
+    box-shadow: 0 0 0 0 rgb(var(--flow) / 0.5);
+  }
+  100% {
+    opacity: 0;
+    box-shadow: 0 0 0 14px rgb(var(--flow) / 0);
+  }
+}
+.af-arrival {
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  pointer-events: none;
+  animation: af-arrival 0.6s ease-out;
+}
+
+/* Error: sacudida horizontal breve (una sola vez). */
+@keyframes af-shake-kf {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  15% {
+    transform: translateX(-4px);
+  }
+  30% {
+    transform: translateX(4px);
+  }
+  45% {
+    transform: translateX(-3px);
+  }
+  60% {
+    transform: translateX(3px);
+  }
+  75% {
+    transform: translateX(-2px);
+  }
+  90% {
+    transform: translateX(2px);
+  }
+}
+.af-shake {
+  animation: af-shake-kf 0.4s ease-in-out;
+}
+
+/* Éxito: el check aparece con un pop. */
+@keyframes af-check-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0) rotate(-25deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.18) rotate(0deg);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.af-check {
+  animation: af-check-pop 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Aristas: la luz «viaja» del origen al destino (haz recorriendo la curva bézier). El <path> lleva
+   pathLength=100, así el patrón es RELATIVO a la longitud de cada arista → un solo haz la recorre
+   entera, sea corta o larga (6% encendido, 94% apagado). */
+@keyframes af-flow-travel {
+  from {
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.af-flow-line {
+  stroke: rgb(var(--flow));
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-dasharray: 6 94;
+  filter: drop-shadow(0 0 3px rgb(var(--flow) / 0.9));
+  animation: af-flow-travel 0.9s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .af-ring,
+  .af-glow,
+  .af-sonar,
+  .af-arrival,
+  .af-shake,
+  .af-check,
+  .af-flow-line {
+    animation: none !important;
+  }
 }

@@ -21,6 +21,7 @@ export default {
         },
         secondary: withAlpha('--secondary'),
         accent: withAlpha('--accent'),
+        flow: withAlpha('--flow'),
         success: withAlpha('--success'),
         warning: withAlpha('--warning'),
         danger: withAlpha('--danger'),

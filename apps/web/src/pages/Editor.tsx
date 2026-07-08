@@ -22,6 +22,7 @@ import { subscribeExecution } from '../lib/socket';
 import { computeLayout } from '../lib/layout';
 import { AfNode } from '../nodes/AfNode';
 import { CommentNode } from '../nodes/CommentNode';
+import { AnimatedEdge } from '../edges/AnimatedEdge';
 import { PropertiesPanel } from '../components/PropertiesPanel';
 import { AiChatPanel } from '../components/AiChatPanel';
 import { SubtaskTree } from '../components/SubtaskTree';
@@ -101,6 +102,7 @@ export function Editor() {
     }
   }, []);
   const nodeTypes = useMemo(() => ({ af: AfNode, comment: CommentNode }), []);
+  const edgeTypes = useMemo(() => ({ animated: AnimatedEdge }), []); // arista con luz viajera (M65)
   const base = useMemo(() => docToReactFlow(doc, nodeStatus, true), [doc, nodeStatus]); // editable → barra flotante (M38)
 
   // «Falta configurar» (M26): pasos que aún no funcionarían (app sin conectar, asistente sin elegir…).
@@ -427,6 +429,7 @@ export function Editor() {
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
             onInit={(inst) => (rf.current = inst)}
             onNodesChange={onNodesChange}
             onNodeDragStart={onNodeDragStart}

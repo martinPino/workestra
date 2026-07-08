@@ -1,5 +1,6 @@
+import { useEffect, useState } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
-import { Square, Crown, TriangleAlert, Settings2, Power, Copy, Trash2 } from 'lucide-react';
+import { Square, Crown, TriangleAlert, Settings2, Power, Copy, Trash2, Check } from 'lucide-react';
 import type { AfNodeData } from '../graph';
 import { getNodeType } from '../editor/node-types';
 import { nodeSetupIssues } from '../editor/node-issues';
@@ -7,15 +8,24 @@ import { ProviderLogo, hasProviderLogo } from '../lib/provider-logos';
 import { useAgents, useConnectors } from '../lib/hooks';
 import { agentGradient, agentInitial } from '../lib/agent-avatar';
 import { useEditorStore } from '../editor/store';
+import { cn } from '../lib/cn';
 import { AgentToolsPort } from './AgentToolsPort';
 import { useT } from '../i18n';
 
-const STATUS_RING: Record<string, string> = {
-  running: 'ring-2 ring-primary shadow-[0_0_18px_rgb(var(--primary)/0.35)]',
-  waiting: 'ring-2 ring-warning shadow-[0_0_18px_rgb(var(--warning)/0.4)] animate-pulse',
-  succeeded: 'ring-2 ring-success shadow-[0_0_18px_rgb(var(--success)/0.35)]',
-  failed: 'ring-2 ring-danger shadow-[0_0_18px_rgb(var(--danger)/0.35)]',
-  skipped: 'opacity-60',
+// Color de borde + glow por estado de ejecución (M65). El aro de energía giratorio, el pulso de
+// llegada y el «sonar» de los nodos lentos son CAPAS superpuestas (ver más abajo), no `ring-*`, para
+// no chocar con el anillo de selección (`ring-2 ring-primary`).
+const STATUS_BORDER: Record<string, string> = {
+  running: 'border-flow/70',
+  waiting: 'border-warning/70',
+  succeeded: 'border-success/70',
+  failed: 'border-danger/80',
+};
+const STATUS_GLOW: Record<string, string> = {
+  // succeeded/failed conservan un glow persistente = «rastro de ejecución» (nodo ya recorrido).
+  waiting: 'shadow-[0_0_16px_rgb(var(--warning)/0.35)] animate-pulse',
+  succeeded: 'shadow-[0_0_14px_rgb(var(--success)/0.28)]',
+  failed: 'shadow-[0_0_18px_rgb(var(--danger)/0.4)]',
 };
 
 const HANDLE_CLASS = '!h-2.5 !w-2.5 !border-2 !border-border !bg-elevated';
@@ -26,8 +36,23 @@ export function AfNode({ id, data, selected }: NodeProps<AfNodeData>) {
   const def = getNodeType(data.kind);
   const Icon = def?.icon ?? Square;
   const disabled = !!data.disabled;
-  const statusRing = data.status ? (STATUS_RING[data.status] ?? '') : '';
-  const selectedRing = selected ? 'ring-2 ring-primary' : '';
+  const status = data.status;
+  const running = status === 'running';
+  // «Está pensando» (M65): a los 800ms de ejecución el nodo escala su animación (glow que respira +
+  // pulso sonar) para que NUNCA parezca congelado, aunque una IA tarde 20s. Reloj de cliente: el
+  // estado reducido no lleva marcas de tiempo (reducer puro), así que lo cronometramos aquí.
+  const [longRun, setLongRun] = useState(false);
+  useEffect(() => {
+    if (!running) {
+      setLongRun(false);
+      return;
+    }
+    const timer = setTimeout(() => setLongRun(true), 800);
+    return () => clearTimeout(timer);
+  }, [running]);
+
+  const borderCls = (status && STATUS_BORDER[status]) || 'border-border';
+  const glowCls = (status && STATUS_GLOW[status]) || '';
   // Los pasos estructurales (inicio/fin) no se pueden desactivar: el motor los necesita.
   const structural = data.kind === 'trigger' || data.kind === 'end';
 
@@ -63,8 +88,38 @@ export function AfNode({ id, data, selected }: NodeProps<AfNodeData>) {
 
   return (
     <div
-      className={`group relative min-w-[156px] max-w-[220px] rounded-xl border border-border bg-elevated px-2.5 py-2 text-xs text-txt-primary shadow-card transition-all duration-150 hover:border-border-strong ${disabled ? 'opacity-50' : ''} ${statusRing} ${selectedRing}`}
+      className={cn(
+        'group relative min-w-[156px] max-w-[220px] rounded-xl border bg-elevated px-2.5 py-2 text-xs text-txt-primary shadow-card transition-all duration-200',
+        borderCls,
+        glowCls,
+        disabled && 'opacity-50',
+        status === 'skipped' && 'opacity-55',
+        status === 'failed' && 'af-shake',
+        selected && 'ring-2 ring-primary',
+        !status && 'hover:border-border-strong',
+      )}
     >
+      {/* Capas de ejecución en vivo (M65): huecas/exteriores y pointer-events-none → no tapan el
+          contenido ni la barra flotante (z-20) / avisos (z-10). Solo se montan mientras el nodo corre. */}
+      {running && (
+        <>
+          <span aria-hidden className="af-arrival" />
+          <span aria-hidden className="af-ring" />
+          {longRun && <span aria-hidden className="af-glow" />}
+          {longRun && <span aria-hidden className="af-sonar" />}
+        </>
+      )}
+      {/* Éxito (M65): check que aparece con un pop. Un nodo que terminó bien no tiene avisos de config,
+          así que no colisiona con la badge de «falta configurar» (misma esquina). */}
+      {status === 'succeeded' && (
+        <span
+          aria-hidden
+          className="af-check absolute -right-2 -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-success text-[#05140e] shadow-[0_0_10px_rgb(var(--success)/0.55)]"
+        >
+          <Check size={12} strokeWidth={3.25} />
+        </span>
+      )}
+
       {/* Barra flotante de controles (M38, estilo n8n): aparece SOLO al pasar el ratón, y solo en el editor.
           El `pb-1.5` del contenedor externo hace de puente sin hueco entre el nodo y la barra. */}
       {data.editable && (
@@ -128,7 +183,10 @@ export function AfNode({ id, data, selected }: NodeProps<AfNodeData>) {
         </span>
       )}
 
-      {issues.length > 0 && (
+      {/* Aviso «falta configurar» SOLO en reposo (sin estado de ejecución): durante/tras un run manda el
+          estado del run (evita solaparse con el check de éxito en la misma esquina, y en el replay una
+          ejecución antigua no debe mostrar avisos de config del workspace actual). */}
+      {issues.length > 0 && !status && (
         <span
           title={issues.map((i) => t(i)).join('\n')}
           aria-label={`${t('Falta configurar este paso')}: ${issues.map((i) => t(i)).join('. ')}`}

@@ -20,6 +20,11 @@ export interface CommentNodeData {
   width?: number;
   height?: number;
 }
+/** Estado de animación de una arista (M65): la luz «viaja» cuando active; estela tenue cuando traversed. */
+export interface FlowEdgeData {
+  active?: boolean;
+  traversed?: boolean;
+}
 
 /** GraphDoc -> nodos/aristas de React Flow (incluye comentarios como nodos tipo `comment`). */
 export function docToReactFlow(
@@ -43,13 +48,25 @@ export function docToReactFlow(
     position: n.position,
     data: { kind: n.kind, status: nodeStatus[n.id], config: n.config, disabled: n.disabled, editable } satisfies AfNodeData,
   }));
-  const edges: RFEdge[] = doc.edges.map((e) => ({
-    id: e.id,
-    source: e.source,
-    target: e.target,
-    sourceHandle: e.sourceHandle ?? undefined,
-    animated: true,
-  }));
+  const edges: RFEdge[] = doc.edges.map((e) => {
+    // Estado en vivo de la arista (M65). La luz «viaja» SOLO hacia un destino que se está ejecutando
+    // AHORA (running): así no se queda encendida tras un fallo (destino que nunca arrancó → ausente),
+    // ni ilumina las ramas muertas de un router (aún sin arrancar) hasta que una se activa de verdad.
+    // La estela tenue (traversed) marca el camino que el flujo YA recorrió: destino que corrió, falló
+    // o está esperando aprobación. Un destino saltado o aún sin empezar deja la arista en reposo.
+    const src = nodeStatus[e.source];
+    const tgt = nodeStatus[e.target];
+    const active = src === 'succeeded' && tgt === 'running';
+    const traversed = src === 'succeeded' && (tgt === 'succeeded' || tgt === 'failed' || tgt === 'waiting');
+    return {
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      sourceHandle: e.sourceHandle ?? undefined,
+      type: 'animated',
+      data: { active, traversed } satisfies FlowEdgeData,
+    };
+  });
   return { nodes: [...commentNodes, ...graphNodes], edges };
 }
 
