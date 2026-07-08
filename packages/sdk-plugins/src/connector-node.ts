@@ -156,13 +156,32 @@ export class ConnectorNodeExecutor implements INodeExecutor {
       }
     }
 
-    const signal = AbortSignal.any([ctx.signal, AbortSignal.timeout(this.timeoutMs)]);
+    const runFetch = (bearer: string) =>
+      fetch(url, {
+        method,
+        headers: { ...headers, authorization: `Bearer ${bearer}` },
+        body,
+        signal: AbortSignal.any([ctx.signal, AbortSignal.timeout(this.timeoutMs)]),
+      });
     try {
-      const res = await fetch(url, { method, headers, body, signal });
+      let current = token;
+      let res = await runFetch(current);
+      // Refresh REACTIVO (M63): algunos proveedores (p. ej. Salesforce) NO mandan `expires_in`, así que el
+      // token caduca sin que `needsRefresh` lo sepa → 401 (INVALID_SESSION_ID). Al primer 401, si hay refresh
+      // token, renovamos, persistimos y REINTENTAMOS una vez. Así el conector no muere al expirar la sesión.
+      if (res.status === 401 && blob.refresh_token) {
+        const refreshed = await refreshAccessToken(connector.provider, blob, Date.now(), (u, i) => fetch(u, i as RequestInit));
+        if (refreshed && refreshed.access_token && refreshed.access_token !== current) {
+          blob = refreshed;
+          current = refreshed.access_token;
+          await this.secrets.set(ctx.workspaceId, connector.credentialsSecretId, serializeTokenBlob(refreshed)).catch(() => undefined);
+          res = await runFetch(current);
+        }
+      }
       const text = await res.text();
       // Redacta el propio token si el endpoint lo reflejara: nunca debe quedar en estado persistido.
-      const bodyPreview = text.slice(0, 4000).split(token).join('«redacted»');
-      const json = safeResponseJson(text, token); // respuesta parseada para {{connector:nodo.json.…}} (M28b)
+      const bodyPreview = text.slice(0, 4000).split(current).join('«redacted»');
+      const json = safeResponseJson(text, current); // respuesta parseada para {{connector:nodo.json.…}} (M28b)
       return store({ status: res.status, ok: res.ok, provider: connector.provider, bodyPreview, json });
     } catch (e) {
       return store({ error: e instanceof Error ? e.message : String(e) });
