@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { NodeConfigSchema, FieldSchema } from '../editor/node-types';
 import { useConnectors, useAgents } from '../lib/hooks';
+import { VarField, useAvailableVars } from './VarField';
 import { useT } from '../i18n';
 
 const inputBase =
@@ -146,6 +147,7 @@ export function SchemaForm({ schema, value, onChange }: Props) {
 
 function Field({ field, value, onChange }: { field: FieldSchema; value: unknown; onChange: (v: unknown) => void }) {
   const t = useT();
+  const vars = useAvailableVars();
   const base = inputBase;
 
   if (field.type === 'connector') {
@@ -187,14 +189,7 @@ function Field({ field, value, onChange }: { field: FieldSchema; value: unknown;
     const jsonError = field.format === 'json' ? validateJsonTemplate(text) : null;
     return (
       <>
-        <textarea
-          value={text}
-          placeholder={field.placeholder}
-          onChange={(e) => onChange(e.target.value)}
-          rows={3}
-          spellCheck={field.format === 'json' ? false : undefined}
-          className={`${base} resize-none ${jsonError ? 'border-danger/70 focus:border-danger/70 focus:ring-danger/20' : ''}`}
-        />
+        <VarField value={text} onChange={(v) => onChange(v)} vars={vars} multiline mono={field.format === 'json'} placeholder={field.placeholder} invalid={!!jsonError} />
         {field.format === 'json' && jsonError && (
           <span className="text-[11px] text-danger">{t('JSON inválido:')} {jsonError}</span>
         )}
@@ -204,5 +199,5 @@ function Field({ field, value, onChange }: { field: FieldSchema; value: unknown;
       </>
     );
   }
-  return <input type="text" value={String(value ?? '')} placeholder={field.placeholder} onChange={(e) => onChange(e.target.value)} className={base} />;
+  return <VarField value={String(value ?? '')} onChange={(v) => onChange(v)} vars={vars} placeholder={field.placeholder} />;
 }

@@ -3,6 +3,7 @@ import { ChevronRight } from 'lucide-react';
 import { CONNECTOR_ACTIONS, type ConnectorAction } from '../editor/connector-actions';
 import { ProviderLogo, hasProviderLogo } from '../lib/provider-logos';
 import { useConnectors } from '../lib/hooks';
+import { VarField, useAvailableVars } from './VarField';
 import { useT } from '../i18n';
 
 const inputBase =
@@ -22,6 +23,7 @@ function defaultsFor(a?: ConnectorAction): Record<string, string> {
  */
 export function ConnectorForm({ value, onChange }: { value: Record<string, unknown>; onChange: (v: Record<string, unknown>) => void }) {
   const t = useT();
+  const vars = useAvailableVars();
   const { data: connectors } = useConnectors();
   const list = connectors ?? [];
   const connectorId = String(value.connectorId ?? '');
@@ -96,11 +98,7 @@ export function ConnectorForm({ value, onChange }: { value: Record<string, unkno
         action.fields.map((f) => (
           <label key={f.key} className="flex flex-col gap-1">
             <span className="text-[11px] font-medium text-txt-secondary">{t(f.label)}</span>
-            {f.multiline ? (
-              <textarea value={params[f.key] ?? ''} placeholder={f.placeholder} onChange={(e) => onField(f.key, e.target.value)} rows={3} className={`${inputBase} resize-none`} />
-            ) : (
-              <input type="text" value={params[f.key] ?? ''} placeholder={f.placeholder} onChange={(e) => onField(f.key, e.target.value)} className={inputBase} />
-            )}
+            <VarField value={params[f.key] ?? ''} onChange={(v) => onField(f.key, v)} vars={vars} multiline={f.multiline} placeholder={f.placeholder} />
           </label>
         ))}
       {action && action.fields.length > 0 && (
@@ -132,7 +130,7 @@ export function ConnectorForm({ value, onChange }: { value: Record<string, unkno
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-[10px] uppercase tracking-wide text-txt-disabled">{t('Cuerpo (JSON)')}</span>
-            <textarea value={String(value.body ?? '')} onChange={(e) => setRaw('body', e.target.value)} rows={3} spellCheck={false} className={`${inputBase} resize-none font-mono`} />
+            <VarField value={String(value.body ?? '')} onChange={(v) => setRaw('body', v)} vars={vars} multiline mono />
           </label>
         </div>
       )}
