@@ -457,13 +457,30 @@ export function Editor() {
           >
             <SelectionSync />
             <Background variant={BackgroundVariant.Dots} gap={22} size={1.5} color="rgb(var(--border))" />
-            <MiniMap pannable zoomable nodeColor="rgb(var(--primary))" maskColor="rgb(var(--bg) / 0.6)" />
+            {/* Minimapa subido (M67) para dejar sitio a la burbuja flotante del chat en la esquina. */}
+            <MiniMap pannable zoomable nodeColor="rgb(var(--primary))" maskColor="rgb(var(--bg) / 0.6)" style={{ bottom: 84 }} />
             <Controls />
           </ReactFlow>
           {lastError && (
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-lg border border-border glass px-3 py-1.5 text-xs text-txt-primary shadow-pop">
               {lastError}
             </div>
+          )}
+          {/* Burbuja flotante del chat de IA (M67): lanzador en la esquina inferior derecha, además del
+              botón «IA» de la barra. Se oculta mientras el panel está abierto (el propio panel lo cierra). */}
+          {!aiChatOpen && (
+            <button
+              type="button"
+              onClick={() => {
+                setAiChatOpen(true);
+                setInspectorOpen(false); // panel derecho único: evita el solape
+              }}
+              aria-label={t('Abrir asistente de IA')}
+              title={t('Asistente de IA')}
+              className="group absolute bottom-4 right-4 z-20 flex h-14 w-14 items-center justify-center rounded-full brand-gradient text-white shadow-pop ring-1 ring-white/15 transition-transform hover:scale-105 active:scale-95"
+            >
+              <Sparkles size={22} className="transition-transform duration-200 group-hover:rotate-12" />
+            </button>
           )}
         </div>
 
