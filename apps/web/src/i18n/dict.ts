@@ -715,5 +715,6 @@ export const EN: Record<string, string> = {
   // --- M60: notas del lienzo (sticky) ---
   'Escribe tu nota. La 1ª línea es el título; usa «- » para viñetas.': 'Write your note. The 1st line is the title; use "- " for bullets.',
   'Doble clic para escribir…': 'Double-click to write…',
+  'Una nota adhesiva de color para anotar en el lienzo (no se ejecuta).': 'A colored sticky note to annotate the canvas (it does not run).',
   'Nueva nota\n- Escribe aquí un punto': 'New note\n- Write a point here',
 };

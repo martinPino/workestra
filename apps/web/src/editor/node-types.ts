@@ -87,6 +87,9 @@ registerNodeType({
   icon: NotebookPen,
   color: 'text-sky-400',
   category: 'logic',
+  // M62: paso de REGISTRO (dev). Fuera de la paleta para no confundir con la nota adhesiva del lienzo;
+  // sigue registrado para los flujos que ya lo usan (p. ej. el STARTER_DOC).
+  advanced: true,
   configSchema: {
     title: 'Anotar / registrar',
     fields: {

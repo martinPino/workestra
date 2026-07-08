@@ -74,6 +74,7 @@ export function Editor() {
   const t = useT();
 
   const rf = useRef<ReactFlowInstance | null>(null);
+  const canvasRef = useRef<HTMLDivElement>(null); // contenedor del lienzo → centrar lo añadido en la vista (M62)
   const dragStart = useRef<Record<string, { x: number; y: number }>>({});
   const [activated, setActivated] = useState(false);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle'); // indicador de autoguardado
@@ -178,7 +179,22 @@ export function Editor() {
     return () => window.removeEventListener('keydown', onKey);
   }, [s]);
 
-  const addNode = (kind: string) => s().addNodeOfKind(kind, { x: 220 + Math.random() * 220, y: 120 + Math.random() * 220 });
+  // Posición en coords del grafo del CENTRO de lo que se ve ahora (con jitter para no apilar). Antes se
+  // añadía en una posición fija (260,120) que, con el lienzo desplazado, caía FUERA de la vista (M62).
+  const centerPos = () => {
+    const r = canvasRef.current?.getBoundingClientRect();
+    const jitter = () => (Math.random() - 0.5) * 80;
+    if (rf.current && r) {
+      const p = rf.current.screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
+      return { x: p.x + jitter(), y: p.y + jitter() };
+    }
+    return { x: 260 + jitter(), y: 160 + jitter() };
+  };
+  const addNode = (kind: string) => s().addNodeOfKind(kind, centerPos());
+  const addNoteHere = () => {
+    s().addCommentAt(centerPos());
+    setPaletteOpen(false);
+  };
   const autoLayout = () => {
     s().applyLayout(computeLayout(s().history.doc));
     setTimeout(() => rf.current?.fitView({ duration: 300 }), 0);
@@ -305,7 +321,7 @@ export function Editor() {
           <Button size="sm" variant="subtle" onClick={autoLayout}>
             <LayoutGrid size={14} /> {t('Layout')}
           </Button>
-          <Button size="sm" variant="subtle" onClick={() => s().addCommentAt({ x: 260, y: 120 })}>
+          <Button size="sm" variant="subtle" onClick={addNoteHere}>
             <StickyNote size={14} /> {t('Nota')}
           </Button>
           <Button
@@ -360,6 +376,18 @@ export function Editor() {
             </IconButton>
           </div>
           <div className="flex flex-col gap-1.5">
+            {/* «Nota» (M62): NO es un paso del flujo — es una nota adhesiva de color en el lienzo. Va aquí,
+                donde el usuario busca bloques, y crea la sticky (no el nodo de registro, que confundía). */}
+            <button
+              onClick={addNoteHere}
+              className="group flex items-center gap-2.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-left text-xs text-txt-primary transition-all hover:border-border-strong hover:bg-elevated"
+            >
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-elevated text-amber-400 transition-transform group-hover:scale-105">
+                <StickyNote size={14} strokeWidth={2} />
+              </span>
+              <span className="font-medium">{t('Nota')}</span>
+              <HelpTip text={t('Una nota adhesiva de color para anotar en el lienzo (no se ejecuta).')} />
+            </button>
             {/* En producción se ocultan los bloques `advanced` (p. ej. HTTP crudo); en dev se ven todos. */}
             {listNodeTypes()
               .filter((nt) => import.meta.env.DEV || !nt.advanced)
@@ -389,7 +417,7 @@ export function Editor() {
         </aside>
 
         {/* Canvas */}
-        <div className="relative min-w-0 flex-1 bg-bg">
+        <div ref={canvasRef} className="relative min-w-0 flex-1 bg-bg">
           <ReactFlow
             nodes={nodes}
             edges={edges}
