@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
-import { Square, Crown, TriangleAlert, Settings2, Power, Copy, Trash2 } from 'lucide-react';
+import { Square, Crown, TriangleAlert, Settings2, Power, Copy, Trash2, Clock, UserRound, Webhook } from 'lucide-react';
 import type { AfNodeData } from '../graph';
 import { getNodeType } from '../editor/node-types';
 import { nodeSetupIssues } from '../editor/node-issues';
@@ -74,7 +74,25 @@ export function AfNode({ id, data, selected }: NodeProps<AfNodeData>) {
     data.kind === 'connector' && data.config?.connectorId
       ? connectors?.find((c) => c.id === String(data.config?.connectorId))?.provider
       : undefined;
-  const showLogo = hasProviderLogo(connectorProvider);
+
+  // Nodo Disparador (M72): el icono cuenta CÓMO arranca el flujo — el logo real de la app cuando lo
+  // dispara Jira/Google Drive, una persona si lo lanza el usuario a mano, un reloj si es por horario,
+  // y el icono de webhook para eventos externos. El `eventId` guarda la elección humana (ver TriggerForm);
+  // su prefijo antes del punto es el proveedor (`jira.issue_created` → `jira`).
+  let triggerProvider: string | undefined;
+  let TriggerIcon = Icon;
+  if (data.kind === 'trigger') {
+    const eventId = String(data.config?.eventId ?? '');
+    const provider = eventId.includes('.') ? eventId.slice(0, eventId.indexOf('.')) : '';
+    if (hasProviderLogo(provider)) triggerProvider = provider;
+    else if (eventId === 'schedule' || data.config?.event === 'cron') TriggerIcon = Clock;
+    else if (eventId === 'webhook' || data.config?.event === 'webhook') TriggerIcon = Webhook;
+    else TriggerIcon = UserRound; // manual (por defecto)
+  }
+
+  // Un logo de marca (conector destino o disparador de app) va sobre fondo blanco; el resto usa el acento del nodo.
+  const logoProvider = triggerProvider ?? (hasProviderLogo(connectorProvider) ? connectorProvider : undefined);
+  const showLogo = !!logoProvider;
 
   // «Falta configurar» (M26): avisos visibles en el propio nodo. Un paso DESACTIVADO no molesta con avisos
   // (no se va a ejecutar), así que se ocultan mientras esté apagado.
@@ -209,7 +227,7 @@ export function AfNode({ id, data, selected }: NodeProps<AfNodeData>) {
               showLogo ? 'bg-white text-neutral-900' : `bg-card ${def?.color ?? 'text-txt-primary'}`
             }`}
           >
-            {showLogo ? <ProviderLogo provider={connectorProvider} size={16} /> : <Icon size={15} strokeWidth={2} />}
+            {showLogo ? <ProviderLogo provider={logoProvider} size={16} /> : <TriggerIcon size={15} strokeWidth={2} />}
           </span>
           <span className="truncate font-medium text-txt-primary">{def?.label ? t(def.label) : data.kind}</span>
         </div>
