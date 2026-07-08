@@ -51,9 +51,13 @@ export function Agents() {
     if (!isDesktop) setChatOpen(false);
   };
 
-  // Al recibir un borrador de la IA, lo aplicamos y llevamos la vista al formulario para revisarlo.
+  // Al abrir el formulario (nuevo, editar o borrador de IA) subimos la vista hasta él. Con rAF esperamos a
+  // que el form monte y el navegador reajuste el scroll (scroll-anchoring, porque el form aparece ARRIBA del
+  // viewport); si no, la animación «smooth» compite con ese reajuste y se ve a tirones. Salto directo = fiable.
   useEffect(() => {
-    if (draftNonce > 0) formWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (draftNonce === 0) return undefined;
+    const raf = requestAnimationFrame(() => formWrapRef.current?.scrollIntoView({ block: 'start' }));
+    return () => cancelAnimationFrame(raf);
   }, [draftNonce]);
 
   return (
