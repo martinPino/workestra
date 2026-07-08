@@ -25,6 +25,7 @@ import {
   addComment,
   updateComment,
   setCommentColor,
+  setCommentSize,
   removeComment,
   replaceGraph as replaceGraphCmd,
   type Move,
@@ -72,6 +73,10 @@ interface EditorState {
   addCommentAt(position: { x: number; y: number }): void;
   updateCommentText(id: string, text: string): void;
   setCommentColorById(id: string, color: string): void;
+  /** Confirma el redimensionado de una nota (deshacible) con tamaño inicial/final explícitos (M64). */
+  setCommentSizeById(id: string, from: { width?: number; height?: number }, to: { width: number; height: number }): void;
+  /** Tamaño en vivo durante el arrastre de la esquina (NO deshacible; se confirma al soltar) — como setPositionsLive. */
+  setCommentSizeLive(id: string, width: number, height: number): void;
   removeCommentById(id: string): void;
   applyLayout(positions: Record<string, { x: number; y: number }>): void;
   setError(msg: string | null): void;
@@ -125,7 +130,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   removeSelected: () => {
     const { history, selection, selectedEdges } = get();
-    if (selection.length > 0) get().dispatchCmd(removeNodes(history.doc, selection));
+    // La selección puede incluir notas (M64): las notas se borran con su propio comando (viven en doc.comments).
+    const commentIds = new Set(history.doc.comments.map((c) => c.id));
+    const nodeSel = selection.filter((id) => !commentIds.has(id));
+    const noteSel = selection.filter((id) => commentIds.has(id));
+    if (nodeSel.length > 0) get().dispatchCmd(removeNodes(history.doc, nodeSel));
+    for (const id of noteSel) get().dispatchCmd(removeComment(get().history.doc, id));
     const doc2 = get().history.doc;
     const remaining = selectedEdges.filter((id) => doc2.edges.some((e) => e.id === id));
     if (remaining.length > 0) get().dispatchCmd(removeEdges(doc2, remaining));
@@ -209,6 +219,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     get().dispatchCmd(addComment({ id: `c-${uid()}`, text: 'Nueva nota\n- Escribe aquí un punto', position, color: 'amber' })),
   updateCommentText: (id, text) => get().dispatchCmd(updateComment(get().history.doc, id, text)),
   setCommentColorById: (id, color) => get().dispatchCmd(setCommentColor(get().history.doc, id, color)),
+  setCommentSizeById: (id, from, to) => get().dispatchCmd(setCommentSize(id, from, to)),
+  setCommentSizeLive: (id, width, height) =>
+    set((s) => ({
+      history: {
+        ...s.history,
+        doc: {
+          ...s.history.doc,
+          comments: s.history.doc.comments.map((c) => (c.id === id ? { ...c, width, height } : c)),
+        },
+      },
+    })),
   removeCommentById: (id) => get().dispatchCmd(removeComment(get().history.doc, id)),
 
   applyLayout: (positions) => {

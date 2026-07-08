@@ -13,6 +13,7 @@ import {
   addComment,
   updateComment,
   removeComment,
+  setCommentSize,
   replaceGraph,
 } from './commands';
 import { createHistory, dispatch, undo, redo } from './command-bus';
@@ -70,6 +71,11 @@ function genCommand(r: () => number, doc: GraphDoc): Command {
     () => addComment({ id: `cm${Math.floor(r() * 1e6)}`, text: 'hola', position: { x: r() * 50, y: r() * 50 } }),
     () => (doc.comments.length ? updateComment(doc, pick(doc.comments.map((c) => c.id)), 'editado') : addComment({ id: `cm${Math.floor(r() * 1e6)}`, text: 'x', position: { x: 0, y: 0 } })),
     () => (doc.comments.length ? removeComment(doc, pick(doc.comments.map((c) => c.id))) : addComment({ id: `cm${Math.floor(r() * 1e6)}`, text: 'x', position: { x: 0, y: 0 } })),
+    () => {
+      if (!doc.comments.length) return addComment({ id: `cm${Math.floor(r() * 1e6)}`, text: 'x', position: { x: 0, y: 0 } });
+      const cm = pick(doc.comments);
+      return setCommentSize(cm.id, { width: cm.width, height: cm.height }, { width: 180 + Math.floor(r() * 200), height: 100 + Math.floor(r() * 200) });
+    },
   ];
   return pick(ops)();
 }

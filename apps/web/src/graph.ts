@@ -17,6 +17,8 @@ export interface CommentNodeData {
   id: string;
   text: string;
   color?: string;
+  width?: number;
+  height?: number;
 }
 
 /** GraphDoc -> nodos/aristas de React Flow (incluye comentarios como nodos tipo `comment`). */
@@ -29,7 +31,10 @@ export function docToReactFlow(
     id: c.id,
     type: 'comment',
     position: c.position,
-    data: { id: c.id, text: c.text, color: c.color } satisfies CommentNodeData,
+    data: { id: c.id, text: c.text, color: c.color, width: c.width, height: c.height } satisfies CommentNodeData,
+    // Tamaño (M64): ancho por defecto 256 (alto automático) hasta que el usuario redimensione; NodeResizer
+    // actualiza estas dimensiones y se persisten. `style` da al wrapper del nodo el tamaño que la nota llena.
+    style: { width: c.width ?? 256, ...(c.height ? { height: c.height } : {}) },
     zIndex: 0,
   }));
   const graphNodes: RFNode[] = doc.nodes.map((n) => ({
@@ -65,6 +70,7 @@ export function docToWorkflowGraph(doc: GraphDoc): WorkflowGraph {
       text: c.text,
       position: { x: Math.round(c.position.x), y: Math.round(c.position.y) },
       ...(c.color ? { color: c.color } : {}),
+      ...(c.width ? { width: Math.round(c.width), height: Math.round(c.height ?? 0) || undefined } : {}),
     })),
   };
 }
@@ -85,7 +91,14 @@ export function workflowGraphToDoc(graph: WorkflowGraph): GraphDoc {
       target: e.target,
       sourceHandle: e.sourceHandle ?? null,
     })),
-    comments: (graph.comments ?? []).map((c) => ({ id: c.id, text: c.text, position: c.position, color: c.color ?? undefined })),
+    comments: (graph.comments ?? []).map((c) => ({
+      id: c.id,
+      text: c.text,
+      position: c.position,
+      color: c.color ?? undefined,
+      width: c.width ?? undefined,
+      height: c.height ?? undefined,
+    })),
   };
 }
 

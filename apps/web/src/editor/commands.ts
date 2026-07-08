@@ -150,6 +150,23 @@ export function setCommentColor(doc: GraphDoc, id: string, color: string): Comma
   };
 }
 
+/**
+ * Redimensionar una nota (M64). Toma `from`/`to` EXPLÍCITOS (no captura del doc) porque el arrastre
+ * actualiza el tamaño en vivo antes de confirmar: `from` es el tamaño al empezar a tirar (onResizeStart)
+ * y `to` el final (onResizeEnd), igual que `moveNodes` con posiciones → undo/redo exacto.
+ */
+export function setCommentSize(
+  id: string,
+  from: { width?: number; height?: number },
+  to: { width: number; height: number },
+): Command {
+  return {
+    label: 'Redimensionar nota',
+    redo: (d) => ({ ...d, comments: d.comments.map((c) => (c.id === id ? { ...c, width: to.width, height: to.height } : c)) }),
+    undo: (d) => ({ ...d, comments: d.comments.map((c) => (c.id === id ? { ...c, width: from.width, height: from.height } : c)) }),
+  };
+}
+
 export function removeComment(doc: GraphDoc, id: string): Command {
   const comment = doc.comments.find((c) => c.id === id);
   return {

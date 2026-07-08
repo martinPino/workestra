@@ -40,7 +40,12 @@ function SelectionSync() {
   useOnSelectionChange({
     onChange: ({ nodes, edges }) => {
       const st = useEditorStore.getState();
-      const ids = new Set(st.history.doc.nodes.map((n) => n.id));
+      // Incluye ids de notas (M64): si no, seleccionar una nota se descartaría aquí y sus asas de
+      // redimensionado nunca aparecerían (las notas viven en doc.comments, no en doc.nodes).
+      const ids = new Set([
+        ...st.history.doc.nodes.map((n) => n.id),
+        ...st.history.doc.comments.map((c) => c.id),
+      ]);
       st.setSelection(
         nodes.map((n) => n.id).filter((id) => ids.has(id)),
         edges.map((e) => e.id),
@@ -431,6 +436,8 @@ export function Editor() {
                 s().setSelection([node.id], []);
                 setInspectorOpen(true);
                 setAiChatOpen(false); // panel derecho único
+              } else if (node.type === 'comment') {
+                s().setSelection([node.id], []); // seleccionar la nota → muestra sus asas de redimensionado (M64)
               }
             }}
             onPaneClick={() => s().setSelection([], [])}

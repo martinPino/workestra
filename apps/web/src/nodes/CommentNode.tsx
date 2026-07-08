@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { NodeProps } from 'reactflow';
+import { type NodeProps, NodeResizer } from 'reactflow';
 import { Trash2 } from 'lucide-react';
 import type { CommentNodeData } from '../graph';
 import { useEditorStore } from '../editor/store';
@@ -49,7 +49,10 @@ export function CommentNode({ data, selected }: NodeProps<CommentNodeData>) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const updateCommentText = useEditorStore((s) => s.updateCommentText);
   const setColor = useEditorStore((s) => s.setCommentColorById);
+  const setSize = useEditorStore((s) => s.setCommentSizeById);
+  const setSizeLive = useEditorStore((s) => s.setCommentSizeLive);
   const remove = useEditorStore((s) => s.removeCommentById);
+  const resizeStart = useRef<{ width?: number; height?: number }>({}); // tamaño al empezar a tirar (para el undo)
   const active = data.color ?? 'amber';
   const c = NOTE_COLORS[active] ?? NOTE_COLORS.amber;
 
@@ -72,7 +75,21 @@ export function CommentNode({ data, selected }: NodeProps<CommentNodeData>) {
   const body = titleIdx >= 0 ? lines.slice(titleIdx + 1) : [];
 
   return (
-    <div className={`group relative w-64 rounded-xl border shadow-md ${c.bg} ${c.border} ${selected ? `ring-2 ${c.ring}` : ''}`}>
+    <div className={`group relative flex h-full w-full flex-col rounded-xl border shadow-md ${c.bg} ${c.border} ${selected ? `ring-2 ${c.ring}` : ''}`}>
+      {/* Redimensionable (M64): tira de las esquinas cuando está seleccionada. `onResize` la agranda EN VIVO
+          (como el arrastre de posición) y `onResizeEnd` confirma el tamaño como comando deshacible (⌘Z). */}
+      <NodeResizer
+        isVisible={selected}
+        minWidth={180}
+        minHeight={72}
+        lineClassName="!border-primary/40"
+        handleClassName="!h-2.5 !w-2.5 !rounded-sm !border-2 !border-white/70 !bg-primary"
+        onResizeStart={(_, p) => {
+          resizeStart.current = { width: Math.round(p.width), height: Math.round(p.height) };
+        }}
+        onResize={(_, p) => setSizeLive(data.id, Math.round(p.width), Math.round(p.height))}
+        onResizeEnd={(_, p) => setSize(data.id, resizeStart.current, { width: Math.round(p.width), height: Math.round(p.height) })}
+      />
       {/* Barra flotante (M60): al pasar el cursor o seleccionar. `pb-1.5` sobre `bottom-full` hace de puente
           SIN hueco entre la nota y la barra (mismo patrón que AfNode) → no parpadea al ir a pulsarla. */}
       {!editing && (
@@ -112,11 +129,11 @@ export function CommentNode({ data, selected }: NodeProps<CommentNodeData>) {
           }}
           rows={Math.max(4, text.split('\n').length + 1)}
           placeholder={t('Escribe tu nota. La 1ª línea es el título; usa «- » para viñetas.')}
-          className="nodrag w-full resize-none rounded-xl bg-transparent p-3 text-xs leading-relaxed text-white/90 outline-none placeholder:text-white/40"
+          className="nodrag min-h-0 w-full flex-1 resize-none bg-transparent p-3 text-xs leading-relaxed text-white/90 outline-none placeholder:text-white/40"
         />
       ) : (
         <div
-          className="cursor-text p-3 text-xs leading-relaxed text-white/85"
+          className="min-h-0 flex-1 cursor-text overflow-auto p-3 text-xs leading-relaxed text-white/85"
           onDoubleClick={(e) => {
             e.stopPropagation();
             setEditing(true);

@@ -32,6 +32,8 @@ export const CommentSchema = z.object({
   text: z.string(),
   position: PositionSchema,
   color: z.string().nullish(),
+  width: z.number().nullish(), // M64: tamaño de la nota (redimensionable arrastrando la esquina)
+  height: z.number().nullish(),
 });
 export type WorkflowComment = z.infer<typeof CommentSchema>;
 

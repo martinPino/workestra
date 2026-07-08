@@ -23,6 +23,9 @@ export interface EditorComment {
   position: { x: number; y: number };
   /** Color de la nota (M60): clave de NOTE_COLORS (amber por defecto). */
   color?: string;
+  /** Tamaño de la nota (M64): redimensionable arrastrando la esquina. */
+  width?: number;
+  height?: number;
 }
 
 export interface GraphDoc {
