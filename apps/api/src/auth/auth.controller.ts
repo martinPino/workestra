@@ -1,8 +1,9 @@
-import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, Post, Req, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, Post, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import type { Role } from '@core/contracts';
 import { RegisterSchema, LoginSchema } from '@core/contracts';
 import { AuthService, EmailTakenError, type JwtPayload } from './auth.service';
 import { Public } from './public.decorator';
+import { AuthRateLimitGuard } from './auth-rate-limit.guard';
 
 interface DevTokenBody {
   sub?: string;
@@ -12,13 +13,14 @@ interface DevTokenBody {
 }
 
 /**
- * ¿Está activo el minter de tokens de DEV? Solo fuera de producción y cuando AUTH_MODE es 'dev' (por
- * defecto en local). En prod se despliega AUTH_MODE=local → el minter queda cerrado y la sesión se emite
- * únicamente por /auth/login|register. Doble barrera con NODE_ENV para que un olvido de AUTH_MODE no lo abra.
+ * ¿Está activo el minter de tokens de DEV? FAIL-CLOSED: cerrado salvo que AUTH_MODE sea EXPLÍCITAMENTE
+ * 'dev' (sin valor por defecto) y NO estemos en producción. Los despliegues (staging/preview/prod) NO fijan
+ * AUTH_MODE → el minter queda cerrado aunque olviden NODE_ENV=production, evitando que cualquiera acuñe un
+ * OWNER de otro tenant. El arranque LOCAL (`pnpm --filter @app/api dev`) sí fija AUTH_MODE=dev.
  */
 function devMinterEnabled(): boolean {
   if (process.env.NODE_ENV === 'production') return false;
-  return (process.env.AUTH_MODE ?? 'dev') === 'dev';
+  return process.env.AUTH_MODE === 'dev';
 }
 
 @Controller('auth')
@@ -29,6 +31,7 @@ export class AuthController {
    * Registro con email+contraseña (M73): crea el usuario y su propio workspace (OWNER) y devuelve la sesión.
    */
   @Public()
+  @UseGuards(AuthRateLimitGuard)
   @Post('register')
   async register(@Body() body: unknown) {
     const parsed = RegisterSchema.safeParse(body);
@@ -43,6 +46,7 @@ export class AuthController {
 
   /** Inicio de sesión con email+contraseña (M73). 401 genérico si email o contraseña no coinciden. */
   @Public()
+  @UseGuards(AuthRateLimitGuard)
   @Post('login')
   async login(@Body() body: unknown) {
     const parsed = LoginSchema.safeParse(body);

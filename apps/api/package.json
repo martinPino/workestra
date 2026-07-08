@@ -5,7 +5,7 @@
   "description": "AgentFlow API (NestJS): REST + WS, auth OIDC/JWT, RBAC, tenant, encolado BullMQ.",
   "scripts": {
     "build": "nest build",
-    "dev": "nest start --watch",
+    "dev": "AUTH_MODE=dev nest start --watch",
     "start": "node dist/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"

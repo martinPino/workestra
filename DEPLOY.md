@@ -94,10 +94,12 @@ funcione en cualquier workspace. El proveedor `dev` no está disponible en produ
   otros valores de dev que no aplican. Usa referencias `${{Redis.REDIS_URL}}` / `${{Postgres.DATABASE_URL}}`.
 
 ## Notas importantes
-- **Auth de desarrollo**: este despliegue usa el endpoint `/auth/token` (dev) para la sesión, porque
-  aún no hay OIDC. Por eso **NO** pongas `NODE_ENV=production` (deshabilitaría ese login y la app
-  quedaría sin acceso). Trátalo como **staging/demo**. Para un prod real: cablea OIDC y entonces sí
-  `NODE_ENV=production`.
+- **Auth (M73)**: la sesión se emite por **login/registro reales** (`/auth/login`, `/auth/register`,
+  email+contraseña con scrypt). En todo despliegue accesible por red pon **`NODE_ENV=production`** y
+  **`AUTH_MODE=local`** en `api` (y `worker`), y **`VITE_AUTH_MODE=local`** al construir `web`. El minter
+  de dev `/auth/token` es **fail-closed**: solo se abre si `AUTH_MODE=dev` explícito y fuera de producción
+  (el arranque local `pnpm --filter @app/api dev` lo fija). NUNCA lo dejes abierto en un host público: acuña
+  un OWNER de cualquier `workspaceId`. Define `SEED_OWNER_PASSWORD` para poder entrar como `owner@acme.dev`.
 - **Migraciones**: automáticas en el arranque de la api (`prisma migrate deploy`, idempotente).
 - **Escalado**: si pones varias réplicas de la api, mueve la migración a un *release command* para
   evitar carreras. Con una réplica no hace falta.
