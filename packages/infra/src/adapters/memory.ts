@@ -40,10 +40,14 @@ export class InMemoryExecutionRepository implements IExecutionRepository {
     return this.executions.get(id) ?? null;
   }
 
-  async list(q: { workspaceId: string; status?: ExecutionStatus; limit?: number }): Promise<Execution[]> {
+  async list(q: { workspaceId: string; status?: ExecutionStatus; limit?: number; workflowVersionIds?: string[] }): Promise<Execution[]> {
     // El Map preserva el orden de inserción; lo invertimos para dar los más recientes primero.
     const all = [...this.executions.values()].reverse();
-    const filtered = all.filter((e) => e.workspaceId === q.workspaceId && (!q.status || e.status === q.status));
+    const versionSet = q.workflowVersionIds ? new Set(q.workflowVersionIds) : null;
+    // Filtra por versiones ANTES del slice (mismo criterio que Prisma): no pierde filas fuera de las N recientes.
+    const filtered = all.filter(
+      (e) => e.workspaceId === q.workspaceId && (!q.status || e.status === q.status) && (!versionSet || versionSet.has(e.workflowVersionId)),
+    );
     return filtered.slice(0, q.limit ?? 50);
   }
 

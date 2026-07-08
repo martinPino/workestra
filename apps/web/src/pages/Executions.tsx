@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Page } from '../app/AppShell';
 import { Card, Badge, Dot, PageHeader, Tabs, Button, Input, EmptyState } from '../ui';
-import { useExecutions, useReviews } from '../lib/hooks';
+import { useExecutions, useReviews, useWorkflows } from '../lib/hooks';
 import { api, type ExecutionRow, type ReviewDto } from '../lib/api';
 import { useAuth, canApprove } from '../lib/auth';
 import { statusLabel, triggerLabel } from '../lib/labels';
@@ -98,9 +98,11 @@ function ExecRow({ e, i }: { e: ExecutionRow; i: number }) {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.02 }} className="px-5 py-3">
       <div className={`grid ${GRID} items-center gap-4 text-sm`}>
-        <Link to={`/executions/${e.id}`} className="group flex min-w-0 items-center gap-2">
-          <span className="font-mono text-[11px] text-txt-disabled group-hover:text-primary">{e.id.slice(0, 12)}</span>
-          <span className="truncate text-txt-secondary group-hover:text-txt-primary group-hover:underline">{t(triggerLabel(e.triggerType))}</span>
+        <Link to={`/executions/${e.id}`} className="group flex min-w-0 flex-col">
+          <span className="truncate text-txt-primary group-hover:text-primary group-hover:underline">{e.workflowName ?? t('(workflow eliminado)')}</span>
+          <span className="flex items-center gap-1.5 text-[11px] text-txt-disabled">
+            <span className="font-mono">{e.id.slice(0, 8)}</span> · {t(triggerLabel(e.triggerType))}
+          </span>
         </Link>
         <Badge tone={s.tone}>
           {s.icon} {t(statusLabel(e.status))}
@@ -121,8 +123,10 @@ function ExecRow({ e, i }: { e: ExecutionRow; i: number }) {
 export function Executions() {
   const t = useT();
   const [tab, setTab] = useState('all');
+  const [wfFilter, setWfFilter] = useState(''); // '' = todos los workflows
+  const { data: workflows } = useWorkflows();
   const statusFilter = tab === 'reviews' ? 'WAITING_HUMAN' : undefined;
-  const { data, isLoading, error } = useExecutions(statusFilter);
+  const { data, isLoading, error } = useExecutions(statusFilter, wfFilter || undefined);
   const waiting = useExecutions('WAITING_HUMAN');
   const waitingCount = waiting.data?.executions.length ?? 0;
 
@@ -136,16 +140,31 @@ export function Executions() {
         title={t('Ejecuciones')}
         subtitle={t('Historial, monitorización en vivo y bandeja de revisiones humanas.')}
         actions={
-          <Tabs
-            active={tab}
-            onChange={setTab}
-            tabs={[
-              { key: 'all', label: t('Todas') },
-              { key: 'reviews', label: waitingCount ? `${t('Revisiones')} · ${waitingCount}` : t('Revisiones') },
-              { key: 'ok', label: t('Correctas') },
-              { key: 'err', label: t('Con incidencias') },
-            ]}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Filtro por workflow: elige de la lista qué flujo mostrar (vacío = todos). */}
+            <select
+              value={wfFilter}
+              onChange={(e) => setWfFilter(e.target.value)}
+              className="h-9 rounded-lg border border-border bg-surface px-2.5 text-sm text-txt-primary outline-none focus:border-primary/60"
+            >
+              <option value="">{t('Todos los workflows')}</option>
+              {(workflows ?? []).map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name}
+                </option>
+              ))}
+            </select>
+            <Tabs
+              active={tab}
+              onChange={setTab}
+              tabs={[
+                { key: 'all', label: t('Todas') },
+                { key: 'reviews', label: waitingCount ? `${t('Revisiones')} · ${waitingCount}` : t('Revisiones') },
+                { key: 'ok', label: t('Correctas') },
+                { key: 'err', label: t('Con incidencias') },
+              ]}
+            />
+          </div>
         }
       />
 
@@ -154,7 +173,7 @@ export function Executions() {
       ) : (
         <Card>
           <div className={`grid ${GRID} gap-4 border-b border-border px-5 py-2.5 text-[11px] font-medium uppercase tracking-wide text-txt-disabled`}>
-            <span>{t('Ejecución')}</span>
+            <span>{t('Workflow')}</span>
             <span>{t('Estado')}</span>
             <span>{t('Hora')}</span>
             <span>{t('Tokens')}</span>

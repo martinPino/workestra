@@ -87,6 +87,8 @@ export interface ExecutionListQuery {
   workspaceId: string;
   status?: ExecutionStatus;
   limit?: number;
+  /** Filtra a estas versiones (todas las de un workflow). Aplicado ANTES del límite en AMBOS adaptadores. */
+  workflowVersionIds?: string[];
 }
 
 export interface IExecutionRepository {

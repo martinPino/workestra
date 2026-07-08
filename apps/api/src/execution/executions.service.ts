@@ -166,12 +166,42 @@ export class ExecutionsService {
     this.runInline(input);
   }
 
-  /** Lista ejecuciones del workspace AUTENTICADO (recientes primero), opcionalmente por estado. */
-  async list(workspaceId: string, opts: { status?: string; limit?: number } = {}) {
+  /**
+   * Lista ejecuciones del workspace AUTENTICADO (recientes primero), opcionalmente por estado y/o workflow.
+   * Enriquece cada fila con `workflowId` + `workflowName` (resueltos por la versión anclada, deduplicados)
+   * para que la UI pueda mostrar y filtrar por workflow. El filtro por workflow se resuelve a las VERSIONES
+   * de ese workflow y se aplica en el repo ANTES del límite → correcto en Prisma e InMemory por igual.
+   */
+  async list(workspaceId: string, opts: { status?: string; limit?: number; workflowId?: string } = {}) {
     // Límite acotado (evita agotar memoria) y estado validado contra el enum (evita queries inválidas).
     const limit = Math.min(Math.max(1, Number(opts.limit ?? 50) || 50), 200);
     const status = opts.status && VALID_STATUSES.includes(opts.status as ExecutionStatus) ? (opts.status as ExecutionStatus) : undefined;
-    const executions = await this.p.executions.list({ workspaceId, status, limit });
+    const workflowId = opts.workflowId?.trim() || undefined;
+
+    // Filtro por workflow → sus versiones (aisla por tenant: solo se resuelve si el workflow es del workspace).
+    let workflowVersionIds: string[] | undefined;
+    if (workflowId) {
+      const wf = await this.p.workflows.get(workflowId);
+      if (!wf || wf.workspaceId !== workspaceId) return { workspaceId, executions: [] };
+      const versions = await this.p.workflows.listVersions(workflowId);
+      workflowVersionIds = versions.map((v) => v.id);
+      if (workflowVersionIds.length === 0) return { workspaceId, executions: [] };
+    }
+    const rows = await this.p.executions.list({ workspaceId, status, limit, workflowVersionIds });
+
+    // Mapa id→nombre de los workflows del workspace (una consulta) + resolución versión→workflowId deduplicada.
+    const names = new Map<string, string>();
+    for (const w of await this.p.workflows.list(workspaceId)) names.set(w.id, w.name);
+    const versionToWf = new Map<string, string | null>();
+    const executions = [];
+    for (const e of rows) {
+      if (!versionToWf.has(e.workflowVersionId)) {
+        const v = await this.p.workflows.getVersion(e.workflowVersionId);
+        versionToWf.set(e.workflowVersionId, v?.workflowId ?? null);
+      }
+      const wfId = versionToWf.get(e.workflowVersionId) ?? null;
+      executions.push({ ...e, workflowId: wfId, workflowName: wfId ? names.get(wfId) ?? null : null });
+    }
     return { workspaceId, executions };
   }
 

@@ -27,7 +27,12 @@ export class PrismaExecutionRepository implements IExecutionRepository {
 
   async list(q: ExecutionListQuery): Promise<Execution[]> {
     const rows = await this.prisma.execution.findMany({
-      where: { workspaceId: q.workspaceId, ...(q.status ? { status: q.status } : {}) },
+      where: {
+        workspaceId: q.workspaceId,
+        ...(q.status ? { status: q.status } : {}),
+        // Filtra por las versiones del workflow (a nivel de BD → correcto también más allá del límite).
+        ...(q.workflowVersionIds ? { workflowVersionId: { in: q.workflowVersionIds } } : {}),
+      },
       orderBy: { createdAt: 'desc' },
       take: q.limit ?? 50,
     });

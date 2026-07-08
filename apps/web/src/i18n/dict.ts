@@ -654,4 +654,8 @@ export const EN: Record<string, string> = {
   'Pegar un ID manualmente': 'Paste an ID manually',
   'Elegir de la lista': 'Choose from the list',
   'No pudimos listar tus carpetas; pega el ID de la carpeta.': "We couldn't list your folders; paste the folder ID.",
+  // --- M55: filtro de ejecuciones por workflow ---
+  'Todos los workflows': 'All workflows',
+  'Workflow': 'Workflow',
+  '(workflow eliminado)': '(deleted workflow)',
 };

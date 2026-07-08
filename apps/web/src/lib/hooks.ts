@@ -10,9 +10,14 @@ export const useWorkflow = (id: string | null) =>
 export const useHealth = () =>
   useQuery({ queryKey: ['health'], queryFn: api.health, refetchInterval: 5000, retry: false });
 
-/** Ejecuciones del workspace (recientes primero). Refresca cada 3s para reflejar cambios en vivo. */
-export const useExecutions = (status?: string) =>
-  useQuery({ queryKey: ['executions', status ?? 'all'], queryFn: () => api.listExecutions(status), refetchInterval: 3000, retry: false });
+/** Ejecuciones del workspace (recientes primero), opcionalmente por estado y/o workflow. Refresca cada 3s. */
+export const useExecutions = (status?: string, workflowId?: string) =>
+  useQuery({
+    queryKey: ['executions', status ?? 'all', workflowId ?? 'all'],
+    queryFn: () => api.listExecutions(status, workflowId),
+    refetchInterval: 3000,
+    retry: false,
+  });
 
 /** Revisiones humanas de una ejecución (para la bandeja de aprobación). */
 export const useReviews = (executionId: string | null) =>

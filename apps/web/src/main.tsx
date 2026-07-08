@@ -11,7 +11,6 @@ import { Agents } from './pages/Agents';
 import { Executions } from './pages/Executions';
 import { ExecutionDetail } from './pages/ExecutionDetail';
 import { Marketplace } from './pages/Marketplace';
-import { Tools } from './pages/Tools';
 import { Integrations } from './pages/Integrations';
 import { SettingsPage } from './pages/Settings';
 import { ensureDevSession } from './lib/auth';
@@ -37,7 +36,6 @@ void ensureDevSession(api.base).finally(() => {
               <Route path="/executions" element={<Executions />} />
               <Route path="/executions/:id" element={<ExecutionDetail />} />
               <Route path="/marketplace" element={<Marketplace />} />
-              <Route path="/tools" element={<Tools />} />
               <Route path="/integrations" element={<Integrations />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Route>

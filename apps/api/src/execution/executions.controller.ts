@@ -12,8 +12,13 @@ export class ExecutionsController {
   }
 
   @Get()
-  list(@Workspace() workspaceId: string, @Query('status') status?: string, @Query('limit') limit?: string) {
-    return this.svc.list(workspaceId, { status, limit: limit ? Number(limit) : undefined });
+  list(
+    @Workspace() workspaceId: string,
+    @Query('status') status?: string,
+    @Query('limit') limit?: string,
+    @Query('workflowId') workflowId?: string,
+  ) {
+    return this.svc.list(workspaceId, { status, limit: limit ? Number(limit) : undefined, workflowId });
   }
 
   @Get(':id')

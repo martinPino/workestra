@@ -4,7 +4,6 @@ import {
   Bot,
   Activity,
   Store,
-  Wrench,
   Plug,
   Settings,
   type LucideIcon,
@@ -24,7 +23,6 @@ export const NAV: NavItem[] = [
   { to: '/agents', label: 'Asistentes', icon: Bot },
   { to: '/executions', label: 'Historial', icon: Activity },
   { to: '/marketplace', label: 'Plantillas', icon: Store },
-  { to: '/tools', label: 'Acciones', icon: Wrench },
   { to: '/integrations', label: 'Conexiones', icon: Plug },
   { to: '/settings', label: 'Ajustes', icon: Settings },
 ];

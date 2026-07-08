@@ -38,6 +38,9 @@ export interface ExecutionRow {
   tokensUsed: number;
   costEstimate: number;
   workflowVersionId: string;
+  /** Workflow al que pertenece la ejecución (resuelto por la versión anclada). */
+  workflowId?: string | null;
+  workflowName?: string | null;
   createdAt?: string | null;
 }
 
@@ -283,10 +286,15 @@ export const api = {
   deleteTriggerBinding: (id: string) =>
     fetch(`${API}/triggers/${id}`, { method: 'DELETE', headers: authHeaders() }).then((r) => json<unknown>(r)),
 
-  listExecutions: (status?: string) =>
-    fetch(`${API}/executions${status ? `?status=${status}` : ''}`, { headers: authHeaders() }).then((r) =>
+  listExecutions: (status?: string, workflowId?: string) => {
+    const qs = new URLSearchParams();
+    if (status) qs.set('status', status);
+    if (workflowId) qs.set('workflowId', workflowId);
+    const q = qs.toString();
+    return fetch(`${API}/executions${q ? `?${q}` : ''}`, { headers: authHeaders() }).then((r) =>
       json<{ workspaceId: string; executions: ExecutionRow[] }>(r),
-    ),
+    );
+  },
   listAgents: () => fetch(`${API}/agents`, { headers: authHeaders() }).then((r) => json<AgentDto[]>(r)),
   createAgent: (body: AgentInput) =>
     fetch(`${API}/agents`, { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) }).then((r) => json<AgentDto>(r)),
