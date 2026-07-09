@@ -92,6 +92,92 @@ const edge = (source: string, target: string, sourceHandle?: string) => ({
 const M = 'gpt-4o-mini';
 
 export const MARKETPLACE: MarketItem[] = [
+  // ------------------------------- ATLASSIAN (M76) ------------------------------
+  // Integración de primera clase: la plataforma es dueña del OAuth; al instalar, si Atlassian no está
+  // conectado, el asistente lo pide (una vez) y los agentes usan Jira/Confluence como herramientas.
+  {
+    id: 'atlassian-project-assistant',
+    kind: 'agent',
+    name: 'Atlassian Project Assistant',
+    tagline: 'Gestiona Jira y Confluence en tu idioma: busca, crea y actualiza sin tocar la API.',
+    description:
+      'Un empleado digital conectado a tu Atlassian. Encuentra incidencias con lenguaje natural, crea tickets, comenta, cambia estados y gestiona documentación en Confluence. La plataforma gestiona el acceso (OAuth): el agente nunca ve credenciales.',
+    icon: '🧩',
+    gradient: 'from-blue-500/25 to-indigo-500/25',
+    category: 'Producto e Ingeniería',
+    difficulty: 'Fácil',
+    setupMinutes: 2,
+    connectors: ['jira'],
+    mcps: [],
+    tools: [],
+    useCases: ['«Crea un bug en KAN: el login falla en Safari»', 'Resume las incidencias abiertas del sprint', 'Crea una página de retro en Confluence'],
+    requirements: ['Una cuenta de Atlassian (Jira o Confluence)'],
+    rating: 4.8,
+    installs: 0,
+    author: 'Workestra',
+    badges: ['Oficial'],
+    collections: ['new', 'popular'],
+    install: {
+      agents: [
+        {
+          ref: 'assistant',
+          name: 'Atlassian Assistant',
+          emoji: '🧩',
+          role: 'Asistente de Atlassian',
+          model: M,
+          tools: [],
+          mcpServers: [{ name: 'Atlassian', url: 'integration://atlassian' }],
+          systemPrompt:
+            'Eres un asistente experto en Atlassian. Usa las herramientas de Jira y Confluence para cumplir la petición: buscar/crear/actualizar incidencias y páginas. Confirma lo hecho con la clave o el título del recurso. Si falta un dato (proyecto, espacio), pregúntalo antes de actuar.',
+        },
+      ],
+    },
+  },
+  {
+    id: 'sprint-ops-atlassian',
+    kind: 'team',
+    name: 'Sprint Ops (Jira + Confluence)',
+    tagline: 'Un equipo que triaja peticiones, crea las incidencias en Jira y documenta el resultado en Confluence.',
+    description:
+      'Tres agentes que comparten UNA conexión de Atlassian: un coordinador decide qué hacer, un especialista de Jira crea o actualiza las incidencias y un documentalista deja la página en Confluence. Instálalo y conecta Atlassian una vez; todos lo usan.',
+    icon: '🏃',
+    gradient: 'from-sky-500/25 to-blue-600/25',
+    category: 'Producto e Ingeniería',
+    difficulty: 'Media',
+    setupMinutes: 3,
+    connectors: ['jira'],
+    mcps: [],
+    tools: [],
+    useCases: ['Convertir una petición en un ticket de Jira y su doc en Confluence', 'Triaje de incidencias entrantes', 'Cerrar el sprint documentando lo entregado'],
+    requirements: ['Una cuenta de Atlassian (Jira y Confluence)'],
+    rating: 4.7,
+    installs: 0,
+    author: 'Workestra',
+    badges: ['Oficial'],
+    collections: ['new', 'ai-teams'],
+    install: {
+      agents: [
+        { ref: 'triage', name: 'Coordinador de Producto', emoji: '🧭', role: 'Triaja y decide', model: M, tools: [], isOrchestrator: true, systemPrompt: 'Eres el coordinador de producto. Lee la petición, decide si requiere una incidencia de Jira y qué documentar. Da instrucciones claras y breves a los especialistas.' },
+        { ref: 'jira', name: 'Especialista de Jira', emoji: '📋', role: 'Gestiona incidencias', model: M, tools: [], mcpServers: [{ name: 'Atlassian', url: 'integration://atlassian' }], systemPrompt: 'Usa las herramientas de Jira para crear, buscar y actualizar incidencias según la instrucción del coordinador. Devuelve la clave de la incidencia (p. ej. KAN-12).' },
+        { ref: 'docs', name: 'Documentalista de Confluence', emoji: '📚', role: 'Documenta en Confluence', model: M, tools: [], mcpServers: [{ name: 'Atlassian', url: 'integration://atlassian' }], systemPrompt: 'Usa las herramientas de Confluence para crear o actualizar la página que documenta lo realizado. Devuelve el título de la página.' },
+      ],
+      workflow: {
+        name: 'Sprint Ops',
+        doc: {
+          nodes: [
+            node('trigger', 'trigger', 40, 200, { event: 'manual' }),
+            node('triage', 'agent', 300, 200, { agentRef: 'triage', input: 'Decide qué hacer con esta petición:\n{{ticket.summary}}\n{{ticket.description}}' }),
+            node('jira', 'agent', 560, 200, { agentRef: 'jira', input: 'Crea o actualiza la incidencia de Jira según:\n{{agent:triage.output}}' }),
+            node('docs', 'agent', 820, 200, { agentRef: 'docs', input: 'Documenta en Confluence el resultado:\n{{agent:jira.output}}' }),
+            node('end', 'end', 1080, 200, {}),
+          ],
+          edges: [edge('trigger', 'triage'), edge('triage', 'jira'), edge('jira', 'docs'), edge('docs', 'end')],
+          comments: [],
+        },
+      },
+    },
+  },
+
   // ---------------------------------- AI TEAMS ----------------------------------
   {
     id: 'team-customer-support',

@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Star, Download, Clock, Users, Check, Loader2, Sparkles, Wrench, Plug, Puzzle, ListChecks, KeyRound, Crown } from 'lucide-react';
 import { Page } from '../app/AppShell';
 import { Button, Badge } from '../ui';
 import { ProviderLogo, hasProviderLogo } from '../lib/provider-logos';
+import { api } from '../lib/api';
 import { useConnectors } from '../lib/hooks';
 import { useCan } from '../lib/auth';
 import { cn } from '../lib/cn';
@@ -14,8 +16,21 @@ import { installItem } from '../marketplace/install';
 const cleanError = (e: unknown) => (e instanceof Error ? e.message : String(e)).replace(/^HTTP \d+:\s*/, '');
 const STEP_LABEL: Record<string, string> = { trigger: 'Disparador', llm: 'IA', agent: 'Agente', condition: 'Condición', connector: 'Conector', tool: 'Acción', router: 'Router', human: 'Aprobación', wait: 'Esperar', end: 'Fin', api: 'API' };
 
-/** Chip de un conector requerido, con su estado (conectado / falta). */
-function ConnectorRow({ provider, connected }: { provider: string; connected: boolean }) {
+/** Chip de un conector requerido, con su estado y un botón «Conectar» en línea (inicia OAuth sin salir). */
+function ConnectorRow({
+  provider,
+  connected,
+  onConnect,
+  connecting,
+  canConnect,
+}: {
+  provider: string;
+  connected: boolean;
+  onConnect?: () => void;
+  connecting?: boolean;
+  canConnect?: boolean;
+}) {
+  const t = useT();
   return (
     <div className="flex items-center justify-between rounded-lg border border-border bg-surface px-3 py-2">
       <div className="flex items-center gap-2">
@@ -29,9 +44,20 @@ function ConnectorRow({ provider, connected }: { provider: string; connected: bo
         <span className="text-sm capitalize text-txt-primary">{provider.replace(/-/g, ' ')}</span>
       </div>
       {connected ? (
-        <span className="inline-flex items-center gap-1 text-xs font-medium text-success"><Check size={13} /> Conectado</span>
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-success">
+          <Check size={13} /> {t('Conectado')}
+        </span>
+      ) : onConnect && canConnect ? (
+        <button
+          type="button"
+          onClick={onConnect}
+          disabled={connecting}
+          className="inline-flex items-center gap-1 rounded-md bg-primary/15 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/25 disabled:opacity-50"
+        >
+          {connecting ? <Loader2 size={12} className="animate-spin" /> : <Plug size={12} />} {t('Conectar')}
+        </button>
       ) : (
-        <span className="inline-flex items-center gap-1 text-xs text-warning">Falta conectar</span>
+        <span className="inline-flex items-center gap-1 text-xs text-warning">{t('Falta conectar')}</span>
       )}
     </div>
   );
@@ -43,11 +69,16 @@ export function MarketplaceDetail() {
   const navigate = useNavigate();
   const item = id ? getMarketItem(id) : undefined;
   const canInstall = useCan('workflow:write');
-  const { data: connectors } = useConnectors();
+  const canConnect = useCan('connector:write');
+  const qc = useQueryClient();
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [installing, setInstalling] = useState(false);
+  const [connecting, setConnecting] = useState<string | null>(null);
   const [error, setError] = useState('');
+
+  // Sondea las conexiones mientras el asistente está abierto: al volver del OAuth, la fila pasa a «Conectado».
+  const { data: connectors } = useConnectors(wizardOpen);
 
   const connectedProviders = useMemo(() => new Set((connectors ?? []).filter((c) => c.status === 'connected').map((c) => c.provider)), [connectors]);
   const connectorIdByProvider = useMemo(() => new Map((connectors ?? []).filter((c) => c.status === 'connected').map((c) => [c.provider, c.id] as const)), [connectors]);
@@ -83,6 +114,30 @@ export function MarketplaceDetail() {
     if (item.connectors.length === 0) void doInstall();
     else setWizardOpen(true);
   };
+
+  // M76: inicia el OAuth de un conector requerido SIN salir del asistente (crea el conector si no existe).
+  const connect = async (provider: string) => {
+    setError('');
+    try {
+      const list = connectors ?? [];
+      let connectorId = list.find((c) => c.provider === provider)?.id;
+      if (!connectorId) {
+        const created = await api.createConnector(provider, `${provider}-1`);
+        connectorId = created.id;
+        await qc.invalidateQueries({ queryKey: ['connectors'] });
+      }
+      const { authorizeUrl } = await api.connectConnector(connectorId);
+      setConnecting(provider);
+      window.open(authorizeUrl, 'agentflow-oauth', 'width=540,height=680');
+    } catch (e) {
+      setError(cleanError(e));
+    }
+  };
+
+  // Deja de marcar «conectando» cuando el proveedor pasa a conectado (lo detecta el sondeo).
+  useEffect(() => {
+    if (connecting && connectedProviders.has(connecting)) setConnecting(null);
+  }, [connectedProviders, connecting]);
 
   return (
     <Page className="max-w-4xl space-y-6">
@@ -245,7 +300,14 @@ export function MarketplaceDetail() {
             </p>
             <div className="mt-4 space-y-1.5">
               {item.connectors.map((p) => (
-                <ConnectorRow key={p} provider={p} connected={connectedProviders.has(p)} />
+                <ConnectorRow
+                  key={p}
+                  provider={p}
+                  connected={connectedProviders.has(p)}
+                  onConnect={() => connect(p)}
+                  connecting={connecting === p}
+                  canConnect={canConnect}
+                />
               ))}
             </div>
             <div className="mt-5 flex items-center justify-between gap-2">
