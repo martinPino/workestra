@@ -1053,4 +1053,6 @@ export const EN: Record<string, string> = {
   "Una cuenta de Atlassian (Jira y Confluence)": "An Atlassian account (Jira and Confluence)",
   "Falta conectar": "Not connected",
   "tu@empresa.com": "you@company.com",
+  "Empezar desde una plantilla": "Start from a template",
+  "Explora equipos, agentes y automatizaciones en el Marketplace.": "Explore teams, agents, and automations in the Marketplace.",
 };

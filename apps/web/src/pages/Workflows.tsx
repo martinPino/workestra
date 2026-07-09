@@ -2,13 +2,12 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Plus, Boxes, GitBranch, Play, Workflow as WorkflowIcon, Trash2, X, Sparkles, Plug, Copy, Check, KeyRound } from 'lucide-react';
+import { Plus, Boxes, GitBranch, Play, Workflow as WorkflowIcon, Trash2, X, Sparkles, Plug, Copy, Check, KeyRound, Store } from 'lucide-react';
 import { Page } from '../app/AppShell';
 import { Card, Button, PageHeader, Badge, Dot, EmptyState, Skeleton, IconButton, Input, Textarea } from '../ui';
 import { useWorkflows } from '../lib/hooks';
 import { api, type WorkflowDto, type ApiKeyView } from '../lib/api';
 import { STARTER_DOC, docToWorkflowGraph } from '../graph';
-import { WORKFLOW_TEMPLATES, type WorkflowTemplate } from '../editor/templates';
 import { ThinkingSteps } from '../components/ThinkingSteps';
 import { ModelKeysDialog } from '../components/ModelKeysDialog';
 import { GENERATION_MODELS, DEFAULT_GENERATION_MODEL } from '../lib/models';
@@ -16,8 +15,8 @@ import { useCan } from '../lib/auth';
 import { useT } from '../i18n';
 
 /** Estado del diálogo «ponle nombre antes de crear». `template` null = empezar en blanco. */
-type Namer = { open: boolean; name: string; template: WorkflowTemplate | null };
-const CLOSED: Namer = { open: false, name: '', template: null };
+type Namer = { open: boolean; name: string };
+const CLOSED: Namer = { open: false, name: '' };
 
 export function Workflows() {
   const t = useT();
@@ -46,17 +45,13 @@ export function Workflows() {
       params.delete('new');
       setParams(params, { replace: true });
       setErr(null); // no arrastrar un error de creación anterior al reabrir por ?new=1
-      setNamer({ open: true, name: '', template: null });
+      setNamer({ open: true, name: '' });
     }
   }, [params]);
 
   const openBlank = () => {
     setErr(null);
-    setNamer({ open: true, name: '', template: null });
-  };
-  const openTemplate = (tpl: WorkflowTemplate) => {
-    setErr(null);
-    setNamer({ open: true, name: t(tpl.name), template: tpl }); // prellenado con el nombre de la plantilla (editable)
+    setNamer({ open: true, name: '' });
   };
   const close = () => {
     if (busy) return;
@@ -70,7 +65,7 @@ export function Workflows() {
     setErr(null);
     try {
       const name = namer.name.trim() || t('Mi automatización');
-      const doc = namer.template ? namer.template.doc : STARTER_DOC;
+      const doc = STARTER_DOC;
       const wf = await api.createWorkflow(name, docToWorkflowGraph(doc));
       await qc.invalidateQueries({ queryKey: ['workflows'] });
       navigate(`/workflows/${wf.id}`);
@@ -113,7 +108,7 @@ export function Workflows() {
       {(canWrite || canManageKeys) && (
         <div>
           <div className="mb-3 text-sm font-medium text-txt-secondary">{t('¿Cómo quieres empezar?')}</div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {canWrite && (
               <Card hover className="cursor-pointer p-4" onClick={openBlank}>
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-elevated text-txt-secondary">
@@ -137,6 +132,16 @@ export function Workflows() {
               </Card>
             )}
 
+            {canWrite && (
+              <Card hover className="cursor-pointer p-4" onClick={() => navigate('/marketplace')}>
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-elevated text-txt-secondary">
+                  <Store size={18} />
+                </div>
+                <div className="mt-2.5 text-sm font-semibold text-txt-primary">{t('Empezar desde una plantilla')}</div>
+                <div className="mt-1 text-xs text-txt-secondary">{t('Explora equipos, agentes y automatizaciones en el Marketplace.')}</div>
+              </Card>
+            )}
+
             {canManageKeys && (
               <Card hover className="cursor-pointer p-4" onClick={() => setMcpOpen(true)}>
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-elevated text-txt-secondary">
@@ -149,22 +154,6 @@ export function Workflows() {
                 <div className="mt-1 text-xs text-txt-secondary">{t('Ejecútalo desde Claude, Cursor o ChatGPT.')}</div>
               </Card>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* Galería de plantillas (M23): clonar una plantilla crea un workflow → requiere 'workflow:write'. */}
-      {canWrite && (
-        <div>
-          <div className="mb-3 text-sm font-medium text-txt-secondary">{t('…o parte de una plantilla')}</div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {WORKFLOW_TEMPLATES.map((tpl) => (
-              <Card key={tpl.id} hover className="cursor-pointer p-4" onClick={() => openTemplate(tpl)}>
-                <div className="text-2xl">{tpl.icon}</div>
-                <div className="mt-2 text-sm font-semibold text-txt-primary">{t(tpl.name)}</div>
-                <div className="mt-1 text-xs leading-relaxed text-txt-secondary">{t(tpl.description)}</div>
-              </Card>
-            ))}
           </div>
         </div>
       )}
@@ -690,7 +679,7 @@ function NameDialog({
           <div>
             <h2 className="text-base font-semibold text-txt-primary">{t('Ponle un nombre')}</h2>
             <p className="mt-0.5 text-xs text-txt-secondary">
-              {namer.template ? t('Puedes cambiar el nombre de la plantilla antes de crearla.') : t('Así la reconocerás en tu lista de automatizaciones.')}
+              {t('Así la reconocerás en tu lista de automatizaciones.')}
             </p>
           </div>
           <IconButton onClick={onClose} aria-label={t('Cancelar')}>
