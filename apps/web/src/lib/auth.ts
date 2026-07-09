@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { can as canScope } from '@core/contracts';
 
 export type Role = 'OWNER' | 'ADMIN' | 'EDITOR' | 'VIEWER';
 
@@ -123,4 +124,14 @@ export async function ensureDevSession(apiBase: string): Promise<void> {
 /** ¿El rol actual puede aprobar/rechazar revisiones? (espejo del RBAC del servidor, solo para UX). */
 export function canApprove(role: Role | null): boolean {
   return role === 'OWNER' || role === 'ADMIN' || role === 'EDITOR';
+}
+
+/**
+ * Hook de RBAC para la UI (M74): ¿puede el rol actual ejecutar `scope`? Usa el MISMO `can()` del backend
+ * (@core/contracts) → una sola fuente de verdad. Solo es para OCULTAR botones (UX); la seguridad real la
+ * impone el servidor con @RequireScopes. Sin sesión → false.
+ */
+export function useCan(scope: string): boolean {
+  const role = useAuth((s) => s.role);
+  return role ? canScope(role, scope) : false;
 }

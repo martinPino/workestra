@@ -12,6 +12,7 @@ import { WORKFLOW_TEMPLATES, type WorkflowTemplate } from '../editor/templates';
 import { ThinkingSteps } from '../components/ThinkingSteps';
 import { ModelKeysDialog } from '../components/ModelKeysDialog';
 import { GENERATION_MODELS, DEFAULT_GENERATION_MODEL } from '../lib/models';
+import { useCan } from '../lib/auth';
 import { useT } from '../i18n';
 
 /** Estado del diálogo «ponle nombre antes de crear». `template` null = empezar en blanco. */
@@ -24,6 +25,8 @@ export function Workflows() {
   const [params, setParams] = useSearchParams();
   const qc = useQueryClient();
   const { data, isLoading } = useWorkflows();
+  const canWrite = useCan('workflow:write'); // crear/editar/publicar workflow
+  const canManageKeys = useCan('apikey:manage'); // gestionar claves de IA del workspace (MCP/BYOK)
 
   const [namer, setNamer] = useState<Namer>(CLOSED);
   const [busy, setBusy] = useState(false);
@@ -105,55 +108,66 @@ export function Workflows() {
         subtitle={t('Elige una plantilla o empieza en blanco. Cada automatización es un flujo visual.')}
       />
 
-      {/* Selector de creación (M29): 3 formas de empezar — en blanco, con IA, o vía MCP. */}
-      <div>
-        <div className="mb-3 text-sm font-medium text-txt-secondary">{t('¿Cómo quieres empezar?')}</div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Card hover className="cursor-pointer p-4" onClick={openBlank}>
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-elevated text-txt-secondary">
-              <Plus size={18} />
-            </div>
-            <div className="mt-2.5 text-sm font-semibold text-txt-primary">{t('Empezar en blanco')}</div>
-            <div className="mt-1 text-xs text-txt-secondary">{t('Un lienzo vacío para diseñar a mano.')}</div>
-          </Card>
+      {/* Selector de creación (M29): 3 formas de empezar — en blanco, con IA, o vía MCP.
+          Crear workflow requiere 'workflow:write'; el MCP gestiona claves y requiere 'apikey:manage'. */}
+      {(canWrite || canManageKeys) && (
+        <div>
+          <div className="mb-3 text-sm font-medium text-txt-secondary">{t('¿Cómo quieres empezar?')}</div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {canWrite && (
+              <Card hover className="cursor-pointer p-4" onClick={openBlank}>
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-elevated text-txt-secondary">
+                  <Plus size={18} />
+                </div>
+                <div className="mt-2.5 text-sm font-semibold text-txt-primary">{t('Empezar en blanco')}</div>
+                <div className="mt-1 text-xs text-txt-secondary">{t('Un lienzo vacío para diseñar a mano.')}</div>
+              </Card>
+            )}
 
-          <Card hover className="cursor-pointer border-primary/30 p-4" onClick={openAi}>
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/12 text-primary">
-              <Sparkles size={18} />
-            </div>
-            <div className="mt-2.5 flex items-center gap-1.5">
-              <span className="text-sm font-semibold text-txt-primary">{t('Construir con IA')}</span>
-              <Badge tone="primary">{t('nuevo')}</Badge>
-            </div>
-            <div className="mt-1 text-xs text-txt-secondary">{t('Descríbelo en tus palabras y la IA lo monta.')}</div>
-          </Card>
+            {canWrite && (
+              <Card hover className="cursor-pointer border-primary/30 p-4" onClick={openAi}>
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/12 text-primary">
+                  <Sparkles size={18} />
+                </div>
+                <div className="mt-2.5 flex items-center gap-1.5">
+                  <span className="text-sm font-semibold text-txt-primary">{t('Construir con IA')}</span>
+                  <Badge tone="primary">{t('nuevo')}</Badge>
+                </div>
+                <div className="mt-1 text-xs text-txt-secondary">{t('Descríbelo en tus palabras y la IA lo monta.')}</div>
+              </Card>
+            )}
 
-          <Card hover className="cursor-pointer p-4" onClick={() => setMcpOpen(true)}>
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-elevated text-txt-secondary">
-              <Plug size={18} />
-            </div>
-            <div className="mt-2.5 flex items-center gap-1.5">
-              <span className="text-sm font-semibold text-txt-primary">{t('Usar desde tu IA (MCP)')}</span>
-              <Badge tone="primary">{t('nuevo')}</Badge>
-            </div>
-            <div className="mt-1 text-xs text-txt-secondary">{t('Ejecútalo desde Claude, Cursor o ChatGPT.')}</div>
-          </Card>
+            {canManageKeys && (
+              <Card hover className="cursor-pointer p-4" onClick={() => setMcpOpen(true)}>
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-elevated text-txt-secondary">
+                  <Plug size={18} />
+                </div>
+                <div className="mt-2.5 flex items-center gap-1.5">
+                  <span className="text-sm font-semibold text-txt-primary">{t('Usar desde tu IA (MCP)')}</span>
+                  <Badge tone="primary">{t('nuevo')}</Badge>
+                </div>
+                <div className="mt-1 text-xs text-txt-secondary">{t('Ejecútalo desde Claude, Cursor o ChatGPT.')}</div>
+              </Card>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Galería de plantillas (M23): atajos ya cableados. */}
-      <div>
-        <div className="mb-3 text-sm font-medium text-txt-secondary">{t('…o parte de una plantilla')}</div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {WORKFLOW_TEMPLATES.map((tpl) => (
-            <Card key={tpl.id} hover className="cursor-pointer p-4" onClick={() => openTemplate(tpl)}>
-              <div className="text-2xl">{tpl.icon}</div>
-              <div className="mt-2 text-sm font-semibold text-txt-primary">{t(tpl.name)}</div>
-              <div className="mt-1 text-xs leading-relaxed text-txt-secondary">{t(tpl.description)}</div>
-            </Card>
-          ))}
+      {/* Galería de plantillas (M23): clonar una plantilla crea un workflow → requiere 'workflow:write'. */}
+      {canWrite && (
+        <div>
+          <div className="mb-3 text-sm font-medium text-txt-secondary">{t('…o parte de una plantilla')}</div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {WORKFLOW_TEMPLATES.map((tpl) => (
+              <Card key={tpl.id} hover className="cursor-pointer p-4" onClick={() => openTemplate(tpl)}>
+                <div className="text-2xl">{tpl.icon}</div>
+                <div className="mt-2 text-sm font-semibold text-txt-primary">{t(tpl.name)}</div>
+                <div className="mt-1 text-xs leading-relaxed text-txt-secondary">{t(tpl.description)}</div>
+              </Card>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {isLoading ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -167,9 +181,11 @@ export function Workflows() {
           title={t('Aún no hay automatizaciones')}
           description={t('Crea tu primera automatización y empieza a orquestar tus tareas.')}
           action={
-            <Button variant="primary" onClick={openBlank}>
-              <Plus size={15} /> {t('Crear automatización')}
-            </Button>
+            canWrite ? (
+              <Button variant="primary" onClick={openBlank}>
+                <Plus size={15} /> {t('Crear automatización')}
+              </Button>
+            ) : undefined
           }
         />
       ) : (
@@ -549,6 +565,7 @@ function McpDialog({ onClose }: { onClose: () => void }) {
 function WorkflowCard({ wf, index, onOpen }: { wf: WorkflowDto; index: number; onOpen: () => void }) {
   const t = useT();
   const qc = useQueryClient();
+  const canDelete = useCan('workflow:delete'); // borrar workflow
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -584,16 +601,18 @@ function WorkflowCard({ wf, index, onOpen }: { wf: WorkflowDto; index: number; o
               <Badge tone={wf.status === 'ACTIVE' ? 'success' : 'default'}>
                 <Dot tone={wf.status === 'ACTIVE' ? 'success' : 'default'} /> {wf.status.toLowerCase()}
               </Badge>
-              <IconButton
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setConfirming(true);
-                }}
-                aria-label={t('Borrar automatización')}
-                className="opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger"
-              >
-                <Trash2 size={14} />
-              </IconButton>
+              {canDelete && (
+                <IconButton
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setConfirming(true);
+                  }}
+                  aria-label={t('Borrar automatización')}
+                  className="opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger"
+                >
+                  <Trash2 size={14} />
+                </IconButton>
+              )}
             </div>
           </div>
           <div className="mt-4 text-sm font-semibold text-txt-primary">{wf.name}</div>

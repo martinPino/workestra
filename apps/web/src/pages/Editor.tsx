@@ -34,8 +34,9 @@ import { useEditorStore } from '../editor/store';
 import { useAgents, useConnectors } from '../lib/hooks';
 import { statusLabel } from '../lib/labels';
 import { Button, IconButton, Badge, Dot } from '../ui';
-import { TriangleAlert } from 'lucide-react';
+import { TriangleAlert, Eye } from 'lucide-react';
 import { useT } from '../i18n';
+import { useCan } from '../lib/auth';
 
 function SelectionSync() {
   useOnSelectionChange({
@@ -79,6 +80,10 @@ export function Editor() {
   const lastError = useEditorStore((s) => s.lastError);
   const s = useEditorStore.getState;
   const t = useT();
+  // RBAC de UX (M74): un VIEWER (sin 'workflow:write') solo puede LEER el editor. La seguridad real la
+  // impone el servidor; esto solo oculta/desactiva la edición para no ofrecer acciones que fallarían.
+  const canEdit = useCan('workflow:write');
+  const canRun = useCan('execution:create');
 
   const rf = useRef<ReactFlowInstance | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null); // contenedor del lienzo → centrar lo añadido en la vista (M62)
@@ -131,15 +136,23 @@ export function Editor() {
           s().loadDoc(wf.graph.nodes.length ? workflowGraphToDoc(wf.graph) : STARTER_DOC, { id: wf.id, name: wf.name });
         } else {
           const list = await api.listWorkflows();
-          const wf = list[0] ? await api.getWorkflow(list[0].id) : await api.createWorkflow('Mi primer workflow', docToWorkflowGraph(STARTER_DOC));
-          s().loadDoc(wf.graph.nodes.length ? workflowGraphToDoc(wf.graph) : STARTER_DOC, { id: wf.id, name: wf.name });
+          if (list[0]) {
+            const wf = await api.getWorkflow(list[0].id);
+            s().loadDoc(wf.graph.nodes.length ? workflowGraphToDoc(wf.graph) : STARTER_DOC, { id: wf.id, name: wf.name });
+          } else if (canEdit) {
+            // Solo un rol con 'workflow:write' auto-crea el primer workflow; un VIEWER no debe crear.
+            const wf = await api.createWorkflow('Mi primer workflow', docToWorkflowGraph(STARTER_DOC));
+            s().loadDoc(wf.graph.nodes.length ? workflowGraphToDoc(wf.graph) : STARTER_DOC, { id: wf.id, name: wf.name });
+          } else {
+            s().loadDoc(STARTER_DOC, { id: 'local', name: t('Sin workflows') });
+          }
         }
       } catch {
         s().setError(t('No se pudo conectar con la API'));
         s().loadDoc(STARTER_DOC, { id: 'local', name: t('local (sin API)') });
       }
     })();
-  }, [id]);
+  }, [id, canEdit]);
 
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     const moves = changes
@@ -168,6 +181,7 @@ export function Editor() {
   }, [s]);
 
   useEffect(() => {
+    if (!canEdit) return undefined; // VIEWER de solo lectura: sin atajos que muten el grafo.
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t && ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName)) return;
@@ -185,7 +199,7 @@ export function Editor() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [s]);
+  }, [s, canEdit]);
 
   // Posición en coords del grafo del CENTRO de lo que se ve ahora (con jitter para no apilar). Antes se
   // añadía en una posición fija (260,120) que, con el lienzo desplazado, caía FUERA de la vista (M62).
@@ -308,9 +322,11 @@ export function Editor() {
       {/* Toolbar (scroll horizontal en móvil) */}
       <div className="flex h-12 shrink-0 items-center gap-3 overflow-x-auto border-b border-border bg-surface px-3 sm:px-4">
         <div className="flex shrink-0 items-center gap-2.5">
-          <IconButton className="md:hidden" aria-label={t('Nodos')} onClick={() => setPaletteOpen(true)}>
-            <Menu size={16} />
-          </IconButton>
+          {canEdit && (
+            <IconButton className="md:hidden" aria-label={t('Nodos')} onClick={() => setPaletteOpen(true)}>
+              <Menu size={16} />
+            </IconButton>
+          )}
           <div className="hidden h-7 w-7 items-center justify-center rounded-lg bg-primary/12 text-primary sm:flex">
             <Boxes size={16} />
           </div>
@@ -321,39 +337,52 @@ export function Editor() {
           <Badge tone={STATUS_TONE[execStatus] ?? 'default'}>
             {running ? <Loader2 size={11} className="animate-spin" /> : <Dot tone={STATUS_TONE[execStatus] ?? 'default'} />} {t(statusLabel(execStatus))}
           </Badge>
+          {!canEdit && (
+            <Badge tone="default">
+              <Eye size={11} /> {t('Solo lectura')}
+            </Badge>
+          )}
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
-          <IconButton disabled={!canUndo} onClick={() => s().undo()} aria-label={t('Deshacer')}>
-            <Undo2 size={16} />
-          </IconButton>
-          <IconButton disabled={!canRedo} onClick={() => s().redo()} aria-label={t('Rehacer')}>
-            <Redo2 size={16} />
-          </IconButton>
-          <div className="mx-1 h-4 w-px bg-border" />
-          <Button size="sm" variant="subtle" onClick={autoLayout}>
-            <LayoutGrid size={14} /> {t('Layout')}
-          </Button>
-          <Button size="sm" variant="subtle" onClick={addNoteHere}>
-            <StickyNote size={14} /> {t('Nota')}
-          </Button>
-          <Button
-            size="sm"
-            variant={aiChatOpen ? 'primary' : 'subtle'}
-            onClick={() => {
-              const next = !aiChatOpen;
-              setAiChatOpen(next);
-              if (next) setInspectorOpen(false); // panel derecho único: evita el solape (sobre todo en móvil)
-            }}
-          >
-            <Sparkles size={14} /> {t('IA')}
-          </Button>
-          <div className="mx-1 h-4 w-px bg-border" />
-          <Button size="sm" variant={activated ? 'secondary' : 'primary'} onClick={handleActivate}>
-            {activated ? <Check size={14} /> : <UploadCloud size={14} />} {activated ? t('Activo') : t('Activar')}
-          </Button>
-          <Button size="sm" variant="primary" onClick={handleRun}>
-            <Play size={14} /> {t('Probar')}
-          </Button>
+          {/* Barra de edición: solo con 'workflow:write'. Un VIEWER no ve deshacer/rehacer, layout, nota,
+              IA (edita el flujo) ni activar/publicar; conserva la lectura del lienzo. */}
+          {canEdit && (
+            <>
+              <IconButton disabled={!canUndo} onClick={() => s().undo()} aria-label={t('Deshacer')}>
+                <Undo2 size={16} />
+              </IconButton>
+              <IconButton disabled={!canRedo} onClick={() => s().redo()} aria-label={t('Rehacer')}>
+                <Redo2 size={16} />
+              </IconButton>
+              <div className="mx-1 h-4 w-px bg-border" />
+              <Button size="sm" variant="subtle" onClick={autoLayout}>
+                <LayoutGrid size={14} /> {t('Layout')}
+              </Button>
+              <Button size="sm" variant="subtle" onClick={addNoteHere}>
+                <StickyNote size={14} /> {t('Nota')}
+              </Button>
+              <Button
+                size="sm"
+                variant={aiChatOpen ? 'primary' : 'subtle'}
+                onClick={() => {
+                  const next = !aiChatOpen;
+                  setAiChatOpen(next);
+                  if (next) setInspectorOpen(false); // panel derecho único: evita el solape (sobre todo en móvil)
+                }}
+              >
+                <Sparkles size={14} /> {t('IA')}
+              </Button>
+              <div className="mx-1 h-4 w-px bg-border" />
+              <Button size="sm" variant={activated ? 'secondary' : 'primary'} onClick={handleActivate}>
+                {activated ? <Check size={14} /> : <UploadCloud size={14} />} {activated ? t('Activo') : t('Activar')}
+              </Button>
+            </>
+          )}
+          {canRun && (
+            <Button size="sm" variant="primary" onClick={handleRun}>
+              <Play size={14} /> {t('Probar')}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -372,8 +401,9 @@ export function Editor() {
 
       <div className="relative flex min-h-0 flex-1">
         {/* Backdrop de la paleta en móvil */}
-        {paletteOpen && <div className="absolute inset-0 z-20 bg-black/40 md:hidden" onClick={() => setPaletteOpen(false)} aria-hidden />}
-        {/* Paleta — overlay deslizante en móvil, fija en desktop */}
+        {canEdit && paletteOpen && <div className="absolute inset-0 z-20 bg-black/40 md:hidden" onClick={() => setPaletteOpen(false)} aria-hidden />}
+        {/* Paleta (añadir nodos/notas) — solo con 'workflow:write'; un VIEWER no la ve. */}
+        {canEdit && (
         <aside
           className={cn(
             'absolute inset-y-0 left-0 z-30 w-44 shrink-0 overflow-y-auto border-r border-border bg-surface p-3 transition-transform duration-200',
@@ -427,6 +457,7 @@ export function Editor() {
             {t('Pulsa un bloque para añadirlo al flujo. Atajos: deshacer ⌘Z, copiar ⌘C/⌘V, borrar Supr.')}
           </p>
         </aside>
+        )}
 
         {/* Canvas */}
         <div ref={canvasRef} className="relative min-w-0 flex-1 bg-bg">
@@ -450,7 +481,10 @@ export function Editor() {
             }}
             onPaneClick={() => s().setSelection([], [])}
             onConnect={onConnect}
-            deleteKeyCode={null}
+            nodesDraggable={canEdit}
+            nodesConnectable={canEdit}
+            elementsSelectable={canEdit}
+            deleteKeyCode={canEdit ? undefined : null} // VIEWER: sin borrar por teclado; editores conservan Backspace
             selectionKeyCode="Shift"
             fitView
             proOptions={{ hideAttribution: true }}
@@ -468,7 +502,7 @@ export function Editor() {
           )}
           {/* Burbuja flotante del chat de IA (M67): lanzador en la esquina inferior derecha, además del
               botón «IA» de la barra. Se oculta mientras el panel está abierto (el propio panel lo cierra). */}
-          {!aiChatOpen && (
+          {canEdit && !aiChatOpen && (
             <button
               type="button"
               onClick={() => {
@@ -512,8 +546,8 @@ export function Editor() {
           </aside>
         )}
 
-        {/* Chat de IA (M30): panel derecho para seguir modificando el flujo conversando. */}
-        {aiChatOpen && <AiChatPanel onClose={() => setAiChatOpen(false)} />}
+        {/* Chat de IA (M30): panel derecho para seguir modificando el flujo conversando. Solo con edición. */}
+        {canEdit && aiChatOpen && <AiChatPanel onClose={() => setAiChatOpen(false)} />}
       </div>
     </div>
   );

@@ -5,7 +5,7 @@ import { Card, PageHeader, Switch, Input, Button, Badge } from '../ui';
 import { useUI } from '../app/ui-store';
 import { cn } from '../lib/cn';
 import { api } from '../lib/api';
-import { useAuth, canApprove, AUTH_MODE, type Role } from '../lib/auth';
+import { useAuth, canApprove, useCan, AUTH_MODE, type Role } from '../lib/auth';
 import { useT } from '../i18n';
 
 const ROLES: Role[] = ['OWNER', 'ADMIN', 'EDITOR', 'VIEWER'];
@@ -89,6 +89,7 @@ export function SettingsPage() {
   const t = useT();
   const theme = useUI((s) => s.theme);
   const setTheme = useUI((s) => s.setTheme);
+  const canManageKeys = useCan('apikey:manage');
 
   return (
     <Page className="max-w-3xl space-y-6">
@@ -133,10 +134,20 @@ export function SettingsPage() {
       </Section>
 
       <Section icon={<KeyRound size={16} />} title={t('Proveedores LLM')} description={t('Claves de API (cifradas por el Secret Manager).')}>
-        <label className="block">
-          <span className="mb-1 block text-xs font-medium text-txt-secondary">Anthropic API Key</span>
-          <Input type="password" placeholder={t('sk-ant-… (usa el Mock si está vacía)')} />
-        </label>
+        {canManageKeys ? (
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-txt-secondary">Anthropic API Key</span>
+            <Input type="password" placeholder={t('sk-ant-… (usa el Mock si está vacía)')} />
+          </label>
+        ) : (
+          <div className="flex items-center justify-between rounded-lg border border-border bg-surface px-3 py-2.5">
+            <div>
+              <div className="text-sm text-txt-primary">Anthropic</div>
+              <div className="text-xs text-txt-secondary">{t('Configurado por un administrador del workspace.')}</div>
+            </div>
+            <span className="font-mono text-[11px] text-txt-disabled">sk-ant-••••••••</span>
+          </div>
+        )}
       </Section>
     </Page>
   );

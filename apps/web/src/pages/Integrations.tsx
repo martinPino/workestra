@@ -8,7 +8,7 @@ import { Card, Badge, Dot, PageHeader, Button } from '../ui';
 import { useConnectors, useConnectorProviders } from '../lib/hooks';
 import { api } from '../lib/api';
 import { ProviderLogo, hasProviderLogo } from '../lib/provider-logos';
-import { useAuth, canApprove } from '../lib/auth';
+import { useAuth, useCan } from '../lib/auth';
 import { useT } from '../i18n';
 
 const PROVIDER_GRADIENT: Record<string, string> = {
@@ -19,7 +19,8 @@ const PROVIDER_GRADIENT: Record<string, string> = {
 
 /** Conectores OAuth (M11): conectar con el proveedor `dev` (funcional) y dispatch por el nodo Conector. */
 function ConnectorsManager() {
-  const { token, role } = useAuth();
+  const { token } = useAuth();
+  const canManageConnectors = useCan('connector:write');
   const t = useT();
   const { data: providers } = useConnectorProviders();
   const [connecting, setConnecting] = useState<string | null>(null);
@@ -98,8 +99,9 @@ function ConnectorsManager() {
                         </span>
                       )}
                     </div>
-                    {connected ? (
-                      <Button size="sm" variant="secondary" onClick={() => disconnect(c!.id)} disabled={!canApprove(role)}>
+                    {/* Gestionar conectores es de ADMIN (connector:write). Sin permiso ocultamos las acciones y dejamos solo la lectura. */}
+                    {canManageConnectors && (connected ? (
+                      <Button size="sm" variant="secondary" onClick={() => disconnect(c!.id)}>
                         <Unplug size={14} /> {t('Desconectar')}
                       </Button>
                     ) : (
@@ -107,11 +109,11 @@ function ConnectorsManager() {
                         size="sm"
                         variant={p.configured ? 'primary' : 'secondary'}
                         onClick={() => connect(p.provider)}
-                        disabled={!canApprove(role) || !p.configured || connecting === p.provider}
+                        disabled={!p.configured || connecting === p.provider}
                       >
                         <Plug size={14} /> {connecting === p.provider ? t('Conectando…') : t('Conectar')}
                       </Button>
-                    )}
+                    ))}
                   </Card>
                 </motion.div>
               );

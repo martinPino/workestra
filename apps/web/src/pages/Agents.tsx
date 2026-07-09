@@ -12,6 +12,7 @@ import { api, type AgentDto, type AgentInput, type AgentDraft, type McpServerRef
 import { AgentChatPanel } from '../components/AgentChatPanel';
 import { ROLE_PRESETS, AGENT_MODELS } from './agent-roles';
 import { agentGradient } from '../lib/agent-avatar';
+import { useCan } from '../lib/auth';
 import { useT } from '../i18n';
 
 let mcpCounter = 0;
@@ -22,6 +23,7 @@ const selectCls =
 
 export function Agents() {
   const t = useT();
+  const canWrite = useCan('agent:write');
   const { data, isLoading } = useAgents();
   const [editing, setEditing] = useState<AgentDto | 'new' | null>(null);
   const [chatOpen, setChatOpen] = useState(false); // M68: chat flotante «crear asistente con IA»
@@ -66,7 +68,7 @@ export function Agents() {
         title={t('Agentes')}
         subtitle={t('Especialistas de IA: define su Rol, objetivo, instrucciones y modelo.')}
         actions={
-          !editing && (
+          canWrite && !editing && (
             <Button variant="primary" onClick={() => openNew(null)}>
               <Plus size={15} /> {t('Nuevo agente')}
             </Button>
@@ -99,9 +101,11 @@ export function Agents() {
             title={t('Sin agentes')}
             description={t('Crea agentes especializados con un Rol para tus workflows.')}
             action={
-              <Button variant="primary" onClick={() => openNew(null)}>
-                <Plus size={15} /> {t('Nuevo agente')}
-              </Button>
+              canWrite ? (
+                <Button variant="primary" onClick={() => openNew(null)}>
+                  <Plus size={15} /> {t('Nuevo agente')}
+                </Button>
+              ) : undefined
             }
           />
         )
@@ -114,7 +118,7 @@ export function Agents() {
       )}
 
       {/* Chat «crear asistente con IA» (M68): burbuja flotante abajo a la derecha, como en el editor. */}
-      {!chatOpen && (
+      {canWrite && !chatOpen && (
         <button
           type="button"
           onClick={() => setChatOpen(true)}
@@ -125,7 +129,7 @@ export function Agents() {
           <Sparkles size={22} className="transition-transform duration-200 group-hover:rotate-12" />
         </button>
       )}
-      {chatOpen && <AgentChatPanel onClose={() => setChatOpen(false)} onDraft={onDraft} />}
+      {canWrite && chatOpen && <AgentChatPanel onClose={() => setChatOpen(false)} onDraft={onDraft} />}
     </Page>
   );
 }
@@ -382,6 +386,7 @@ function Field({ label, hint, className, children }: { label: string; hint?: str
 
 function AgentCard({ agent, index, onEdit }: { agent: AgentDto; index: number; onEdit: () => void }) {
   const t = useT();
+  const canWrite = useCan('agent:write');
   const qc = useQueryClient();
   const gradient = agentGradient(agent.id);
   const role = agent.permissions?.role ?? 'EDITOR';
@@ -413,14 +418,16 @@ function AgentCard({ agent, index, onEdit }: { agent: AgentDto; index: number; o
             </div>
             <p className="mt-0.5 line-clamp-2 text-xs text-txt-secondary">{agent.description ?? t('Agente especializado.')}</p>
           </div>
-          <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-            <IconButton onClick={onEdit} aria-label={t('Editar')}>
-              <Pencil size={14} />
-            </IconButton>
-            <IconButton onClick={() => setConfirming(true)} aria-label={t('Borrar')} className="hover:text-danger">
-              <Trash2 size={14} />
-            </IconButton>
-          </div>
+          {canWrite && (
+            <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+              <IconButton onClick={onEdit} aria-label={t('Editar')}>
+                <Pencil size={14} />
+              </IconButton>
+              <IconButton onClick={() => setConfirming(true)} aria-label={t('Borrar')} className="hover:text-danger">
+                <Trash2 size={14} />
+              </IconButton>
+            </div>
+          )}
         </div>
 
         {confirming ? (
