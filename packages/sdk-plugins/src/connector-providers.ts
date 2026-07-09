@@ -61,14 +61,25 @@ export function connectorProviders(selfBase = 'http://localhost:3001'): Record<s
     },
     jira: {
       provider: 'jira',
-      label: 'Jira',
+      // UNA sola conexión OAuth de Atlassian sirve a Jira y Confluence (integración de primera clase, M76).
+      label: 'Atlassian',
       authorizeUrl: 'https://auth.atlassian.com/authorize',
       tokenUrl: 'https://auth.atlassian.com/oauth/token',
       // Base de Atlassian; el nodo debe apuntar a /ex/jira/{cloudid}/rest/api/3/… (ver docs).
       baseUrl: 'https://api.atlassian.com',
-      // `manage:jira-webhook`: registrar/borrar webhooks dinámicos vía REST (triggers sin código, M19).
-      // `offline_access`: refresh token para renovar el webhook (caduca a los 30 días).
-      scopes: ['read:jira-work', 'write:jira-work', 'manage:jira-webhook', 'offline_access'],
+      // Jira: `manage:jira-webhook` registra/borra webhooks dinámicos (triggers sin código, M19).
+      // Confluence: leer/buscar/crear contenido (herramientas de agente, M76).
+      // `offline_access`: refresh token para renovar el token/webhook (caducan a los 30 días).
+      scopes: [
+        'read:jira-work',
+        'write:jira-work',
+        'manage:jira-webhook',
+        'read:confluence-content.all',
+        'read:confluence-space.summary',
+        'write:confluence-content',
+        'search:confluence',
+        'offline_access',
+      ],
       requiresConfig: true,
       tokenExchange: 'json',
       tokenPath: 'access_token',

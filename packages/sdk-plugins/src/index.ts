@@ -18,6 +18,8 @@ export * from './router-node';
 export * from './connector-providers';
 export * from './oauth-token';
 export * from './jira-webhooks';
+export * from './integrations';
+export * from './integration-tool-resolver';
 export * from './trigger-events';
 export * from './drive-poll';
 export * from './slack-api';

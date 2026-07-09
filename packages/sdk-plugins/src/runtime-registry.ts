@@ -16,6 +16,7 @@ import { AgentNodeExecutor } from './agent-node';
 import { HumanNodeExecutor } from './human-node';
 import { ConnectorNodeExecutor } from './connector-node';
 import { RouterNodeExecutor } from './router-node';
+import { IntegrationToolResolver, composeMcpResolvers } from './integration-tool-resolver';
 
 export interface RuntimeRegistryDeps {
   agents: IAgentRepository;
@@ -52,6 +53,12 @@ export function createRuntimeRegistry(deps: RuntimeRegistryDeps): NodeExecutorRe
   registry.register(new WaitNodeExecutor());
   registry.register(new WorkNodeExecutor('tool', deps.stepDelayMs ?? 0));
 
+  // M76: integraciones de primera clase (Atlassian…). Si hay conectores+secretos, resuelve las refs
+  // `integration://<key>` del agente a herramientas con el token OAuth (dueña la plataforma) inyectado.
+  // Se COMPONE con el resolver MCP HTTP: cada uno ignora las refs del otro.
+  const integrationResolver =
+    deps.connectors && deps.secrets ? new IntegrationToolResolver(deps.connectors, deps.secrets) : undefined;
+
   const runtime = new AgentRuntime({
     router: deps.llmRouter,
     tools: new ToolRegistry()
@@ -60,7 +67,7 @@ export function createRuntimeRegistry(deps: RuntimeRegistryDeps): NodeExecutorRe
       .register(new BrowserTool({ files: deps.files })), // M71/M72: «Browser Automation» — motor intercambiable + capturas persistidas (replay)
     authz: new ToolAuthorizationService(),
     memory: deps.memory,
-    mcp: deps.mcp,
+    mcp: composeMcpResolvers(deps.mcp, integrationResolver),
   });
   const orchestrator = new Orchestrator({
     planner: new LlmPlanner(deps.llmRouter, deps.plannerModel ?? 'mock-1'),
