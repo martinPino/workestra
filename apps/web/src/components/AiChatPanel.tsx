@@ -132,7 +132,7 @@ export function AiChatPanel({ onClose }: { onClose: () => void }) {
           >
             {GENERATION_MODELS.map((m) => (
               <option key={m.value} value={m.value}>
-                {m.label}
+                {t(m.label)}
               </option>
             ))}
           </select>
