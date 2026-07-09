@@ -1,104 +1,177 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Search, Star, Download, Bot, Workflow, Wrench, Plug } from 'lucide-react';
+import { Search, Star, Download, Clock, Users, Sparkles, ArrowRight } from 'lucide-react';
 import { Page } from '../app/AppShell';
-import { Card, Badge, PageHeader, Input } from '../ui';
+import { PageHeader, Input } from '../ui';
+import { ProviderLogo, hasProviderLogo } from '../lib/provider-logos';
 import { cn } from '../lib/cn';
 import { useT } from '../i18n';
+import { MARKETPLACE, KINDS, COLLECTIONS, type MarketItem, type MarketKind } from '../marketplace/catalog';
 
-type Cat = 'all' | 'agents' | 'workflows' | 'tools' | 'connectors';
+const DIFFICULTY_TONE: Record<MarketItem['difficulty'], string> = {
+  'Fácil': 'text-success',
+  'Media': 'text-warning',
+  'Avanzada': 'text-danger',
+};
 
-interface Item {
-  name: string;
-  author: string;
-  desc: string;
-  cat: Exclude<Cat, 'all'>;
-  rating: number;
-  downloads: string;
-  gradient: string;
+const fmtInstalls = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
+
+/** Fila de logos de conectores + chips de MCP requeridos por un item. */
+function Requirements({ item }: { item: MarketItem }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {item.connectors.map((p) =>
+        hasProviderLogo(p) ? (
+          <span key={p} className="flex h-6 w-6 items-center justify-center rounded-md border border-border bg-white" title={p}>
+            <ProviderLogo provider={p} size={14} />
+          </span>
+        ) : (
+          <span key={p} className="rounded-md border border-border bg-card px-1.5 py-0.5 text-[10px] text-txt-secondary">{p}</span>
+        ),
+      )}
+      {item.mcps.map((m) => (
+        <span key={m} className="rounded-md border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary" title={`MCP: ${m}`}>
+          {m}
+        </span>
+      ))}
+    </div>
+  );
 }
 
-const ITEMS: Item[] = [
-  { name: 'Backend Agent Pro', author: 'agentflow', desc: 'Java/Spring, Git, Docker, Postgres, Maven.', cat: 'agents', rating: 4.9, downloads: '12.4k', gradient: 'from-indigo-500 to-fuchsia-500' },
-  { name: 'QA Playwright', author: 'agentflow', desc: 'E2E testing con Playwright y reportes.', cat: 'agents', rating: 4.8, downloads: '9.1k', gradient: 'from-emerald-500 to-teal-500' },
-  { name: 'Bug → PR pipeline', author: 'community', desc: 'De un bug de Jira a un PR revisado.', cat: 'workflows', rating: 4.7, downloads: '6.3k', gradient: 'from-amber-500 to-orange-500' },
-  { name: 'Incident Responder', author: 'ops-guild', desc: 'Triage de alertas de Sentry y runbooks.', cat: 'workflows', rating: 4.6, downloads: '3.8k', gradient: 'from-rose-500 to-pink-500' },
-  { name: 'HTTP Tool+', author: 'agentflow', desc: 'Cliente HTTP con allowlist y reintentos.', cat: 'tools', rating: 4.9, downloads: '18.2k', gradient: 'from-sky-500 to-blue-500' },
-  { name: 'GitHub Connector', author: 'agentflow', desc: 'Issues, PRs, commits y webhooks.', cat: 'connectors', rating: 4.9, downloads: '22.7k', gradient: 'from-zinc-500 to-zinc-700' },
-  { name: 'Slack Connector', author: 'agentflow', desc: 'Mensajes, canales y comandos.', cat: 'connectors', rating: 4.8, downloads: '15.9k', gradient: 'from-purple-500 to-violet-500' },
-  { name: 'Notion Sync', author: 'community', desc: 'Sincroniza docs y bases de datos.', cat: 'connectors', rating: 4.5, downloads: '5.1k', gradient: 'from-neutral-400 to-neutral-600' },
-];
+function MarketCard({ item }: { item: MarketItem }) {
+  const t = useT();
+  const navigate = useNavigate();
+  const kind = KINDS.find((k) => k.key === item.kind);
+  return (
+    <motion.button
+      layout
+      onClick={() => navigate(`/marketplace/${item.id}`)}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="group flex h-full flex-col rounded-2xl border border-border bg-elevated p-4 text-left shadow-card transition-all hover:border-border-strong hover:shadow-pop"
+    >
+      <div className="flex items-start gap-3">
+        <span className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-xl shadow-subtle', item.gradient)}>{item.icon}</span>
+        <div className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold text-txt-primary">{item.name}</span>
+          <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-txt-disabled">
+            <span>{kind?.icon}</span>
+            <span className="truncate">{item.category}</span>
+          </div>
+        </div>
+      </div>
 
-const CATS: { key: Cat; label: string; icon: React.ReactNode }[] = [
-  { key: 'all', label: 'Todo', icon: <Star size={13} /> },
-  { key: 'agents', label: 'Agentes', icon: <Bot size={13} /> },
-  { key: 'workflows', label: 'Workflows', icon: <Workflow size={13} /> },
-  { key: 'tools', label: 'Herramientas', icon: <Wrench size={13} /> },
-  { key: 'connectors', label: 'Conectores', icon: <Plug size={13} /> },
-];
+      <p className="mt-2.5 line-clamp-2 flex-1 text-xs leading-relaxed text-txt-secondary">{item.tagline}</p>
+
+      <div className="mt-2.5 flex flex-wrap gap-1">
+        {item.badges.slice(0, 3).map((b) => (
+          <span key={b} className="rounded-full bg-card px-2 py-0.5 text-[10px] font-medium text-txt-secondary">{b}</span>
+        ))}
+      </div>
+
+      {(item.connectors.length > 0 || item.mcps.length > 0) && (
+        <div className="mt-2.5">
+          <Requirements item={item} />
+        </div>
+      )}
+
+      <div className="mt-3 flex items-center justify-between border-t border-border/60 pt-2.5 text-[11px] text-txt-disabled">
+        <div className="flex items-center gap-2.5">
+          {item.kind === 'team' && (
+            <span className="inline-flex items-center gap-1" title={t('Agentes')}>
+              <Users size={12} /> {item.install.agents?.length ?? 0}
+            </span>
+          )}
+          <span className={cn('font-medium', DIFFICULTY_TONE[item.difficulty])}>{item.difficulty}</span>
+          <span className="inline-flex items-center gap-1">
+            <Clock size={12} /> {item.setupMinutes}m
+          </span>
+        </div>
+        <div className="flex items-center gap-2.5">
+          <span className="inline-flex items-center gap-1">
+            <Star size={12} className="text-amber-400" /> {item.rating}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <Download size={12} /> {fmtInstalls(item.installs)}
+          </span>
+        </div>
+      </div>
+      <div className="mt-2 flex items-center justify-between">
+        <span className="text-[10px] text-txt-disabled">por {item.author}</span>
+        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
+          {t('Ver')} <ArrowRight size={12} />
+        </span>
+      </div>
+    </motion.button>
+  );
+}
 
 export function Marketplace() {
   const t = useT();
-  const [cat, setCat] = useState<Cat>('all');
   const [q, setQ] = useState('');
+  const [kind, setKind] = useState<MarketKind | 'all'>('all');
+  const [collection, setCollection] = useState<string | null>(null);
 
-  const items = useMemo(
-    () => ITEMS.filter((it) => (cat === 'all' || it.cat === cat) && it.name.toLowerCase().includes(q.toLowerCase())),
-    [cat, q],
-  );
+  const items = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    return MARKETPLACE.filter((it) => {
+      if (kind !== 'all' && it.kind !== kind) return false;
+      if (collection && !it.collections.includes(collection)) return false;
+      if (query && !`${it.name} ${it.tagline} ${it.category}`.toLowerCase().includes(query)) return false;
+      return true;
+    });
+  }, [q, kind, collection]);
 
   return (
     <Page className="space-y-6">
-      <PageHeader title="Marketplace" subtitle={t("Descubre y reutiliza agentes, workflows, herramientas y conectores.")} />
+      <PageHeader title={t('Marketplace')} subtitle={t('Instala equipos inteligentes, agentes y automatizaciones con un clic.')} />
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative w-full max-w-sm">
-          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-txt-disabled" />
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Buscar en el marketplace…")} className="pl-9" />
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {CATS.map((c) => (
-            <button
-              key={c.key}
-              onClick={() => setCat(c.key)}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors',
-                cat === c.key ? 'border-primary/30 bg-primary/12 text-primary' : 'border-border bg-card text-txt-secondary hover:text-txt-primary',
-              )}
-            >
-              {c.icon} {t(c.label)}
-            </button>
-          ))}
-        </div>
+      <div className="relative max-w-xl">
+        <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-txt-disabled" />
+        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('Busca equipos, agentes, automatizaciones…')} className="pl-9" />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {items.map((it, i) => (
-          <motion.div key={it.name} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
-            <Card hover className="group flex h-full flex-col p-5">
-              <div className={`mb-4 flex h-24 items-center justify-center rounded-lg bg-gradient-to-br ${it.gradient}`}>
-                <div className="text-2xl font-bold text-white/90">{it.name.charAt(0)}</div>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-txt-primary">{it.name}</span>
-                <Badge tone="default">{it.cat}</Badge>
-              </div>
-              <p className="mt-1 flex-1 text-xs text-txt-secondary">{t(it.desc)}</p>
-              <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-xs text-txt-secondary">
-                <span>{t("por")} {it.author}</span>
-                <div className="flex items-center gap-3">
-                  <span className="flex items-center gap-1">
-                    <Star size={12} className="fill-warning text-warning" /> {it.rating}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Download size={12} /> {it.downloads}
-                  </span>
-                </div>
-              </div>
-            </Card>
-          </motion.div>
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => setKind('all')}
+          className={cn('flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors', kind === 'all' ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border bg-card text-txt-secondary hover:text-txt-primary')}
+        >
+          <Sparkles size={13} /> {t('Todo')}
+        </button>
+        {KINDS.map((k) => (
+          <button
+            key={k.key}
+            onClick={() => setKind(k.key)}
+            className={cn('flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors', kind === k.key ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border bg-card text-txt-secondary hover:text-txt-primary')}
+          >
+            <span>{k.icon}</span> {t(k.label)}
+          </button>
         ))}
       </div>
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="mr-1 text-[11px] font-medium uppercase tracking-wide text-txt-disabled">{t('Colecciones')}</span>
+        {COLLECTIONS.map((c) => (
+          <button
+            key={c.id}
+            onClick={() => setCollection((cur) => (cur === c.id ? null : c.id))}
+            className={cn('rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors', collection === c.id ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border bg-card text-txt-secondary hover:text-txt-primary')}
+          >
+            {c.emoji} {c.label}
+          </button>
+        ))}
+      </div>
+
+      {items.length === 0 ? (
+        <div className="rounded-xl border border-border bg-elevated p-10 text-center text-sm text-txt-secondary">{t('No hay resultados. Prueba con otra búsqueda o categoría.')}</div>
+      ) : (
+        <motion.div layout className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {items.map((it) => (
+            <MarketCard key={it.id} item={it} />
+          ))}
+        </motion.div>
+      )}
     </Page>
   );
 }

@@ -11,6 +11,7 @@ import { Agents } from './pages/Agents';
 import { Executions } from './pages/Executions';
 import { ExecutionDetail } from './pages/ExecutionDetail';
 import { Marketplace } from './pages/Marketplace';
+import { MarketplaceDetail } from './pages/MarketplaceDetail';
 import { Integrations } from './pages/Integrations';
 import { SettingsPage } from './pages/Settings';
 import { Team } from './pages/Team';
@@ -59,6 +60,7 @@ void ensureDevSession(api.base).finally(() => {
               <Route path="/executions" element={<Executions />} />
               <Route path="/executions/:id" element={<ExecutionDetail />} />
               <Route path="/marketplace" element={<Marketplace />} />
+              <Route path="/marketplace/:id" element={<MarketplaceDetail />} />
               <Route path="/integrations" element={<Integrations />} />
               <Route path="/team" element={<Team />} />
               <Route path="/settings" element={<SettingsPage />} />

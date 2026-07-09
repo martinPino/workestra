@@ -1,0 +1,753 @@
+import type { GraphDoc } from '../editor/model';
+
+/**
+ * Catálogo del Marketplace (M75) — la «App Store» de empleados digitales: AI Teams, Agents, Automations,
+ * Browser Automation y MCP Solutions. Es data RICA en el front (como las plantillas, pero con toda la
+ * metadata + una RECETA de instalación). Instalar usa las APIs existentes: crea los agentes y el workflow,
+ * y detecta los conectores que faltan. rating/installs son de vitrina; el resto es real.
+ */
+
+export type MarketKind = 'team' | 'agent' | 'automation' | 'browser' | 'mcp';
+
+/** Un agente de la receta: se crea al instalar y se referencia en el grafo por `ref`. */
+export interface SeedAgent {
+  ref: string;
+  name: string;
+  emoji: string;
+  role: string;
+  systemPrompt: string;
+  model: string;
+  tools: string[];
+  mcpServers?: { name: string; url: string }[];
+  isOrchestrator?: boolean;
+}
+
+/** Qué crea la instalación: agentes (opcional) y/o un workflow ya cableado. */
+export interface InstallRecipe {
+  agents?: SeedAgent[];
+  workflow?: { name: string; doc: GraphDoc };
+}
+
+export interface MarketVariable {
+  key: string;
+  label: string;
+  example?: string;
+}
+
+export interface MarketItem {
+  id: string;
+  kind: MarketKind;
+  name: string;
+  tagline: string;
+  description: string;
+  icon: string;
+  gradient: string;
+  category: string; // área de negocio
+  difficulty: 'Fácil' | 'Media' | 'Avanzada';
+  setupMinutes: number;
+  connectors: string[]; // claves de proveedor
+  mcps: string[];
+  tools: string[];
+  useCases: string[];
+  variables?: MarketVariable[];
+  requirements?: string[];
+  rating: number;
+  installs: number;
+  author: string;
+  badges: string[];
+  collections: string[];
+  install: InstallRecipe;
+}
+
+/** Categorías de primer nivel (los «niveles» del marketplace). */
+export const KINDS: { key: MarketKind; label: string; icon: string; tagline: string }[] = [
+  { key: 'team', label: 'AI Teams', icon: '🤝', tagline: 'Equipos de agentes que colaboran' },
+  { key: 'agent', label: 'AI Agents', icon: '🤖', tagline: 'Empleados digitales individuales' },
+  { key: 'automation', label: 'Automations', icon: '⚡', tagline: 'Flujos entre tus apps' },
+  { key: 'browser', label: 'Browser Automation', icon: '🌐', tagline: 'Tareas en el navegador' },
+  { key: 'mcp', label: 'MCP Solutions', icon: '🧩', tagline: 'Expertos conectados por MCP' },
+];
+
+/** Colecciones destacadas (chips de la home del marketplace). */
+export const COLLECTIONS: { id: string; label: string; emoji: string }[] = [
+  { id: 'popular', label: 'Most Popular', emoji: '🔥' },
+  { id: 'new', label: 'New', emoji: '✨' },
+  { id: 'trending', label: 'Trending', emoji: '📈' },
+  { id: 'ai-teams', label: 'AI Teams', emoji: '🤝' },
+  { id: 'beginner', label: 'Beginner Friendly', emoji: '🌱' },
+  { id: 'browser', label: 'Browser Automation', emoji: '🌐' },
+  { id: 'mcp', label: 'MCP Ready', emoji: '🧩' },
+];
+
+// --- Helpers para construir los grafos de instalación (mismo formato que las plantillas) ---
+type N = GraphDoc['nodes'][number];
+const node = (id: string, kind: string, x: number, y: number, config: Record<string, unknown> = {}): N =>
+  ({ id, kind, position: { x, y }, config }) as N;
+const edge = (source: string, target: string, sourceHandle?: string) => ({
+  id: `e_${source}_${target}${sourceHandle ? `_${sourceHandle}` : ''}`,
+  source,
+  target,
+  sourceHandle: sourceHandle ?? null,
+});
+const M = 'gpt-4o-mini';
+
+export const MARKETPLACE: MarketItem[] = [
+  // ---------------------------------- AI TEAMS ----------------------------------
+  {
+    id: 'team-customer-support',
+    kind: 'team',
+    name: 'Customer Support Team',
+    tagline: 'Triaje, respuesta y escalado de tickets, en equipo.',
+    description:
+      'Un equipo completo de atención al cliente: un coordinador clasifica cada consulta, un agente de soporte redacta la respuesta con tono de marca, y si el caso es delicado se avisa a tu equipo por Slack. Ideal para bandeja de entrada de soporte o formularios de contacto.',
+    icon: '🎧',
+    gradient: 'from-sky-500 to-indigo-500',
+    category: 'Customer Support',
+    difficulty: 'Media',
+    setupMinutes: 8,
+    connectors: ['gmail', 'slack'],
+    mcps: [],
+    tools: ['http'],
+    useCases: ['Bandeja de soporte', 'Formularios de contacto', 'Chat de ayuda'],
+    variables: [{ key: 'brand', label: 'Nombre de tu marca', example: 'ACME' }],
+    requirements: ['Una cuenta de Gmail o correo de soporte', 'Un canal de Slack para escalados'],
+    rating: 4.9,
+    installs: 3820,
+    author: 'workestra',
+    badges: ['Popular', 'AI Powered'],
+    collections: ['popular', 'ai-teams', 'trending'],
+    install: {
+      agents: [
+        { ref: 'triage', name: 'Coordinador de Soporte', emoji: '🧭', role: 'Clasifica y reparte', model: M, tools: [], isOrchestrator: true, systemPrompt: 'Eres el coordinador de un equipo de soporte. Clasifica la consulta (facturación, técnico, comercial, urgente) y decide la mejor respuesta. Sé breve.' },
+        { ref: 'responder', name: 'Agente de Soporte', emoji: '💬', role: 'Redacta la respuesta', model: M, tools: [], systemPrompt: 'Eres un agente de soporte empático y resolutivo. Responde de forma clara y útil, con el tono de la marca. Si no puedes resolverlo, ofrece escalar.' },
+      ],
+      workflow: {
+        name: 'Customer Support Team',
+        doc: {
+          nodes: [
+            node('trigger', 'trigger', 40, 200, { event: 'webhook' }),
+            node('triage', 'agent', 300, 200, { agentRef: 'triage', input: 'Clasifica y orienta esta consulta:\n{{ticket.summary}}\n{{ticket.description}}' }),
+            node('reply', 'agent', 560, 200, { agentRef: 'responder', input: 'Redacta la respuesta al cliente sobre:\n{{ticket.summary}}' }),
+            node('urgent', 'condition', 820, 200, { expression: 'agent:triage.output ~ urgente' }),
+            node('done', 'end', 1080, 120, {}),
+            node('escalate', 'connector', 1080, 320, { provider: 'slack', connectorId: null, method: 'POST', path: '/chat.postMessage', body: '{"channel":"#soporte","text":"⚠️ Ticket urgente. Revisad: {{agent:reply.output}}"}' }),
+            node('escalated', 'end', 1340, 320, {}),
+          ],
+          edges: [edge('trigger', 'triage'), edge('triage', 'reply'), edge('reply', 'urgent'), edge('urgent', 'done', 'false'), edge('urgent', 'escalate', 'true'), edge('escalate', 'escalated')],
+          comments: [],
+        },
+      },
+    },
+  },
+  {
+    id: 'team-sales',
+    kind: 'team',
+    name: 'Sales Team',
+    tagline: 'Califica leads, redacta el primer contacto y avisa a ventas.',
+    description:
+      'Equipo comercial que recibe un lead, lo califica (BANT), redacta un email de primer contacto personalizado y notifica al comercial asignado. Conecta tu CRM para registrar la actividad.',
+    icon: '💼',
+    gradient: 'from-emerald-500 to-lime-500',
+    category: 'Sales',
+    difficulty: 'Media',
+    setupMinutes: 10,
+    connectors: ['hubspot', 'gmail'],
+    mcps: [],
+    tools: ['http'],
+    useCases: ['Inbound leads', 'Formularios de demo', 'Enriquecer y priorizar'],
+    rating: 4.8,
+    installs: 2610,
+    author: 'workestra',
+    badges: ['Popular', 'Sales Automation'],
+    collections: ['popular', 'ai-teams', 'trending'],
+    install: {
+      agents: [
+        { ref: 'qualifier', name: 'Calificador de Leads', emoji: '🎯', role: 'Puntúa el lead', model: M, tools: [], systemPrompt: 'Eres un SDR. Califica el lead con BANT (presupuesto, autoridad, necesidad, plazo) y da una puntuación de 1 a 5 con una frase de justificación.' },
+        { ref: 'writer', name: 'Redactor de Outreach', emoji: '✍️', role: 'Escribe el primer email', model: M, tools: [], systemPrompt: 'Eres un redactor de ventas. Escribe un primer email breve, personalizado y con una llamada a la acción clara. Nada de spam.' },
+      ],
+      workflow: {
+        name: 'Sales Team',
+        doc: {
+          nodes: [
+            node('trigger', 'trigger', 40, 180, { event: 'webhook' }),
+            node('qualify', 'agent', 300, 180, { agentRef: 'qualifier', input: 'Califica este lead:\n{{ticket.summary}}\n{{ticket.description}}' }),
+            node('draft', 'agent', 560, 180, { agentRef: 'writer', input: 'Escribe el primer email para:\n{{ticket.summary}}' }),
+            node('note', 'tool', 820, 180, { message: 'Lead calificado y email redactado: {{agent:draft.output}}' }),
+            node('end', 'end', 1080, 180, {}),
+          ],
+          edges: [edge('trigger', 'qualify'), edge('qualify', 'draft'), edge('draft', 'note'), edge('note', 'end')],
+          comments: [],
+        },
+      },
+    },
+  },
+  {
+    id: 'team-recruiting',
+    kind: 'team',
+    name: 'Recruiting Team',
+    tagline: 'Cribado de CVs, resumen y propuesta de entrevista.',
+    description:
+      'Equipo de selección: revisa una candidatura frente a la oferta, resume fortalezas y riesgos, y prepara un email para agendar (o descartar con tacto). Conecta tu calendario para proponer huecos.',
+    icon: '🧑‍💼',
+    gradient: 'from-violet-500 to-purple-500',
+    category: 'HR',
+    difficulty: 'Media',
+    setupMinutes: 9,
+    connectors: ['gmail', 'google-calendar'],
+    mcps: [],
+    tools: [],
+    useCases: ['Cribado de candidatos', 'Screening inicial', 'Agenda de entrevistas'],
+    rating: 4.7,
+    installs: 1440,
+    author: 'workestra',
+    badges: ['New', 'AI Powered'],
+    collections: ['new', 'ai-teams'],
+    install: {
+      agents: [
+        { ref: 'screener', name: 'Cribador de CVs', emoji: '🔎', role: 'Evalúa la candidatura', model: M, tools: [], systemPrompt: 'Eres un reclutador técnico. Evalúa la candidatura frente a la oferta: encaje (1-5), fortalezas, riesgos y una recomendación (avanzar/descartar).' },
+        { ref: 'comms', name: 'Comunicación', emoji: '✉️', role: 'Redacta al candidato', model: M, tools: [], systemPrompt: 'Redactas comunicaciones de RRHH con tacto y claridad: para avanzar propones agenda; para descartar, agradeces con respeto.' },
+      ],
+      workflow: {
+        name: 'Recruiting Team',
+        doc: {
+          nodes: [
+            node('trigger', 'trigger', 40, 180, { event: 'manual' }),
+            node('screen', 'agent', 300, 180, { agentRef: 'screener', input: 'Evalúa esta candidatura:\n{{ticket.description}}' }),
+            node('write', 'agent', 560, 180, { agentRef: 'comms', input: 'Redacta el email al candidato según:\n{{agent:screen.output}}' }),
+            node('end', 'end', 820, 180, {}),
+          ],
+          edges: [edge('trigger', 'screen'), edge('screen', 'write'), edge('write', 'end')],
+          comments: [],
+        },
+      },
+    },
+  },
+  {
+    id: 'team-research',
+    kind: 'team',
+    name: 'Research Team',
+    tagline: 'Investiga en la web, analiza y redacta un informe.',
+    description:
+      'Equipo de investigación: un agente busca y navega la web, un analista extrae los hechos clave y un redactor produce un informe claro con fuentes. Perfecto para due diligence, análisis de mercado o competencia.',
+    icon: '🔬',
+    gradient: 'from-amber-500 to-orange-500',
+    category: 'Research',
+    difficulty: 'Avanzada',
+    setupMinutes: 6,
+    connectors: [],
+    mcps: [],
+    tools: ['browser', 'http'],
+    useCases: ['Análisis de mercado', 'Investigación de competencia', 'Due diligence'],
+    rating: 4.8,
+    installs: 2050,
+    author: 'workestra',
+    badges: ['Trending', 'AI Powered'],
+    collections: ['trending', 'ai-teams'],
+    install: {
+      agents: [
+        { ref: 'researcher', name: 'Investigador', emoji: '🌐', role: 'Busca y navega', model: M, tools: ['browser', 'http'], systemPrompt: 'Eres un investigador. Usa el navegador y HTTP para reunir información fiable sobre el tema. Cita las fuentes (URLs).' },
+        { ref: 'analyst', name: 'Analista', emoji: '📊', role: 'Extrae lo clave', model: M, tools: [], systemPrompt: 'Eres un analista. A partir de la investigación, extrae los 5-7 hechos más relevantes y sus implicaciones.' },
+        { ref: 'writer', name: 'Redactor', emoji: '📝', role: 'Escribe el informe', model: M, tools: [], systemPrompt: 'Redactas un informe ejecutivo claro y conciso con secciones y una conclusión, citando fuentes.' },
+      ],
+      workflow: {
+        name: 'Research Team',
+        doc: {
+          nodes: [
+            node('trigger', 'trigger', 40, 180, { event: 'manual' }),
+            node('research', 'agent', 300, 180, { agentRef: 'researcher', input: 'Investiga a fondo:\n{{ticket.summary}}' }),
+            node('analyze', 'agent', 560, 180, { agentRef: 'analyst', input: 'Analiza estos hallazgos:\n{{agent:research.output}}' }),
+            node('report', 'agent', 820, 180, { agentRef: 'writer', input: 'Redacta el informe:\n{{agent:analyze.output}}' }),
+            node('end', 'end', 1080, 180, {}),
+          ],
+          edges: [edge('trigger', 'research'), edge('research', 'analyze'), edge('analyze', 'report'), edge('report', 'end')],
+          comments: [],
+        },
+      },
+    },
+  },
+
+  // ---------------------------------- AI AGENTS ----------------------------------
+  {
+    id: 'agent-email-assistant',
+    kind: 'agent',
+    name: 'Email Assistant',
+    tagline: 'Lee, resume y redacta respuestas de correo.',
+    description: 'Un asistente que entiende un hilo de correo, lo resume y propone una respuesta lista para enviar, con tu tono. Conecta Gmail para enviar directamente.',
+    icon: '📧',
+    gradient: 'from-rose-500 to-red-500',
+    category: 'Operations',
+    difficulty: 'Fácil',
+    setupMinutes: 4,
+    connectors: ['gmail'],
+    mcps: [],
+    tools: [],
+    useCases: ['Bandeja de entrada', 'Respuestas rápidas', 'Resúmenes de hilos'],
+    rating: 4.9,
+    installs: 8900,
+    author: 'workestra',
+    badges: ['Popular', 'Beginner Friendly'],
+    collections: ['popular', 'beginner'],
+    install: {
+      agents: [{ ref: 'a', name: 'Email Assistant', emoji: '📧', role: 'Correo', model: M, tools: [], systemPrompt: 'Eres un asistente de correo. Resume el hilo y propón una respuesta clara, educada y accionable, en el idioma del remitente.' }],
+    },
+  },
+  {
+    id: 'agent-research',
+    kind: 'agent',
+    name: 'Research Agent',
+    tagline: 'Investiga cualquier tema navegando la web.',
+    description: 'Un investigador que navega, busca y sintetiza información fiable con fuentes. Usa Browser Automation por dentro; tú solo le pides el tema.',
+    icon: '🔭',
+    gradient: 'from-cyan-500 to-blue-500',
+    category: 'Research',
+    difficulty: 'Media',
+    setupMinutes: 3,
+    connectors: [],
+    mcps: [],
+    tools: ['browser', 'http'],
+    useCases: ['Investigación de temas', 'Comparativas', 'Resúmenes con fuentes'],
+    rating: 4.8,
+    installs: 6100,
+    author: 'workestra',
+    badges: ['AI Powered', 'Trending'],
+    collections: ['trending'],
+    install: {
+      agents: [{ ref: 'a', name: 'Research Agent', emoji: '🔭', role: 'Investigación', model: M, tools: ['browser', 'http'], systemPrompt: 'Eres un investigador. Navega y busca para responder con hechos concretos y las fuentes (URLs). Sé riguroso.' }],
+    },
+  },
+  {
+    id: 'agent-data-analyst',
+    kind: 'agent',
+    name: 'Data Analyst',
+    tagline: 'Interpreta datos y explica los hallazgos.',
+    description: 'Un analista que recibe datos o una pregunta, razona sobre ellos y devuelve conclusiones claras con recomendaciones. Ideal para informes rápidos.',
+    icon: '📈',
+    gradient: 'from-teal-500 to-emerald-500',
+    category: 'Operations',
+    difficulty: 'Fácil',
+    setupMinutes: 3,
+    connectors: [],
+    mcps: [],
+    tools: ['http'],
+    useCases: ['Informes ad-hoc', 'Interpretar métricas', 'Resúmenes ejecutivos'],
+    rating: 4.7,
+    installs: 4300,
+    author: 'workestra',
+    badges: ['Beginner Friendly'],
+    collections: ['beginner'],
+    install: {
+      agents: [{ ref: 'a', name: 'Data Analyst', emoji: '📈', role: 'Análisis', model: M, tools: ['http'], systemPrompt: 'Eres un analista de datos. Explica qué dicen los datos, señala tendencias y da 2-3 recomendaciones accionables.' }],
+    },
+  },
+  {
+    id: 'agent-meeting-assistant',
+    kind: 'agent',
+    name: 'Meeting Assistant',
+    tagline: 'Prepara agendas y resume reuniones.',
+    description: 'Prepara la agenda de una reunión, toma notas y genera el acta con acuerdos y próximos pasos. Conecta tu calendario para contexto.',
+    icon: '🗓️',
+    gradient: 'from-fuchsia-500 to-pink-500',
+    category: 'Executive',
+    difficulty: 'Fácil',
+    setupMinutes: 4,
+    connectors: ['google-calendar'],
+    mcps: [],
+    tools: [],
+    useCases: ['Actas de reunión', 'Agendas', 'Seguimiento de acuerdos'],
+    rating: 4.6,
+    installs: 3300,
+    author: 'workestra',
+    badges: ['New'],
+    collections: ['new', 'beginner'],
+    install: {
+      agents: [{ ref: 'a', name: 'Meeting Assistant', emoji: '🗓️', role: 'Reuniones', model: M, tools: [], systemPrompt: 'Eres un asistente de reuniones. Prepara agendas y, tras la reunión, redacta un acta con decisiones, responsables y próximos pasos.' }],
+    },
+  },
+  {
+    id: 'agent-invoice-assistant',
+    kind: 'agent',
+    name: 'Invoice Assistant',
+    tagline: 'Extrae los datos de una factura y los valida.',
+    description: 'Un asistente que lee una factura (PDF o web), extrae proveedor, importe, impuestos y fecha, y comprueba que cuadre. Usa Browser Automation para portales de proveedores.',
+    icon: '🧾',
+    gradient: 'from-slate-500 to-slate-700',
+    category: 'Finance',
+    difficulty: 'Media',
+    setupMinutes: 5,
+    connectors: [],
+    mcps: [],
+    tools: ['browser'],
+    useCases: ['Cuentas por pagar', 'Extracción de facturas', 'Validación de importes'],
+    rating: 4.7,
+    installs: 2900,
+    author: 'workestra',
+    badges: ['AI Powered'],
+    collections: ['trending'],
+    install: {
+      agents: [{ ref: 'a', name: 'Invoice Assistant', emoji: '🧾', role: 'Facturas', model: M, tools: ['browser'], systemPrompt: 'Eres un asistente de cuentas por pagar. Extrae proveedor, número, fecha, base, impuestos y total de la factura, y verifica que el total cuadre. Devuelve un JSON claro.' }],
+    },
+  },
+
+  // ---------------------------------- AUTOMATIONS ----------------------------------
+  {
+    id: 'auto-gmail-slack',
+    kind: 'automation',
+    name: 'Gmail → Slack',
+    tagline: 'Avisa en Slack cuando llega un correo importante.',
+    description: 'Cuando entra un correo (o uno que cumple un criterio), resume el mensaje y lo publica en un canal de Slack. Menos bandeja, más contexto para el equipo.',
+    icon: '🔔',
+    gradient: 'from-purple-500 to-violet-500',
+    category: 'Operations',
+    difficulty: 'Fácil',
+    setupMinutes: 5,
+    connectors: ['gmail', 'slack'],
+    mcps: [],
+    tools: [],
+    useCases: ['Avisos de bandeja', 'Correos de clientes', 'Alertas de equipo'],
+    rating: 4.8,
+    installs: 5400,
+    author: 'community',
+    badges: ['Popular', 'Beginner Friendly'],
+    collections: ['popular', 'beginner'],
+    install: {
+      workflow: {
+        name: 'Gmail → Slack',
+        doc: {
+          nodes: [
+            node('trigger', 'trigger', 40, 160, { event: 'webhook' }),
+            node('sum', 'llm', 300, 160, { model: M, prompt: 'Resume el correo en una frase clara.', input: 'De: {{ticket.summary}}\n{{ticket.description}}' }),
+            node('slack', 'connector', 560, 160, { provider: 'slack', connectorId: null, method: 'POST', path: '/chat.postMessage', body: '{"channel":"#general","text":"📩 {{agent:sum.output}}"}' }),
+            node('end', 'end', 820, 160, {}),
+          ],
+          edges: [edge('trigger', 'sum'), edge('sum', 'slack'), edge('slack', 'end')],
+          comments: [],
+        },
+      },
+    },
+  },
+  {
+    id: 'auto-daily-report',
+    kind: 'automation',
+    name: 'Daily Report',
+    tagline: 'Un resumen diario automático a tu canal.',
+    description: 'Cada día, recopila el estado (ventas, incidencias, lo que definas), lo resume con IA y lo publica en Slack. Se dispara por horario.',
+    icon: '📊',
+    gradient: 'from-orange-500 to-amber-500',
+    category: 'Operations',
+    difficulty: 'Fácil',
+    setupMinutes: 6,
+    connectors: ['slack'],
+    mcps: [],
+    tools: ['http'],
+    useCases: ['Resumen diario', 'Standup asíncrono', 'KPIs del día'],
+    rating: 4.6,
+    installs: 3100,
+    author: 'community',
+    badges: ['Beginner Friendly'],
+    collections: ['beginner'],
+    install: {
+      workflow: {
+        name: 'Daily Report',
+        doc: {
+          nodes: [
+            node('trigger', 'trigger', 40, 160, { event: 'cron' }),
+            node('sum', 'llm', 300, 160, { model: M, prompt: 'Redacta un resumen diario breve y motivador con los datos aportados.', input: 'Datos de hoy:\n{{ticket.description}}' }),
+            node('slack', 'connector', 560, 160, { provider: 'slack', connectorId: null, method: 'POST', path: '/chat.postMessage', body: '{"channel":"#daily","text":"☀️ Resumen de hoy:\\n{{agent:sum.output}}"}' }),
+            node('end', 'end', 820, 160, {}),
+          ],
+          edges: [edge('trigger', 'sum'), edge('sum', 'slack'), edge('slack', 'end')],
+          comments: [],
+        },
+      },
+    },
+  },
+  {
+    id: 'auto-lead-qualification',
+    kind: 'automation',
+    name: 'Lead Qualification',
+    tagline: 'Puntúa cada lead entrante y enruta el flujo.',
+    description: 'Cuando llega un lead, la IA lo puntúa; si es caliente, avisa a ventas; si no, lo guarda para nurturing. Bifurca según la puntuación.',
+    icon: '🎯',
+    gradient: 'from-lime-500 to-green-500',
+    category: 'Sales',
+    difficulty: 'Media',
+    setupMinutes: 7,
+    connectors: ['slack'],
+    mcps: [],
+    tools: [],
+    useCases: ['Inbound', 'Routing de leads', 'Priorización'],
+    rating: 4.7,
+    installs: 2400,
+    author: 'community',
+    badges: ['Sales Automation', 'Trending'],
+    collections: ['trending'],
+    install: {
+      workflow: {
+        name: 'Lead Qualification',
+        doc: {
+          nodes: [
+            node('trigger', 'trigger', 40, 200, { event: 'webhook' }),
+            node('score', 'llm', 300, 200, { model: M, prompt: 'Puntúa el lead como CALIENTE o FRÍO con una frase.', input: '{{ticket.summary}}\n{{ticket.description}}' }),
+            node('hot', 'condition', 560, 200, { expression: 'agent:score.output ~ CALIENTE' }),
+            node('nurture', 'tool', 820, 100, { message: 'Lead frío guardado para nurturing.' }),
+            node('end1', 'end', 1080, 100, {}),
+            node('notify', 'connector', 820, 300, { provider: 'slack', connectorId: null, method: 'POST', path: '/chat.postMessage', body: '{"channel":"#ventas","text":"🔥 Lead caliente: {{ticket.summary}}"}' }),
+            node('end2', 'end', 1080, 300, {}),
+          ],
+          edges: [edge('trigger', 'score'), edge('score', 'hot'), edge('hot', 'nurture', 'false'), edge('nurture', 'end1'), edge('hot', 'notify', 'true'), edge('notify', 'end2')],
+          comments: [],
+        },
+      },
+    },
+  },
+  {
+    id: 'auto-ai-email-reply',
+    kind: 'automation',
+    name: 'AI Email Reply',
+    tagline: 'Responde correos automáticamente con IA.',
+    description: 'Para correos entrantes, genera un borrador de respuesta con tu tono y lo envía (o lo deja para revisión). Reduce el tiempo de respuesta a segundos.',
+    icon: '↩️',
+    gradient: 'from-blue-500 to-indigo-500',
+    category: 'Customer Support',
+    difficulty: 'Media',
+    setupMinutes: 6,
+    connectors: ['gmail'],
+    mcps: [],
+    tools: [],
+    useCases: ['Respuestas automáticas', 'Soporte de primer nivel', 'FAQ por correo'],
+    rating: 4.6,
+    installs: 2700,
+    author: 'community',
+    badges: ['AI Powered'],
+    collections: ['popular'],
+    install: {
+      workflow: {
+        name: 'AI Email Reply',
+        doc: {
+          nodes: [
+            node('trigger', 'trigger', 40, 160, { event: 'webhook' }),
+            node('reply', 'llm', 300, 160, { model: M, prompt: 'Eres soporte. Redacta una respuesta útil y amable al correo.', input: '{{ticket.summary}}\n{{ticket.description}}' }),
+            node('note', 'tool', 560, 160, { message: 'Respuesta lista: {{agent:reply.output}}' }),
+            node('end', 'end', 820, 160, {}),
+          ],
+          edges: [edge('trigger', 'reply'), edge('reply', 'note'), edge('note', 'end')],
+          comments: [],
+        },
+      },
+    },
+  },
+
+  // ------------------------------ BROWSER AUTOMATION ------------------------------
+  {
+    id: 'browser-extract-tables',
+    kind: 'browser',
+    name: 'Extract Tables',
+    tagline: 'Extrae tablas de cualquier web a datos limpios.',
+    description: 'Abre una página, localiza las tablas y las devuelve como datos estructurados listos para usar. Sin saber nada de scraping.',
+    icon: '📋',
+    gradient: 'from-emerald-500 to-teal-500',
+    category: 'Operations',
+    difficulty: 'Media',
+    setupMinutes: 3,
+    connectors: [],
+    mcps: [],
+    tools: ['browser'],
+    useCases: ['Extraer tablas', 'Recopilar datos', 'Migrar información'],
+    variables: [{ key: 'url', label: 'URL de la página', example: 'https://ejemplo.com/precios' }],
+    rating: 4.7,
+    installs: 1900,
+    author: 'workestra',
+    badges: ['Browser Automation'],
+    collections: ['browser', 'trending'],
+    install: {
+      agents: [{ ref: 'a', name: 'Table Extractor', emoji: '📋', role: 'Extracción web', model: M, tools: ['browser'], systemPrompt: 'Abres la web indicada con el navegador, localizas las tablas y devuelves su contenido como datos estructurados (JSON). Extrae texto, no capturas.' }],
+      workflow: {
+        name: 'Extract Tables',
+        doc: {
+          nodes: [
+            node('trigger', 'trigger', 40, 160, { event: 'manual' }),
+            node('extract', 'agent', 300, 160, { agentRef: 'a', input: 'Extrae las tablas de: {{ticket.summary}}' }),
+            node('end', 'end', 560, 160, {}),
+          ],
+          edges: [edge('trigger', 'extract'), edge('extract', 'end')],
+          comments: [],
+        },
+      },
+    },
+  },
+  {
+    id: 'browser-price-monitor',
+    kind: 'browser',
+    name: 'Price Monitor',
+    tagline: 'Vigila precios y avisa si cambian.',
+    description: 'Revisa periódicamente el precio de un producto en una web y te avisa por Slack si sube o baja. Ideal para competencia o compras.',
+    icon: '🏷️',
+    gradient: 'from-amber-500 to-yellow-500',
+    category: 'Ecommerce',
+    difficulty: 'Media',
+    setupMinutes: 6,
+    connectors: ['slack'],
+    mcps: [],
+    tools: ['browser'],
+    useCases: ['Vigilancia de precios', 'Competencia', 'Alertas de stock'],
+    variables: [{ key: 'url', label: 'URL del producto', example: 'https://tienda.com/producto' }],
+    rating: 4.6,
+    installs: 1500,
+    author: 'community',
+    badges: ['Browser Automation', 'New'],
+    collections: ['browser', 'new'],
+    install: {
+      agents: [{ ref: 'a', name: 'Price Watcher', emoji: '🏷️', role: 'Vigilancia web', model: M, tools: ['browser'], systemPrompt: 'Abres la URL del producto, extraes el precio actual y lo comparas con el objetivo. Indica si hay cambio relevante y el precio exacto.' }],
+      workflow: {
+        name: 'Price Monitor',
+        doc: {
+          nodes: [
+            node('trigger', 'trigger', 40, 160, { event: 'cron' }),
+            node('check', 'agent', 300, 160, { agentRef: 'a', input: 'Comprueba el precio en: {{ticket.summary}}' }),
+            node('slack', 'connector', 560, 160, { provider: 'slack', connectorId: null, method: 'POST', path: '/chat.postMessage', body: '{"channel":"#precios","text":"🏷️ {{agent:check.output}}"}' }),
+            node('end', 'end', 820, 160, {}),
+          ],
+          edges: [edge('trigger', 'check'), edge('check', 'slack'), edge('slack', 'end')],
+          comments: [],
+        },
+      },
+    },
+  },
+  {
+    id: 'browser-website-testing',
+    kind: 'browser',
+    name: 'Website Testing',
+    tagline: 'Prueba tu web como un usuario real y reporta fallos.',
+    description: 'Un agente QA que recorre un flujo de tu web (login, formulario, checkout), valida que funcione y avisa con captura si algo falla. La misma base que el equipo QA.',
+    icon: '🧪',
+    gradient: 'from-rose-500 to-pink-500',
+    category: 'Development',
+    difficulty: 'Avanzada',
+    setupMinutes: 5,
+    connectors: [],
+    mcps: [],
+    tools: ['browser'],
+    useCases: ['QA de UI', 'Smoke tests', 'Regresiones'],
+    rating: 4.8,
+    installs: 2200,
+    author: 'workestra',
+    badges: ['Browser Automation', 'AI Powered'],
+    collections: ['browser', 'trending'],
+    install: {
+      agents: [{ ref: 'qa', name: 'QA de navegador', emoji: '🧪', role: 'Testing', model: M, tools: ['browser'], systemPrompt: 'Eres un ingeniero de QA. Usa Browser Automation para ejecutar la prueba de UI paso a paso; si algo falla, captura pantalla y describe el paso, lo esperado y lo obtenido. Empieza por «PASA» o «FALLA».' }],
+      workflow: {
+        name: 'Website Testing',
+        doc: {
+          nodes: [
+            node('trigger', 'trigger', 40, 160, { event: 'manual' }),
+            node('test', 'agent', 300, 160, { agentRef: 'qa', input: 'Abre la web y ejecuta la prueba de UI. Empieza por PASA o FALLA.' }),
+            node('end', 'end', 560, 160, {}),
+          ],
+          edges: [edge('trigger', 'test'), edge('test', 'end')],
+          comments: [],
+        },
+      },
+    },
+  },
+
+  // ------------------------------- MCP SOLUTIONS -------------------------------
+  {
+    id: 'mcp-github-expert',
+    kind: 'mcp',
+    name: 'GitHub Expert',
+    tagline: 'Un experto conectado a GitHub por MCP.',
+    description: 'Un agente que trabaja con tus repos: issues, PRs, revisiones y búsquedas de código, a través del servidor MCP oficial de GitHub. Tú le hablas en lenguaje natural.',
+    icon: '🐙',
+    gradient: 'from-zinc-600 to-zinc-800',
+    category: 'Development',
+    difficulty: 'Media',
+    setupMinutes: 5,
+    connectors: [],
+    mcps: ['GitHub'],
+    tools: [],
+    useCases: ['Gestión de issues', 'Revisión de PRs', 'Búsqueda de código'],
+    requirements: ['Acceso al MCP de GitHub'],
+    rating: 4.8,
+    installs: 3600,
+    author: 'workestra',
+    badges: ['MCP Ready', 'Popular'],
+    collections: ['mcp', 'popular'],
+    install: {
+      agents: [{ ref: 'a', name: 'GitHub Expert', emoji: '🐙', role: 'MCP GitHub', model: M, tools: [], mcpServers: [{ name: 'GitHub', url: 'https://api.githubcopilot.com/mcp/' }], systemPrompt: 'Eres un experto en GitHub. Usa las herramientas MCP de GitHub para gestionar issues, PRs y buscar código. Explica lo que haces en lenguaje claro.' }],
+    },
+  },
+  {
+    id: 'mcp-jira-expert',
+    kind: 'mcp',
+    name: 'Jira Expert',
+    tagline: 'Gestiona Jira hablando en lenguaje natural.',
+    description: 'Un agente que crea y actualiza tickets, consulta sprints y organiza el backlog vía el MCP de Atlassian. Ideal para PMs y equipos ágiles.',
+    icon: '🟦',
+    gradient: 'from-blue-500 to-sky-600',
+    category: 'Development',
+    difficulty: 'Media',
+    setupMinutes: 5,
+    connectors: [],
+    mcps: ['Atlassian'],
+    tools: [],
+    useCases: ['Gestión de tickets', 'Sprints', 'Backlog'],
+    rating: 4.7,
+    installs: 2100,
+    author: 'workestra',
+    badges: ['MCP Ready'],
+    collections: ['mcp'],
+    install: {
+      agents: [{ ref: 'a', name: 'Jira Expert', emoji: '🟦', role: 'MCP Jira', model: M, tools: [], mcpServers: [{ name: 'Atlassian', url: 'https://mcp.atlassian.com/v1/sse' }], systemPrompt: 'Eres un experto en Jira/Atlassian. Usa las herramientas MCP para crear/actualizar tickets, consultar sprints y organizar el backlog.' }],
+    },
+  },
+  {
+    id: 'mcp-notion-expert',
+    kind: 'mcp',
+    name: 'Notion Expert',
+    tagline: 'Tu wiki de Notion, operada por un agente.',
+    description: 'Un agente que lee y escribe en tus páginas y bases de datos de Notion vía MCP. Documenta, busca y organiza sin salir del chat.',
+    icon: '📔',
+    gradient: 'from-neutral-500 to-neutral-700',
+    category: 'Operations',
+    difficulty: 'Media',
+    setupMinutes: 5,
+    connectors: [],
+    mcps: ['Notion'],
+    tools: [],
+    useCases: ['Documentación', 'Bases de conocimiento', 'Búsqueda interna'],
+    rating: 4.6,
+    installs: 1700,
+    author: 'workestra',
+    badges: ['MCP Ready', 'New'],
+    collections: ['mcp', 'new'],
+    install: {
+      agents: [{ ref: 'a', name: 'Notion Expert', emoji: '📔', role: 'MCP Notion', model: M, tools: [], mcpServers: [{ name: 'Notion', url: 'https://mcp.notion.com/mcp' }], systemPrompt: 'Eres un experto en Notion. Usa las herramientas MCP para leer/escribir páginas y bases de datos, documentar y buscar información.' }],
+    },
+  },
+  {
+    id: 'mcp-salesforce-expert',
+    kind: 'mcp',
+    name: 'Salesforce Expert',
+    tagline: 'Consulta y actualiza tu CRM por MCP.',
+    description: 'Un agente que trabaja con oportunidades, cuentas y contactos de Salesforce vía MCP. Pregúntale por el pipeline o pídele que actualice un registro.',
+    icon: '☁️',
+    gradient: 'from-sky-500 to-blue-600',
+    category: 'Sales',
+    difficulty: 'Media',
+    setupMinutes: 6,
+    connectors: [],
+    mcps: ['Salesforce'],
+    tools: [],
+    useCases: ['Consultar pipeline', 'Actualizar registros', 'Reporting de CRM'],
+    rating: 4.6,
+    installs: 1400,
+    author: 'workestra',
+    badges: ['MCP Ready', 'Enterprise'],
+    collections: ['mcp'],
+    install: {
+      agents: [{ ref: 'a', name: 'Salesforce Expert', emoji: '☁️', role: 'MCP Salesforce', model: M, tools: [], mcpServers: [{ name: 'Salesforce', url: 'https://mcp.salesforce.com/mcp' }], systemPrompt: 'Eres un experto en Salesforce. Usa las herramientas MCP para consultar y actualizar oportunidades, cuentas y contactos, y explicar el estado del pipeline.' }],
+    },
+  },
+];
+
+export const getMarketItem = (id: string): MarketItem | undefined => MARKETPLACE.find((m) => m.id === id);

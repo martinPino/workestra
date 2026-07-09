@@ -9,7 +9,23 @@
 
 import { siGoogledrive } from 'simple-icons';
 
-const WITH_LOGO = new Set(['slack', 'jira', 'github', 'google-sheets', 'gmail', 'google-calendar', 'google-drive', 'salesforce']);
+const WITH_LOGO = new Set([
+  'slack',
+  'jira',
+  'github',
+  'google-sheets',
+  'gmail',
+  'google-calendar',
+  'google-drive',
+  'salesforce',
+  'stripe',
+  'hubspot',
+  'notion',
+  'figma',
+  'canva',
+  'shopify',
+  'postgres',
+]);
 
 /** ¿Este proveedor tiene un logo de marca? (si no, el llamante pinta su icono/gradiente genérico). */
 export function hasProviderLogo(provider: string | undefined): boolean {
@@ -103,6 +119,97 @@ function SalesforceLogo({ size }: { size: number }) {
   );
 }
 
+function StripeLogo({ size }: { size: number }) {
+  // Tile en el morado de marca de Stripe (#635BFF) con la "S" en blanco.
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" role="img" aria-label="Stripe" xmlns="http://www.w3.org/2000/svg">
+      <rect width="24" height="24" rx="5" fill="#635BFF" />
+      <text x="12" y="17" textAnchor="middle" fontFamily="Arial, Helvetica, sans-serif" fontSize="14" fontWeight="700" fill="#fff">
+        S
+      </text>
+    </svg>
+  );
+}
+
+function HubspotLogo({ size }: { size: number }) {
+  // Tile en el naranja de marca de HubSpot (#FF7A59) con la "H" en blanco.
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" role="img" aria-label="HubSpot" xmlns="http://www.w3.org/2000/svg">
+      <rect width="24" height="24" rx="5" fill="#FF7A59" />
+      <text x="12" y="17" textAnchor="middle" fontFamily="Arial, Helvetica, sans-serif" fontSize="13.5" fontWeight="700" fill="#fff">
+        H
+      </text>
+    </svg>
+  );
+}
+
+function NotionLogo({ size }: { size: number }) {
+  // Tile negro con el monograma "N" en blanco (marca de Notion).
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" role="img" aria-label="Notion" xmlns="http://www.w3.org/2000/svg">
+      <rect width="24" height="24" rx="5" fill="#000000" />
+      <text x="12" y="17" textAnchor="middle" fontFamily="Georgia, 'Times New Roman', serif" fontSize="14" fontWeight="700" fill="#fff">
+        N
+      </text>
+    </svg>
+  );
+}
+
+function FigmaLogo({ size }: { size: number }) {
+  // Los 5 nodos de color de la marca de Figma (glyph simple y fiable).
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" role="img" aria-label="Figma" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="9.5" cy="5.5" r="3.5" fill="#F24E1E" />
+      <circle cx="14.5" cy="5.5" r="3.5" fill="#FF7262" />
+      <circle cx="9.5" cy="12" r="3.5" fill="#A259FF" />
+      <circle cx="14.5" cy="12" r="3.5" fill="#1ABCFE" />
+      <circle cx="9.5" cy="18.5" r="3.5" fill="#0ACF83" />
+    </svg>
+  );
+}
+
+function CanvaLogo({ size }: { size: number }) {
+  // Círculo con gradiente de marca de Canva (#6420FF→#00C4CC) y la "C" en blanco.
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" role="img" aria-label="Canva" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="canvaGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#6420FF" />
+          <stop offset="100%" stopColor="#00C4CC" />
+        </linearGradient>
+      </defs>
+      <circle cx="12" cy="12" r="12" fill="url(#canvaGrad)" />
+      <text x="12" y="17" textAnchor="middle" fontFamily="Georgia, 'Times New Roman', serif" fontSize="14" fontWeight="700" fill="#fff">
+        C
+      </text>
+    </svg>
+  );
+}
+
+function ShopifyLogo({ size }: { size: number }) {
+  // Tile en el verde de marca de Shopify (#95BF47) con la "S" en blanco.
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" role="img" aria-label="Shopify" xmlns="http://www.w3.org/2000/svg">
+      <rect width="24" height="24" rx="5" fill="#95BF47" />
+      <text x="12" y="17" textAnchor="middle" fontFamily="Arial, Helvetica, sans-serif" fontSize="14" fontWeight="700" fill="#fff">
+        S
+      </text>
+    </svg>
+  );
+}
+
+function PostgresLogo({ size }: { size: number }) {
+  // Tile en el azul de marca de PostgreSQL (#336791) con el monograma "Pg" en blanco.
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" role="img" aria-label="PostgreSQL" xmlns="http://www.w3.org/2000/svg">
+      <rect width="24" height="24" rx="5" fill="#336791" />
+      <text x="12" y="16.5" textAnchor="middle" fontFamily="Arial, Helvetica, sans-serif" fontSize="10" fontWeight="700" fill="#fff">
+        Pg
+      </text>
+    </svg>
+  );
+}
+
 /** Logo de marca del proveedor. `null` si no hay: el llamante usa su fallback (icono/gradiente genérico). */
 export function ProviderLogo({ provider, size = 18 }: { provider: string | undefined; size?: number }) {
   switch (provider) {
@@ -122,6 +229,20 @@ export function ProviderLogo({ provider, size = 18 }: { provider: string | undef
       return <GoogleDriveLogo size={size} />;
     case 'salesforce':
       return <SalesforceLogo size={size} />;
+    case 'stripe':
+      return <StripeLogo size={size} />;
+    case 'hubspot':
+      return <HubspotLogo size={size} />;
+    case 'notion':
+      return <NotionLogo size={size} />;
+    case 'figma':
+      return <FigmaLogo size={size} />;
+    case 'canva':
+      return <CanvaLogo size={size} />;
+    case 'shopify':
+      return <ShopifyLogo size={size} />;
+    case 'postgres':
+      return <PostgresLogo size={size} />;
     default:
       return null;
   }
