@@ -266,6 +266,61 @@ export const MARKETPLACE: MarketItem[] = [
     },
   },
 
+  {
+    id: 'team-dev',
+    kind: 'team',
+    name: 'Dev Team',
+    tagline: 'Un ticket de Jira lo reparte el Team Lead entre tus developers.',
+    description:
+      'Un equipo de desarrollo que arranca solo cuando entra un ticket en Jira. Un Team Lead (router) lee el ticket, decide a qué especialista le toca — frontend, backend o QA — y le pasa el trabajo; pueden entrar varios a la vez si el ticket lo requiere. Cada developer devuelve su plan de implementación. Ideal para triaje y arranque automático de tareas de ingeniería.',
+    icon: '👩‍💻',
+    gradient: 'from-violet-500 to-fuchsia-500',
+    category: 'Engineering',
+    difficulty: 'Media',
+    setupMinutes: 7,
+    connectors: ['jira'],
+    mcps: [],
+    tools: ['http'],
+    useCases: ['Triaje de tickets de ingeniería', 'Arranque automático de tareas', 'Reparto de trabajo por especialidad'],
+    requirements: ['Una cuenta de Jira con el disparador de tickets activado'],
+    rating: 4.8,
+    installs: 1460,
+    author: 'workestra',
+    badges: ['New', 'AI Powered'],
+    collections: ['new', 'ai-teams', 'trending'],
+    install: {
+      agents: [
+        { ref: 'lead', name: 'Team Lead', emoji: '🧑‍✈️', role: 'Reparte el ticket', model: M, tools: [], isOrchestrator: true, systemPrompt: 'Eres el Team Lead de un equipo de desarrollo. Lee el ticket de Jira y decide qué especialista(s) deben ocuparse: frontend (UI, componentes), backend (API, datos, lógica) o QA (pruebas, regresiones). Elige solo los necesarios y reparte el trabajo con instrucciones claras.' },
+        { ref: 'frontend', name: 'Frontend Developer', emoji: '🎨', role: 'UI y componentes', model: M, tools: [], systemPrompt: 'Eres un desarrollador frontend. A partir del ticket, propón el plan de implementación de UI: componentes, estados, llamadas a la API y casos borde. Sé concreto y accionable.' },
+        { ref: 'backend', name: 'Backend Developer', emoji: '⚙️', role: 'API y datos', model: M, tools: [], systemPrompt: 'Eres un desarrollador backend. A partir del ticket, propón el plan de implementación: endpoints, modelo de datos, validaciones y migraciones. Señala riesgos y dependencias.' },
+        { ref: 'qa', name: 'QA Engineer', emoji: '🧪', role: 'Pruebas', model: M, tools: [], systemPrompt: 'Eres ingeniero de QA. A partir del ticket, define el plan de pruebas: criterios de aceptación, casos happy-path y borde, y regresiones a vigilar.' },
+      ],
+      workflow: {
+        name: 'Dev Team',
+        doc: {
+          nodes: [
+            node('trigger', 'trigger', 40, 220, { event: 'webhook', eventId: 'jira.issue_created' }),
+            node('lead', 'router', 320, 220, { agentRef: 'lead', input: 'Reparte este ticket de Jira al especialista adecuado:\n{{ticket.key}} — {{ticket.summary}}\n{{ticket.description}}', max: 0 }),
+            node('frontend', 'agent', 620, 60, { agentRef: 'frontend', input: 'Plan de implementación frontend para:\n{{ticket.key}} — {{ticket.summary}}\n{{ticket.description}}' }),
+            node('backend', 'agent', 620, 220, { agentRef: 'backend', input: 'Plan de implementación backend para:\n{{ticket.key}} — {{ticket.summary}}\n{{ticket.description}}' }),
+            node('qa', 'agent', 620, 380, { agentRef: 'qa', input: 'Plan de pruebas para:\n{{ticket.key}} — {{ticket.summary}}\n{{ticket.description}}' }),
+            node('end', 'end', 920, 220, {}),
+          ],
+          edges: [
+            edge('trigger', 'lead'),
+            edge('lead', 'frontend'),
+            edge('lead', 'backend'),
+            edge('lead', 'qa'),
+            edge('frontend', 'end'),
+            edge('backend', 'end'),
+            edge('qa', 'end'),
+          ],
+          comments: [],
+        },
+      },
+    },
+  },
+
   // ---------------------------------- AI AGENTS ----------------------------------
   {
     id: 'agent-email-assistant',

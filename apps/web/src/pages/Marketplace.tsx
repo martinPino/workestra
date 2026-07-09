@@ -62,7 +62,7 @@ function MarketCard({ item }: { item: MarketItem }) {
         </div>
       </div>
 
-      <p className="mt-2.5 line-clamp-2 flex-1 text-xs leading-relaxed text-txt-secondary">{item.tagline}</p>
+      <p className="mt-2.5 line-clamp-2 flex-1 text-xs leading-relaxed text-txt-secondary">{t(item.tagline)}</p>
 
       <div className="mt-2.5 flex flex-wrap gap-1">
         {item.badges.slice(0, 3).map((b) => (

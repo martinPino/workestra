@@ -96,7 +96,7 @@ export function MarketplaceDetail() {
             <span>{kind?.icon} {t(kind?.label ?? '')}</span><span>·</span><span>{item.category}</span>
           </div>
           <h1 className="mt-0.5 text-2xl font-semibold text-txt-primary">{item.name}</h1>
-          <p className="mt-1 text-sm text-txt-secondary">{item.tagline}</p>
+          <p className="mt-1 text-sm text-txt-secondary">{t(item.tagline)}</p>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-txt-disabled">
             <span className="inline-flex items-center gap-1"><Star size={13} className="text-amber-400" /> {item.rating}</span>
             <span className="inline-flex items-center gap-1"><Download size={13} /> {item.installs.toLocaleString('es-ES')} {t('instalaciones')}</span>
@@ -126,7 +126,7 @@ export function MarketplaceDetail() {
         <div className="space-y-6 lg:col-span-2">
           <section>
             <h2 className="mb-1.5 text-sm font-semibold text-txt-primary">{t('Descripción')}</h2>
-            <p className="text-sm leading-relaxed text-txt-secondary">{item.description}</p>
+            <p className="text-sm leading-relaxed text-txt-secondary">{t(item.description)}</p>
           </section>
 
           {item.install.agents && item.install.agents.length > 0 && (
@@ -137,8 +137,8 @@ export function MarketplaceDetail() {
                   <div key={a.ref} className="flex items-start gap-2.5 rounded-lg border border-border bg-elevated p-3">
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-card text-base">{a.emoji}</span>
                     <div className="min-w-0">
-                      <div className="flex items-center gap-1 text-sm font-medium text-txt-primary">{a.name}{a.isOrchestrator && <Crown size={12} className="text-amber-400" />}</div>
-                      <div className="text-xs text-txt-disabled">{a.role}</div>
+                      <div className="flex items-center gap-1 text-sm font-medium text-txt-primary">{t(a.name)}{a.isOrchestrator && <Crown size={12} className="text-amber-400" />}</div>
+                      <div className="text-xs text-txt-disabled">{t(a.role)}</div>
                       {a.tools.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{a.tools.map((tl) => <span key={tl} className="rounded bg-card px-1.5 py-0.5 text-[10px] text-txt-secondary">{tl}</span>)}</div>}
                     </div>
                   </div>
@@ -167,7 +167,7 @@ export function MarketplaceDetail() {
             <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-txt-primary"><ListChecks size={15} /> {t('Casos de uso')}</h2>
             <ul className="space-y-1">
               {item.useCases.map((u) => (
-                <li key={u} className="flex items-center gap-2 text-sm text-txt-secondary"><Check size={13} className="text-success" /> {u}</li>
+                <li key={u} className="flex items-center gap-2 text-sm text-txt-secondary"><Check size={13} className="text-success" /> {t(u)}</li>
               ))}
             </ul>
           </section>
@@ -178,7 +178,7 @@ export function MarketplaceDetail() {
               <div className="space-y-1.5">
                 {item.variables.map((v) => (
                   <div key={v.key} className="flex items-center justify-between rounded-lg border border-border bg-surface px-3 py-2 text-sm">
-                    <span className="text-txt-primary">{v.label}</span>
+                    <span className="text-txt-primary">{t(v.label)}</span>
                     {v.example && <span className="font-mono text-[11px] text-txt-disabled">{v.example}</span>}
                   </div>
                 ))}
@@ -224,7 +224,7 @@ export function MarketplaceDetail() {
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-txt-disabled">{t('Requisitos')}</h3>
               <ul className="space-y-1">
                 {item.requirements.map((r) => (
-                  <li key={r} className="text-xs text-txt-secondary">• {r}</li>
+                  <li key={r} className="text-xs text-txt-secondary">• {t(r)}</li>
                 ))}
               </ul>
             </section>
