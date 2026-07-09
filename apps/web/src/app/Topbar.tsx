@@ -63,7 +63,7 @@ function UserMenu() {
 /** Devuelve la etiqueta de nav (en español, clave i18n) de la ruta actual; se traduce con t() al render. */
 function titleFor(pathname: string): string {
   const seg = '/' + pathname.split('/')[1];
-  return NAV.find((n) => n.to === seg)?.label ?? 'AgentFlow';
+  return NAV.find((n) => n.to === seg)?.label ?? 'Workestra';
 }
 
 /** Selector de idioma ES/EN (segmentado) en el header. Persiste en localStorage vía el ui-store. */
@@ -103,7 +103,7 @@ export function Topbar() {
         <IconButton className="md:hidden" aria-label="Menu" onClick={() => setMobileNav(true)}>
           <Menu size={18} />
         </IconButton>
-        <span className="hidden text-txt-secondary sm:inline">AgentFlow</span>
+        <span className="hidden text-txt-secondary sm:inline">Workestra</span>
         <span className="hidden text-txt-disabled sm:inline">/</span>
         <span className="truncate font-medium text-txt-primary">{t(titleFor(pathname))}</span>
       </div>

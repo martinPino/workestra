@@ -325,7 +325,7 @@ function ScheduleSection({ wfId }: { wfId: string }) {
   );
 }
 
-/** Evento de Jira: conectar + elegir proyecto + activar (AgentFlow registra el webhook EN Jira). */
+/** Evento de Jira: conectar + elegir proyecto + activar (Workestra registra el webhook EN Jira). */
 function JiraSection({ wfId, eventId }: { wfId: string; eventId: string }) {
   const t = useT();
   const { role } = useAuth();
@@ -605,7 +605,7 @@ function DriveSection({ wfId }: { wfId: string }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-[11px] text-txt-disabled">{t('AgentFlow vigilará la carpeta y arrancará el flujo por cada fichero nuevo, con el fichero listo para usar.')}</p>
+      <p className="text-[11px] text-txt-disabled">{t('Workestra vigilará la carpeta y arrancará el flujo por cada fichero nuevo, con el fichero listo para usar.')}</p>
       {!drive ? (
         <Button size="sm" variant="primary" onClick={doConnect} disabled={!canApprove(role) || connBusy}>
           <Plug size={13} /> {connBusy ? t('Conectando…') : t('Conectar Google Drive')}

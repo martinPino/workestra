@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { PanelLeftClose, PanelLeft, Command } from 'lucide-react';
 import { visibleNav } from './nav';
+import { Logo } from './Logo';
 import { useUI } from './ui-store';
 import { useAuth } from '../lib/auth';
 import { cn } from '../lib/cn';
@@ -38,12 +39,10 @@ export function Sidebar() {
       >
         {/* Marca */}
         <div className={cn('flex h-14 items-center gap-2.5 px-4', collapsedEff && 'justify-center px-0')}>
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg brand-gradient shadow-glow">
-            <span className="text-sm font-bold text-white">A</span>
-          </div>
+          <Logo size={32} className="shrink-0 text-txt-primary" />
           {!collapsedEff && (
             <div className="leading-tight">
-              <div className="text-sm font-semibold tracking-tight text-txt-primary">AgentFlow</div>
+              <div className="text-sm font-semibold tracking-tight text-txt-primary">Workestra</div>
               <div className="text-[10px] text-txt-secondary">Agent Orchestration</div>
             </div>
           )}

@@ -98,7 +98,7 @@ export function SettingsPage() {
       {/* El minter de tokens de dev solo tiene sentido en modo 'dev'; con auth real (login) se oculta. */}
       {AUTH_MODE === 'dev' && <SessionCard />}
 
-      <Section icon={<Monitor size={16} />} title={t('Apariencia')} description={t('Personaliza cómo se ve AgentFlow.')}>
+      <Section icon={<Monitor size={16} />} title={t('Apariencia')} description={t('Personaliza cómo se ve Workestra.')}>
         <div className="flex gap-2">
           {(
             [

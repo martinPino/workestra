@@ -4,7 +4,33 @@ import { Loader2 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth, hasValidSession, type SessionUser } from '../lib/auth';
 import { Button, Input } from '../ui';
+import { Logo } from '../app/Logo';
+import { useUI, type Lang } from '../app/ui-store';
 import { useT } from '../i18n';
+
+/** Selector ES/EN para las páginas SIN sesión (el del Topbar solo existe dentro de la app autenticada). */
+function AuthLangSelector() {
+  const lang = useUI((s) => s.lang);
+  const setLang = useUI((s) => s.setLang);
+  const opts: Lang[] = ['es', 'en'];
+  return (
+    <div className="flex items-center rounded-lg border border-border bg-card p-0.5" role="group" aria-label="Language">
+      {opts.map((l) => (
+        <button
+          key={l}
+          type="button"
+          onClick={() => setLang(l)}
+          aria-pressed={lang === l}
+          className={`rounded-md px-2 py-1 text-[11px] font-semibold uppercase transition-colors ${
+            lang === l ? 'bg-elevated text-txt-primary' : 'text-txt-secondary hover:text-txt-primary'
+          }`}
+        >
+          {l}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 /** Limpia el prefijo «HTTP 4xx: » de los errores del cliente API para mostrar solo el mensaje humano. */
 function cleanError(e: unknown): string {
@@ -16,13 +42,14 @@ function cleanError(e: unknown): string {
 export function AuthShell({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   const t = useT();
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-surface px-4 py-10">
+    <div className="relative flex min-h-dvh items-center justify-center bg-surface px-4 py-10">
+      <div className="absolute right-4 top-4">
+        <AuthLangSelector />
+      </div>
       <div className="w-full max-w-sm">
         <div className="mb-7 flex flex-col items-center text-center">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl brand-gradient shadow-glow">
-            <span className="text-lg font-bold text-white">A</span>
-          </div>
-          <div className="mt-3 text-lg font-semibold tracking-tight text-txt-primary">AgentFlow</div>
+          <Logo size={44} className="text-txt-primary" />
+          <div className="mt-3 text-lg font-semibold tracking-tight text-txt-primary">Workestra</div>
           <h1 className="mt-5 text-xl font-semibold text-txt-primary">{t(title)}</h1>
           <p className="mt-1 text-sm text-txt-secondary">{t(subtitle)}</p>
         </div>
@@ -76,9 +103,9 @@ export function Login() {
   };
 
   return (
-    <AuthShell title="Inicia sesión" subtitle="Bienvenido de nuevo a AgentFlow">
+    <AuthShell title="Inicia sesión" subtitle="Bienvenido de nuevo a Workestra">
       <form onSubmit={onSubmit} className="flex flex-col gap-3">
-        <Field label="Email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tu@empresa.com" autoFocus />
+        <Field label="Email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t('tu@empresa.com')} autoFocus />
         <Field label="Contraseña" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
         {error && <p className="text-xs text-danger">{error}</p>}
         <Button type="submit" variant="primary" className="mt-1 w-full justify-center" disabled={busy}>
@@ -111,8 +138,8 @@ export function Register() {
   return (
     <AuthShell title="Crea tu cuenta" subtitle="Empieza a automatizar en minutos">
       <form onSubmit={onSubmit} className="flex flex-col gap-3">
-        <Field label="Nombre" type="text" autoComplete="name" required value={name} onChange={(e) => setName(e.target.value)} placeholder="Tu nombre" autoFocus />
-        <Field label="Email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tu@empresa.com" />
+        <Field label="Nombre" type="text" autoComplete="name" required value={name} onChange={(e) => setName(e.target.value)} placeholder={t('Tu nombre')} autoFocus />
+        <Field label="Email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t('tu@empresa.com')} />
         <Field label="Contraseña" type="password" autoComplete="new-password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t('Mínimo 8 caracteres')} />
         {error && <p className="text-xs text-danger">{error}</p>}
         <Button type="submit" variant="primary" className="mt-1 w-full justify-center" disabled={busy}>

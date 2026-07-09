@@ -125,7 +125,7 @@ export function workflowGraphToDoc(graph: WorkflowGraph): GraphDoc {
 export const STARTER_DOC: GraphDoc = {
   nodes: [
     { id: 'trigger', kind: 'trigger', position: { x: 40, y: 160 }, config: { event: 'manual' } },
-    { id: 'work', kind: 'tool', position: { x: 300, y: 160 }, config: { message: 'Hola AgentFlow' } },
+    { id: 'work', kind: 'tool', position: { x: 300, y: 160 }, config: { message: 'Hola Workestra' } },
     { id: 'end', kind: 'end', position: { x: 560, y: 160 }, config: {} },
   ],
   edges: [

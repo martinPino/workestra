@@ -64,8 +64,8 @@ export const EN: Record<string, string> = {
   'sábado': 'Saturday',
   // --- M19 · recetas de disparador (Jira sin código) ---
   'Cuando pase algo en una app conectada': 'When something happens in a connected app',
-  'Elige un evento de Jira y AgentFlow conectará tu flujo por ti. Sin URLs ni secretos.':
-    'Pick a Jira event and AgentFlow will connect your flow for you. No URLs or secrets.',
+  'Elige un evento de Jira y Workestra conectará tu flujo por ti. Sin URLs ni secretos.':
+    'Pick a Jira event and Workestra will connect your flow for you. No URLs or secrets.',
   'Necesitas una sesión (rol EDITOR o superior) para crear disparadores.': 'You need a session (EDITOR role or higher) to create triggers.',
   'Cuando se crea un ticket de Jira': 'When a Jira ticket is created',
   'Cuando se actualiza un ticket de Jira': 'When a Jira ticket is updated',
@@ -525,7 +525,7 @@ export const EN: Record<string, string> = {
   'Orchestrator planificó 2 subtareas': 'Orchestrator planned 2 subtasks',
   'Oscuro': 'Dark',
   'Pausar': 'Pause',
-  'Personaliza cómo se ve AgentFlow.': 'Customize how AgentFlow looks.',
+  'Personaliza cómo se ve Workestra.': 'Customize how Workestra looks.',
   'Peticiones HTTP restringidas por allowlist de hosts.': 'HTTP requests restricted by a host allowlist.',
   'Plan del Orchestrator': 'Orchestrator plan',
   'Plan rechazado:': 'Plan rejected:',
@@ -629,8 +629,8 @@ export const EN: Record<string, string> = {
   'Guarda el workflow para poder activar disparadores.': 'Save the workflow to activate triggers.',
   'Proyecto de Jira': 'Jira project',
   'Conectar Google Drive': 'Connect Google Drive',
-  'AgentFlow vigilará la carpeta y arrancará el flujo por cada fichero nuevo, con el fichero listo para usar.':
-    'AgentFlow will watch the folder and start the flow for every new file, with the file ready to use.',
+  'Workestra vigilará la carpeta y arrancará el flujo por cada fichero nuevo, con el fichero listo para usar.':
+    'Workestra will watch the folder and start the flow for every new file, with the file ready to use.',
   'Carpeta de Drive': 'Drive folder',
   'ID de la carpeta (vacío = toda tu unidad)': 'Folder ID (empty = your whole drive)',
   'Comprobar cada': 'Check every',
@@ -778,7 +778,7 @@ export const EN: Record<string, string> = {
 
   // --- M73: Login / Registro / Invitación ---
   'Inicia sesión': 'Sign in',
-  'Bienvenido de nuevo a AgentFlow': 'Welcome back to AgentFlow',
+  'Bienvenido de nuevo a Workestra': 'Welcome back to Workestra',
   'Contraseña': 'Password',
   'Entrar': 'Sign in',
   '¿No tienes cuenta?': 'Don’t have an account?',
@@ -1052,4 +1052,5 @@ export const EN: Record<string, string> = {
   "Cerrar el sprint documentando lo entregado": "Close the sprint by documenting what was delivered",
   "Una cuenta de Atlassian (Jira y Confluence)": "An Atlassian account (Jira and Confluence)",
   "Falta conectar": "Not connected",
+  "tu@empresa.com": "you@company.com",
 };
