@@ -60,7 +60,12 @@ export class TeamService {
     const email = dto.email.toLowerCase();
     const members = await this.p.team.listMembers(actor.organizationId);
     if (members.some((m) => m.email === email)) throw new ConflictException('Esa persona ya está en el equipo.');
-    const existing = (await this.p.team.listInvitations(actor.organizationId)).find((i) => i.email === email);
+    // En v1 la invitación crea un usuario NUEVO; si el email ya tiene cuenta (en cualquier equipo) no podría
+    // aceptarla (User.email es único global) → lo rechazamos aquí en vez de crear una invitación imposible.
+    if (await this.p.auth.findByEmail(email)) throw new ConflictException('Ese email ya tiene una cuenta en AgentFlow.');
+    // Solo bloquea una invitación PENDIENTE y aún VIGENTE; una caducada no debe impedir volver a invitar.
+    const now = Date.now();
+    const existing = (await this.p.team.listInvitations(actor.organizationId)).find((i) => i.email === email && i.expiresAt.getTime() > now);
     if (existing) throw new ConflictException('Ya hay una invitación pendiente para ese email.');
 
     const rawToken = newToken();

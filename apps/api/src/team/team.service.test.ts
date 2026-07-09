@@ -86,6 +86,12 @@ describe('TeamService — reglas de gestión (M74)', () => {
     expect(await authSvc.login({ email: 'member@t.com', password: 'micontraseña' })).not.toBeNull();
   });
 
+  it('no se puede invitar a un email que YA tiene cuenta (no podría aceptar)', async () => {
+    const { svc, auth } = await setup();
+    await auth.createAccount({ email: 'ya@existe.com', passwordHash: await hashPassword('x'), name: 'Ya' });
+    await expect(svc.invite('owner@t.com', { email: 'ya@existe.com', role: 'EDITOR' })).rejects.toThrow(/ya tiene una cuenta/);
+  });
+
   it('una invitación no se puede aceptar dos veces', async () => {
     const { svc } = await setup();
     const { acceptUrl } = await svc.invite('owner@t.com', { email: 'once@t.com', role: 'EDITOR' });
