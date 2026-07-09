@@ -10,7 +10,10 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist", "prisma"],
+  "files": [
+    "dist",
+    "prisma"
+  ],
   "scripts": {
     "build": "prisma generate && tsc -p tsconfig.json",
     "typecheck": "prisma generate && tsc -p tsconfig.json --noEmit",
@@ -28,9 +31,11 @@
     "@core/contracts": "workspace:*",
     "@core/engine": "workspace:*",
     "@prisma/client": "^5.22.0",
-    "ioredis": "^5.4.1"
+    "ioredis": "^5.4.1",
+    "nodemailer": "^6.9.0"
   },
   "devDependencies": {
+    "@types/nodemailer": "^6.4.0",
     "prisma": "^5.22.0",
     "tsx": "^4.19.2"
   }
