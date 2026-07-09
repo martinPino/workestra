@@ -9,6 +9,8 @@ export class WorkflowsController {
   constructor(private readonly svc: WorkflowsService) {}
 
   @Post()
+  @UseGuards(ScopesGuard)
+  @RequireScopes('workflow:write') // crear MUTA: un VIEWER (solo lectura) no debe poder crear workflows
   create(@Body() body: { name: string; graph?: unknown }, @Workspace() workspaceId: string) {
     return this.svc.create(body, workspaceId);
   }
@@ -59,11 +61,15 @@ export class WorkflowsController {
   }
 
   @Put(':id/graph')
+  @UseGuards(ScopesGuard)
+  @RequireScopes('workflow:write') // editar el grafo MUTA: no para VIEWER
   saveGraph(@Param('id') id: string, @Body() body: unknown, @Workspace() workspaceId: string) {
     return this.svc.saveGraph(id, body, workspaceId);
   }
 
   @Post(':id/publish')
+  @UseGuards(ScopesGuard)
+  @RequireScopes('workflow:write') // publicar congela una versión (MUTA): no para VIEWER
   publish(@Param('id') id: string, @Workspace() workspaceId: string) {
     return this.svc.publish(id, workspaceId);
   }

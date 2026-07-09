@@ -1,12 +1,18 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { Workspace } from '../auth/workspace.decorator';
+import { ScopesGuard } from '../rbac/scopes.guard';
+import { RequireScopes } from '../rbac/scopes.decorator';
 import { ExecutionsService } from './executions.service';
 
 @Controller('executions')
 export class ExecutionsController {
   constructor(private readonly svc: ExecutionsService) {}
 
+  // Lanzar una ejecución MUTA (crea un run y consume IA): requiere execution:create (EDITOR+). Un VIEWER
+  // (solo lectura) NO debe poder ejecutar workflows.
   @Post()
+  @UseGuards(ScopesGuard)
+  @RequireScopes('execution:create')
   start(@Body() body: { workflowId: string; context?: Record<string, unknown> }, @Workspace() workspaceId: string) {
     return this.svc.start(body.workflowId, workspaceId, body.context);
   }

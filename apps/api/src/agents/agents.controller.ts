@@ -28,6 +28,8 @@ export class AgentsController {
   }
 
   @Post()
+  @UseGuards(ScopesGuard)
+  @RequireScopes('agent:write') // crear agente MUTA: no para VIEWER
   create(@Body() body: Parameters<AgentsService['create']>[0], @Workspace() workspaceId: string) {
     return this.svc.create(body, workspaceId);
   }
@@ -41,16 +43,22 @@ export class AgentsController {
 
   // «Conectar» un servidor MCP (M45): guarda su credencial cifrada para activarlo. «Desconectar» la borra.
   @Post('mcp/connect')
+  @UseGuards(ScopesGuard)
+  @RequireScopes('agent:write') // guarda una credencial MCP cifrada (MUTA): no para VIEWER
   connectMcp(@Body() body: { serverId: string; token: string }, @Workspace() workspaceId: string) {
     return this.svc.connectMcp(workspaceId, body?.serverId ?? '', body?.token ?? '');
   }
 
   @Delete('mcp/connect/:serverId')
+  @UseGuards(ScopesGuard)
+  @RequireScopes('agent:write') // borra una credencial MCP (MUTA): no para VIEWER
   disconnectMcp(@Param('serverId') serverId: string, @Workspace() workspaceId: string) {
     return this.svc.disconnectMcp(workspaceId, serverId);
   }
 
   @Patch(':id')
+  @UseGuards(ScopesGuard)
+  @RequireScopes('agent:write') // editar agente MUTA: no para VIEWER
   update(
     @Param('id') id: string,
     @Body() body: Parameters<AgentsService['update']>[1],
@@ -60,6 +68,8 @@ export class AgentsController {
   }
 
   @Delete(':id')
+  @UseGuards(ScopesGuard)
+  @RequireScopes('agent:write') // borrar agente MUTA: no para VIEWER
   remove(@Param('id') id: string, @Workspace() workspaceId: string) {
     return this.svc.remove(id, workspaceId);
   }

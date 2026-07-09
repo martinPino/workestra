@@ -27,4 +27,23 @@ describe('RBAC (deny-by-default)', () => {
   it('un scope desconocido se deniega', () => {
     expect(can('ADMIN', 'billing:charge')).toBe(false);
   });
+
+  // Bloquea la regresión del bug M74: un VIEWER podía crear/editar por endpoints sin @RequireScopes.
+  it('scopes exactos de los endpoints que mutan (M74)', () => {
+    // VIEWER NO puede escribir NADA
+    for (const s of ['workflow:write', 'agent:write', 'execution:create', 'connector:write', 'connector:delete', 'apikey:manage']) {
+      expect(can('VIEWER', s)).toBe(false);
+    }
+    // EDITOR: autoría de flujos/agentes + lanzar ejecuciones… pero NO gestionar integraciones ni claves de IA
+    expect(can('EDITOR', 'agent:write')).toBe(true);
+    expect(can('EDITOR', 'agent:execute')).toBe(true);
+    expect(can('EDITOR', 'execution:create')).toBe(true);
+    expect(can('EDITOR', 'connector:write')).toBe(false);
+    expect(can('EDITOR', 'connector:delete')).toBe(false);
+    expect(can('EDITOR', 'apikey:manage')).toBe(false);
+    // ADMIN sí gestiona conectores (connector:*) y claves de IA (apikey:manage)
+    expect(can('ADMIN', 'connector:write')).toBe(true);
+    expect(can('ADMIN', 'connector:delete')).toBe(true);
+    expect(can('ADMIN', 'apikey:manage')).toBe(true);
+  });
 });

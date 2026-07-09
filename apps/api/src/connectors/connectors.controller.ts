@@ -58,14 +58,14 @@ export class ConnectorsController {
 
   @Post()
   @UseGuards(ScopesGuard)
-  @RequireScopes('workflow:write')
+  @RequireScopes('connector:write') // gestionar integraciones/credenciales OAuth es de ADMIN (EDITOR solo connector:read)
   create(@Body() body: { provider: string; key: string }, @Workspace() workspaceId: string) {
     return this.svc.create(workspaceId, body?.provider, body?.key);
   }
 
   @Post(':id/connect')
   @UseGuards(ScopesGuard)
-  @RequireScopes('workflow:write')
+  @RequireScopes('connector:write') // iniciar el OAuth de un conector: de ADMIN
   connect(@Param('id') id: string, @Workspace() workspaceId: string) {
     return this.svc.connect(id, workspaceId);
   }
@@ -88,7 +88,7 @@ export class ConnectorsController {
 
   @Delete(':id')
   @UseGuards(ScopesGuard)
-  @RequireScopes('workflow:write')
+  @RequireScopes('connector:delete') // borrar un conector y sus credenciales OAuth: de ADMIN
   remove(@Param('id') id: string, @Workspace() workspaceId: string) {
     return this.svc.delete(id, workspaceId);
   }
