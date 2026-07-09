@@ -228,7 +228,7 @@ function AgentForm({ initial, seed, onDone, onCancel }: { initial: AgentDto | nu
                 onClick={() => applyPreset(p.id)}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-txt-secondary transition-colors hover:border-primary/50 hover:text-txt-primary"
               >
-                <span>{p.emoji}</span> {p.role}
+                <span>{p.emoji}</span> {t(p.role)}
               </button>
             ))}
           </div>
