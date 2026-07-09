@@ -25,7 +25,7 @@ export const NAV: NavItem[] = [
   { to: '/workflows', label: 'Automatizaciones', icon: Workflow },
   { to: '/agents', label: 'Asistentes', icon: Bot },
   { to: '/executions', label: 'Historial', icon: Activity },
-  { to: '/marketplace', label: 'Plantillas', icon: Store },
+  { to: '/marketplace', label: 'Marketplace', icon: Store },
   { to: '/integrations', label: 'Conexiones', icon: Plug },
   { to: '/team', label: 'Equipo', icon: Users, roles: ['OWNER', 'ADMIN'] },
   { to: '/settings', label: 'Ajustes', icon: Settings },

@@ -116,7 +116,7 @@ export function MarketplaceDetail() {
         {item.badges.map((b) => (
           <Badge key={b} tone="default">{b}</Badge>
         ))}
-        <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', item.difficulty === 'Fácil' ? 'bg-success/10 text-success' : item.difficulty === 'Media' ? 'bg-warning/10 text-warning' : 'bg-danger/10 text-danger')}>{item.difficulty}</span>
+        <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', item.difficulty === 'Fácil' ? 'bg-success/10 text-success' : item.difficulty === 'Media' ? 'bg-warning/10 text-warning' : 'bg-danger/10 text-danger')}>{t(item.difficulty)}</span>
       </div>
 
       {error && <div className="rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">{error}</div>}

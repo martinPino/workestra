@@ -83,7 +83,7 @@ function MarketCard({ item }: { item: MarketItem }) {
               <Users size={12} /> {item.install.agents?.length ?? 0}
             </span>
           )}
-          <span className={cn('font-medium', DIFFICULTY_TONE[item.difficulty])}>{item.difficulty}</span>
+          <span className={cn('font-medium', DIFFICULTY_TONE[item.difficulty])}>{t(item.difficulty)}</span>
           <span className="inline-flex items-center gap-1">
             <Clock size={12} /> {item.setupMinutes}m
           </span>
