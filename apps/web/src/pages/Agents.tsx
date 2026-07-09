@@ -10,7 +10,8 @@ import { TOOL_CATALOG, MCP_PRESETS, toolLabel, type McpPreset } from '../lib/too
 import { McpLogo } from '../lib/mcp-logos';
 import { api, type AgentDto, type AgentInput, type AgentDraft, type McpServerRef } from '../lib/api';
 import { AgentChatPanel } from '../components/AgentChatPanel';
-import { ROLE_PRESETS, AGENT_MODELS } from './agent-roles';
+import { ROLE_PRESETS } from './agent-roles';
+import { GENERATION_MODELS, DEFAULT_GENERATION_MODEL } from '../lib/models';
 import { agentGradient } from '../lib/agent-avatar';
 import { useCan } from '../lib/auth';
 import { useT } from '../i18n';
@@ -145,7 +146,7 @@ function AgentForm({ initial, seed, onDone, onCancel }: { initial: AgentDto | nu
   const qc = useQueryClient();
   const [role, setRole] = useState(initial?.name ?? seed?.name ?? '');
   const [goal, setGoal] = useState(initial?.description ?? seed?.description ?? '');
-  const [model, setModel] = useState(initial?.model ?? seed?.model ?? 'llama-3.3-70b-versatile');
+  const [model, setModel] = useState(initial?.model ?? seed?.model ?? DEFAULT_GENERATION_MODEL);
   const [instructions, setInstructions] = useState(initial?.systemPrompt ?? seed?.systemPrompt ?? '');
   const [tools, setTools] = useState<string[]>(initial?.tools ?? seed?.tools ?? []);
   // Servidores MCP / conectores del agente (M69): antes solo se podían asignar desde el nodo del editor.
@@ -241,9 +242,12 @@ function AgentForm({ initial, seed, onDone, onCancel }: { initial: AgentDto | nu
         </Field>
         <Field label={t('Modelo')} hint={t('llama-* es gratis vía Groq/Ollama')}>
           <select value={model} onChange={(e) => setModel(e.target.value)} className={selectCls}>
-            {AGENT_MODELS.map((m) => (
-              <option key={m} value={m}>
-                {m}
+            {(GENERATION_MODELS.some((m) => m.value === model)
+              ? GENERATION_MODELS
+              : [{ label: model, value: model }, ...GENERATION_MODELS]
+            ).map((m) => (
+              <option key={m.value} value={m.value}>
+                {t(m.label)}
               </option>
             ))}
           </select>

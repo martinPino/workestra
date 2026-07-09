@@ -1,18 +1,5 @@
 import type { AgentInput } from '../lib/api';
 
-/** Modelos ofrecidos al crear/editar un agente (mismos que el nodo LLM). Los `llama*` son gratis vía
- *  Groq/Ollama (LLM_BASE_URL); los `claude-*`/`gpt-5` requieren la clave del proveedor correspondiente. */
-export const AGENT_MODELS = [
-  'mock-1',
-  'llama-3.3-70b-versatile',
-  'llama-3.1-8b-instant',
-  'llama3.2',
-  'claude-sonnet-5',
-  'claude-haiku-4-5',
-  'claude-opus-4-8',
-  'gpt-5',
-] as const;
-
 export interface RolePreset {
   id: string;
   emoji: string;
