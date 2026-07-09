@@ -38,13 +38,36 @@ export const MCP_PRESETS: McpPreset[] = [
   { name: 'Notion', url: 'https://mcp.notion.com/mcp', color: '#000000' },
   { name: 'Linear', url: 'https://mcp.linear.app/mcp', color: '#5E6AD2' },
   { name: 'Sentry', url: 'https://mcp.sentry.dev/mcp', color: '#362D59' },
-  { name: 'Atlassian', url: 'https://mcp.atlassian.com/v1/sse', color: '#0052CC' },
+  // Atlassian NO va aquí: es una INTEGRACIÓN de primera clase (OAuth de la plataforma), no un MCP con token
+  // pegado. Su MCP remoto exige OAuth y una API key no lo autentica. Ver INTEGRATION_PRESETS (M76).
   { name: 'Stripe', url: 'https://mcp.stripe.com', color: '#635BFF' },
   { name: 'Salesforce', url: 'https://mcp.salesforce.com/mcp', color: '#00A1E0' },
   { name: 'Hugging Face', url: 'https://huggingface.co/mcp', color: '#FFD21E', darkText: true },
   { name: 'DeepWiki', url: 'https://mcp.deepwiki.com/mcp', color: '#1F6FEB' },
   { name: 'Context7', url: 'https://mcp.context7.com/mcp', color: '#0EA5E9' },
 ];
+
+/**
+ * Integraciones de PRIMERA CLASE (M76): la plataforma es dueña del OAuth y expone las capacidades del
+ * proveedor (Jira/Confluence) como herramientas del agente. Se enganchan al agente como una ref MCP sentinela
+ * `integration://<key>` (sin token pegado); el runtime resuelve el conector OAuth del workspace e inyecta el
+ * token server-side. `provider` es la clave del conector que aporta el OAuth (Atlassian → `jira`).
+ */
+export interface IntegrationPreset {
+  key: string;
+  name: string;
+  url: string;
+  provider: string;
+}
+
+export const INTEGRATION_PRESETS: IntegrationPreset[] = [
+  { key: 'atlassian', name: 'Atlassian', url: 'integration://atlassian', provider: 'jira' },
+];
+
+export const isIntegrationUrl = (url: string): boolean => url.startsWith('integration://');
+
+export const integrationPresetForUrl = (url: string): IntegrationPreset | undefined =>
+  INTEGRATION_PRESETS.find((p) => p.url === url);
 
 export const mcpPresetFor = (server: { url?: string; name?: string }): McpPreset | undefined =>
   MCP_PRESETS.find((p) => p.url === server.url) ?? (server.name ? MCP_PRESETS.find((p) => p.name === server.name) : undefined);

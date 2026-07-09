@@ -21,6 +21,13 @@ export interface McpTool {
   description: string;
   parameters: Record<string, unknown>;
   invoke(args: Record<string, unknown>): Promise<unknown>;
+  /**
+   * M76: scope RBAC exigido en tiempo de invocación. Las herramientas de una INTEGRACIÓN de primera clase
+   * (token de la plataforma) lo fijan (`integration:read`/`integration:write`) para NO saltarse la
+   * autorización por el mero hecho de estar enganchadas. Las de un servidor MCP genérico lo dejan sin
+   * definir (confianza por enganche, como hasta ahora).
+   */
+  scope?: string;
 }
 
 /**

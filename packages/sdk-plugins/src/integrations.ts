@@ -21,6 +21,8 @@ export interface IntegrationToolDef {
   name: string;
   description: string;
   parameters: Record<string, unknown>;
+  /** Scope RBAC exigido al invocar (lo fija `withScope`): `integration:read` o `integration:write`. */
+  scope?: string;
   run(args: Record<string, unknown>, ctx: IntegrationToolCtx): Promise<unknown>;
 }
 
@@ -368,12 +370,20 @@ const CONFLUENCE_TOOLS: IntegrationToolDef[] = [
   },
 ];
 
+/** Herramientas que MUTAN (crean/comentan/transicionan): exigen `integration:write`; el resto `integration:read`. */
+const WRITE_TOOLS = new Set(['jira_create_issue', 'jira_add_comment', 'jira_transition_issue', 'confluence_create_page']);
+
+/** Asigna el scope RBAC a cada herramienta según sea de lectura o de escritura (autorización en tiempo de uso). */
+function withScope(tools: IntegrationToolDef[]): IntegrationToolDef[] {
+  return tools.map((t) => ({ ...t, scope: WRITE_TOOLS.has(t.name) ? 'integration:write' : 'integration:read' }));
+}
+
 export const INTEGRATIONS: Record<string, IntegrationDef> = {
   atlassian: {
     key: 'atlassian',
     label: 'Atlassian',
     provider: 'jira', // una sola conexión OAuth de Atlassian sirve a Jira y Confluence
-    tools: [...JIRA_TOOLS, ...CONFLUENCE_TOOLS],
+    tools: withScope([...JIRA_TOOLS, ...CONFLUENCE_TOOLS]),
   },
 };
 

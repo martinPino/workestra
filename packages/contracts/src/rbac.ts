@@ -8,7 +8,7 @@ import type { Role } from './enums';
  */
 export const ROLE_SCOPES: Record<Role, string[]> = {
   OWNER: ['*'],
-  ADMIN: ['workspace:*', 'workflow:*', 'agent:*', 'execution:*', 'connector:*', 'tool:*', 'secret:read', 'plugin:*', 'apikey:manage', 'team:manage'],
+  ADMIN: ['workspace:*', 'workflow:*', 'agent:*', 'execution:*', 'connector:*', 'integration:*', 'tool:*', 'secret:read', 'plugin:*', 'apikey:manage', 'team:manage'],
   EDITOR: [
     'workflow:read',
     'workflow:write',
@@ -23,8 +23,12 @@ export const ROLE_SCOPES: Record<Role, string[]> = {
     'tool:http',
     'tool:browser',
     'connector:read',
+    // M76: usar integraciones de primera clase (Atlassian…) desde un agente. `connector:*` (conectar el
+    // OAuth) sigue siendo solo de ADMIN; esto es solo USAR lo ya conectado, como los nodos de conector.
+    'integration:read',
+    'integration:write',
   ],
-  VIEWER: ['workflow:read', 'agent:read', 'execution:read', 'tool:read', 'connector:read'],
+  VIEWER: ['workflow:read', 'agent:read', 'execution:read', 'tool:read', 'connector:read', 'integration:read'],
 };
 
 /** Devuelve true solo si el rol tiene el scope (o su comodín). Desconocido => false. */

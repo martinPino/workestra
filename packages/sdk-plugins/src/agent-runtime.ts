@@ -7,6 +7,7 @@ import type {
   LlmToolDef,
   Role,
 } from '@core/contracts';
+import { can } from '@core/contracts';
 import type { IMemoryStore, IMcpToolResolver, McpTool } from '@core/engine';
 import { type ModelRouter, CostCalculator } from '@core/llm';
 import { ToolRegistry } from './tools';
@@ -126,12 +127,19 @@ export class AgentRuntime implements IAgentRuntime {
         let allowed = true;
         const mcpTool = mcpByName.get(call.name);
         if (mcpTool) {
-          // Herramienta de un servidor MCP enganchado al agente: autorizada por estar enganchada (el
-          // servidor lo añadió el workspace). Un fallo de red devuelve un error legible, no rompe el bucle.
-          try {
-            result = await mcpTool.invoke(call.arguments);
-          } catch (e) {
-            result = { error: 'fallo del servidor MCP', reason: e instanceof Error ? e.message : String(e) };
+          // Herramienta MCP/integración enganchada al agente. Las de una INTEGRACIÓN de primera clase (M76)
+          // llevan un `scope` RBAC y se AUTORIZAN por rol antes de invocar (no basta con estar enganchadas,
+          // porque usan el token OAuth de la plataforma); las de un servidor MCP genérico (sin `scope`) siguen
+          // siendo de confianza por enganche. Un fallo de red devuelve un error legible, no rompe el bucle.
+          if (mcpTool.scope && !can(role, mcpTool.scope)) {
+            allowed = false;
+            result = { error: 'tool no autorizada', reason: `el rol ${role} no tiene el permiso ${mcpTool.scope}` };
+          } else {
+            try {
+              result = await mcpTool.invoke(call.arguments);
+            } catch (e) {
+              result = { error: 'fallo del servidor MCP', reason: e instanceof Error ? e.message : String(e) };
+            }
           }
         } else {
           const authz = this.deps.authz.authorize({ role, agentTools: agent.tools, toolKey: call.name });

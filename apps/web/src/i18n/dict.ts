@@ -1034,4 +1034,9 @@ export const EN: Record<string, string> = {
   "Llama 3.3 70B · equilibrado (por defecto)": "Llama 3.3 70B · balanced (default)",
   "Llama 3.1 8B · muy rápido": "Llama 3.1 8B · very fast",
   "GPT-OSS 120B · potente": "GPT-OSS 120B · powerful",
+  "Conecta {name} en Integraciones para activar sus herramientas.": "Connect {name} in Integrations to enable its tools.",
+  "Acceso gestionado por la plataforma (OAuth). Conéctalo una vez en Integraciones.": "Access managed by the platform (OAuth). Connect it once in Integrations.",
+  "Acceso gestionado por la plataforma — sin pegar claves.": "Access managed by the platform — no keys to paste.",
+  "La credencial no funcionó o": "The credential didn’t work, or",
+  "requiere iniciar sesión (OAuth).": "requires signing in (OAuth).",
 };

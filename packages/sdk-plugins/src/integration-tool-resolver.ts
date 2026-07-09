@@ -12,7 +12,9 @@ import { resolveConnectorToken } from './connector-token';
 import { getIntegration, integrationKeyFromUrl, type IntegrationToolCtx } from './integrations';
 import { jiraAccessibleResources, type JiraFetch } from './jira-webhooks';
 
-const defaultFetch: JiraFetch = (url, init) => fetch(url, init as RequestInit);
+/** Timeout por petición: una API de Atlassian lenta/hostil no debe colgar la ejecución del agente (como McpHttpClient). */
+const TIMEOUT_MS = 12_000;
+const defaultFetch: JiraFetch = (url, init) => fetch(url, { ...(init as RequestInit), signal: AbortSignal.timeout(TIMEOUT_MS) });
 
 export class IntegrationToolResolver implements IMcpToolResolver {
   constructor(
@@ -47,7 +49,15 @@ export class IntegrationToolResolver implements IMcpToolResolver {
       name: tool.name,
       description: tool.description,
       parameters: tool.parameters,
-      invoke: (args: Record<string, unknown>) => tool.run(args, ctx),
+      scope: tool.scope, // M76: el runtime exige este scope RBAC antes de invocar (no confía solo en el enganche)
+      invoke: async (args: Record<string, unknown>) => {
+        try {
+          return await tool.run(args, ctx);
+        } catch (e) {
+          // Timeout / fallo de red → error legible para el modelo, no cuelga ni rompe la ejecución.
+          return { error: 'request_failed', detail: e instanceof Error ? e.message : String(e) };
+        }
+      },
     }));
   }
 }

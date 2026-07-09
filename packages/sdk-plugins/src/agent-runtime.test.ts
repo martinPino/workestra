@@ -89,6 +89,54 @@ describe('AgentRuntime', () => {
     expect(log.find((l) => l.tool === 'GitHub_crear_issue')?.allowed).toBe(true);
   });
 
+  it('M76: DENIEGA una herramienta de integración con scope si el rol del agente no lo tiene (VIEWER)', async () => {
+    let invoked = false;
+    const mcp: AgentRuntimeDeps['mcp'] = {
+      async resolve() {
+        return [
+          {
+            name: 'jira_create_issue',
+            description: 'crea un issue en Jira',
+            parameters: {},
+            scope: 'integration:write', // VIEWER no tiene integration:write
+            invoke: async () => {
+              invoked = true;
+              return { ok: true };
+            },
+          },
+        ];
+      },
+    };
+    const a = agent({ tools: [], mcpServers: [{ id: 's1', name: 'Atlassian', url: 'integration://atlassian' }], permissions: { role: 'VIEWER' } });
+    const res = await new AgentRuntime({ ...deps(), mcp }).invoke(a, { ...emptyContext(), variables: { task: 'usa la herramienta para crear un issue' } }, 'ws1');
+    expect(invoked).toBe(false); // el guard RBAC impidió la invocación con el token de la plataforma
+    const log = toolLog(res);
+    expect(log.find((l) => l.tool === 'jira_create_issue')?.allowed).toBe(false);
+  });
+
+  it('M76: PERMITE la herramienta de integración con scope si el rol la concede (EDITOR)', async () => {
+    let invoked = false;
+    const mcp: AgentRuntimeDeps['mcp'] = {
+      async resolve() {
+        return [
+          {
+            name: 'jira_create_issue',
+            description: 'crea un issue en Jira',
+            parameters: {},
+            scope: 'integration:write',
+            invoke: async () => {
+              invoked = true;
+              return { ok: true };
+            },
+          },
+        ];
+      },
+    };
+    const a = agent({ tools: [], mcpServers: [{ id: 's1', name: 'Atlassian', url: 'integration://atlassian' }], permissions: { role: 'EDITOR' } });
+    await new AgentRuntime({ ...deps(), mcp }).invoke(a, { ...emptyContext(), variables: { task: 'usa la herramienta para crear un issue' } }, 'ws1');
+    expect(invoked).toBe(true);
+  });
+
   it('escribe en memoria compartida tras responder', async () => {
     const writes: Array<{ scope: MemoryScope; key: string }> = [];
     const memory: AgentRuntimeDeps['memory'] = {

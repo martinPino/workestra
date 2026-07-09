@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { IConnectorRepository, ISecretStore, ConnectorRecord } from '@core/engine';
 import type { McpServerRef } from '@core/contracts';
+import { can } from '@core/contracts';
 import { getIntegration, integrationKeyFromUrl, integrationUrl, INTEGRATIONS } from './integrations';
 import { IntegrationToolResolver, composeMcpResolvers } from './integration-tool-resolver';
 import type { JiraFetch } from './jira-webhooks';
@@ -80,6 +81,26 @@ describe('integrations registry (M76)', () => {
       }
     }
   });
+
+  it('las herramientas de escritura exigen integration:write; las de lectura integration:read', () => {
+    const byName = Object.fromEntries(getIntegration('atlassian')!.tools.map((t) => [t.name, t.scope]));
+    expect(byName['jira_create_issue']).toBe('integration:write');
+    expect(byName['jira_add_comment']).toBe('integration:write');
+    expect(byName['jira_transition_issue']).toBe('integration:write');
+    expect(byName['confluence_create_page']).toBe('integration:write');
+    expect(byName['jira_search_issues']).toBe('integration:read');
+    expect(byName['jira_get_issue']).toBe('integration:read');
+    expect(byName['confluence_search']).toBe('integration:read');
+    expect(byName['confluence_get_page']).toBe('integration:read');
+  });
+
+  it('RBAC: VIEWER puede leer pero no escribir; EDITOR+ puede ambas', () => {
+    expect(can('VIEWER', 'integration:read')).toBe(true);
+    expect(can('VIEWER', 'integration:write')).toBe(false);
+    expect(can('EDITOR', 'integration:write')).toBe(true);
+    expect(can('ADMIN', 'integration:write')).toBe(true);
+    expect(can('OWNER', 'integration:write')).toBe(true);
+  });
 });
 
 // --- Resolver -------------------------------------------------------------------------------------
@@ -126,6 +147,25 @@ describe('IntegrationToolResolver (M76)', () => {
     expect(call.init?.method).toBe('POST');
     expect(call.init?.headers?.authorization).toBe('Bearer tok-123');
     expect(JSON.parse(call.init!.body!)).toMatchObject({ fields: { project: { key: 'KAN' }, summary: 'Hola' } });
+  });
+
+  it('propaga el scope RBAC a cada McpTool resuelto', async () => {
+    const { fetchFn } = makeFetch({});
+    const resolver = new IntegrationToolResolver(connectorRepo([CONNECTED]), secretStore({ 'connector:conn-1:oauth': 'tok-123' }), fetchFn);
+    const tools = await resolver.resolve('ws-1', serversFor('atlassian'));
+    expect(tools.find((t) => t.name === 'jira_create_issue')!.scope).toBe('integration:write');
+    expect(tools.find((t) => t.name === 'jira_get_issue')!.scope).toBe('integration:read');
+  });
+
+  it('un fallo/timeout de fetch degrada a un error legible (no cuelga ni lanza fuera de invoke)', async () => {
+    const fetchFn: JiraFetch = async (url) => {
+      if (url.includes('accessible-resources')) return { ok: true, status: 200, json: async () => [{ id: 'cloud-1', url: '', name: '' }] };
+      throw new Error('TimeoutError: request timed out');
+    };
+    const resolver = new IntegrationToolResolver(connectorRepo([CONNECTED]), secretStore({ 'connector:conn-1:oauth': 'tok-123' }), fetchFn);
+    const tools = await resolver.resolve('ws-1', serversFor('atlassian'));
+    const out = (await tools.find((t) => t.name === 'jira_get_issue')!.invoke({ issueKey: 'KAN-1' })) as { error: string };
+    expect(out.error).toBe('request_failed');
   });
 
   it('confluence_search: convierte query a CQL text ~', async () => {

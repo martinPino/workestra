@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Link } from 'react-router-dom';
 import { Plus, Check, X, Boxes, Wrench, TriangleAlert, Plug } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type McpServerRef } from '../lib/api';
-import { TOOL_CATALOG, MCP_PRESETS } from '../lib/tools';
+import { TOOL_CATALOG, MCP_PRESETS, INTEGRATION_PRESETS, isIntegrationUrl, integrationPresetForUrl } from '../lib/tools';
+import { useConnectors } from '../lib/hooks';
 import { McpLogo } from '../lib/mcp-logos';
 import { useT } from '../i18n';
 
@@ -49,7 +51,11 @@ function McpWarn({ server }: { server: { id: string; name: string; url: string }
     ? q.data.connected
       ? `${t('La credencial de')} ${server.name} ${t('no es válida. Vuelve a conectar.')}`
       : `${t('Faltan las credenciales para')} ${server.name}. ${t('Conéctalo para activarlo.')}`
-    : `${t('No se pudo conectar con')} ${server.name}.`;
+    : q.data.connected
+      ? // Se envió una credencial y aun así falla sin ser 401/403 (p. ej. el MCP remoto de Atlassian exige
+        // OAuth y devuelve 404 con un token que no es OAuth): mensaje honesto en vez de un genérico.
+        `${t('La credencial no funcionó o')} ${server.name} ${t('requiere iniciar sesión (OAuth).')}`
+      : `${t('No se pudo conectar con')} ${server.name}.`;
 
   return (
     <span className="group/warn absolute -bottom-1.5 left-1/2 z-20 -translate-x-1/2">
@@ -128,6 +134,41 @@ function McpWarn({ server }: { server: { id: string; name: string; url: string }
 }
 
 /**
+ * Aviso de una INTEGRACIÓN de primera clase (M76) enganchada al agente (ref `integration://…`). A diferencia
+ * de un MCP con token pegado, aquí la plataforma es dueña del OAuth: el aviso solo mira si el conector OAuth
+ * del workspace (por `provider`) está CONECTADO. Si no lo está, muestra un enlace a Integraciones para
+ * conectarlo una vez; el agente nunca ve el token.
+ */
+function IntegrationWarn({ server }: { server: { name: string; url: string } }) {
+  const t = useT();
+  const preset = integrationPresetForUrl(server.url);
+  const { data: connectors } = useConnectors();
+  if (!preset) return null;
+  const connected = (connectors ?? []).some((c) => c.provider === preset.provider && c.status === 'connected');
+  if (connected) return null; // conectado → sin aviso; las herramientas ya funcionan
+
+  return (
+    <span className="group/warn absolute -bottom-1.5 left-1/2 z-20 -translate-x-1/2">
+      <span className="flex h-4 w-4 items-center justify-center rounded-full border-2 border-elevated bg-warning text-white shadow-card">
+        <TriangleAlert size={9} strokeWidth={2.75} />
+      </span>
+      <span className="absolute bottom-full left-1/2 hidden -translate-x-1/2 pb-1.5 group-hover/warn:block">
+        <span className="pointer-events-auto block w-max max-w-[220px] rounded-lg border border-border bg-elevated p-2 text-[11px] leading-snug text-txt-secondary shadow-pop">
+          {t('Conecta {name} en Integraciones para activar sus herramientas.').replace('{name}', server.name)}
+          <Link
+            to="/integrations"
+            onClick={(e) => e.stopPropagation()}
+            className="mt-1.5 flex w-full items-center justify-center gap-1 rounded-md bg-primary/15 py-1 text-[11px] font-medium text-primary hover:bg-primary/25"
+          >
+            <Plug size={11} /> {t('Conectar')}
+          </Link>
+        </span>
+      </span>
+    </span>
+  );
+}
+
+/**
  * Puerto «Herramientas» del nodo Agente estilo n8n (M40): del puerto cuelgan las herramientas del agente como
  * sub-nodos circulares unidos por líneas punteadas, con un «+» para añadir tools internas o SERVIDORES MCP.
  * Al ejecutar, el runtime del agente se conecta a esos servidores y usa sus herramientas. Todo edita el agente
@@ -177,6 +218,12 @@ export function AgentToolsPort({
   const addPreset = (p: { name: string; url: string }) => {
     if (mcpServers.some((s) => s.url === p.url)) return; // ya añadido
     save.mutate({ mcpServers: [...mcpServers, { id: `mcp_${Date.now().toString(36)}`, name: p.name, url: p.url }] });
+    setOpen(false);
+  };
+  // M76: engancha una integración de primera clase como ref sentinela `integration://<key>` (sin token).
+  const addIntegration = (p: { name: string; url: string }) => {
+    if (mcpServers.some((s) => s.url === p.url)) return;
+    save.mutate({ mcpServers: [...mcpServers, { id: `int_${Date.now().toString(36)}`, name: p.name, url: p.url }] });
     setOpen(false);
   };
 
@@ -236,7 +283,12 @@ export function AgentToolsPort({
               <div key={it.kind === 'mcp' ? it.id : it.key} className="group/tool flex flex-col items-center" style={{ width: CIRCLE }}>
                 <div className="relative flex items-center justify-center rounded-full border border-border bg-elevated" style={{ width: CIRCLE, height: CIRCLE }}>
                   {it.kind === 'mcp' ? <McpLogo server={{ url: it.url, name: it.label }} box={30} /> : <it.icon size={19} className="text-txt-secondary" />}
-                  {it.kind === 'mcp' && <McpWarn server={{ id: it.id, name: it.label, url: it.url }} />}
+                  {it.kind === 'mcp' &&
+                    (isIntegrationUrl(it.url) ? (
+                      <IntegrationWarn server={{ name: it.label, url: it.url }} />
+                    ) : (
+                      <McpWarn server={{ id: it.id, name: it.label, url: it.url }} />
+                    ))}
                   {editable && (
                     <button
                       type="button"
@@ -296,6 +348,37 @@ export function AgentToolsPort({
               </button>
             );
           })}
+
+          {/* Integraciones de primera clase (M76): acceso gestionado por la plataforma (OAuth), sin pegar claves. */}
+          <div className="my-1.5 border-t border-border" />
+          <p className="flex items-center gap-1.5 px-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-txt-disabled">
+            <Plug size={11} /> {t('Integraciones')}
+          </p>
+          <div className="mb-1 flex flex-wrap gap-1">
+            {INTEGRATION_PRESETS.map((p) => {
+              const added = mcpServers.some((s) => s.url === p.url);
+              return (
+                <button
+                  key={p.url}
+                  type="button"
+                  disabled={added}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    addIntegration(p);
+                  }}
+                  title={added ? t('Ya añadido') : t('Acceso gestionado por la plataforma (OAuth). Conéctalo una vez en Integraciones.')}
+                  className={`inline-flex items-center gap-1.5 rounded-md border px-1.5 py-1 text-[11px] transition-colors ${
+                    added
+                      ? 'border-primary/50 bg-primary/10 text-primary'
+                      : 'border-border bg-surface text-txt-secondary hover:border-border-strong hover:text-txt-primary'
+                  }`}
+                >
+                  <McpLogo server={{ name: p.name }} box={16} /> {p.name} {added && <Check size={10} />}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mb-1 px-1 text-[10px] text-txt-disabled">{t('Acceso gestionado por la plataforma — sin pegar claves.')}</p>
 
           <div className="my-1.5 border-t border-border" />
           <p className="flex items-center gap-1.5 px-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-txt-disabled">
