@@ -96,6 +96,19 @@ export function connectorProviders(selfBase = 'http://localhost:3001'): Record<s
       tokenExchange: 'form',
       tokenPath: 'access_token',
     },
+    sentry: {
+      provider: 'sentry',
+      label: 'Sentry',
+      // OAuth Application de Sentry (Settings → API → Applications): Authorization Code estándar.
+      authorizeUrl: 'https://sentry.io/oauth/authorize/',
+      tokenUrl: 'https://sentry.io/oauth/token/',
+      baseUrl: 'https://sentry.io/api/0',
+      // Leer organización, proyectos e issues/eventos: para leer errores y disparar flujos por ellos.
+      scopes: ['org:read', 'project:read', 'event:read'],
+      requiresConfig: true,
+      tokenExchange: 'form',
+      tokenPath: 'access_token',
+    },
     // --- Google (M28): un solo cliente OAuth de Google (`GOOGLE_CLIENT_ID/SECRET`) sirve a las 3 apps vía
     // `configProvider: 'google'`. `access_type=offline` + `prompt=consent` para obtener refresh token. ---
     'google-sheets': {

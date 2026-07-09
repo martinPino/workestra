@@ -7,7 +7,7 @@
  * y Jira llevan sus colores de marca. Quien no tenga logo (p. ej. `dev`) usa el icono genérico del que llama.
  */
 
-import { siGoogledrive } from 'simple-icons';
+import { siGoogledrive, siSentry } from 'simple-icons';
 
 const WITH_LOGO = new Set([
   'slack',
@@ -25,6 +25,7 @@ const WITH_LOGO = new Set([
   'canva',
   'shopify',
   'postgres',
+  'sentry',
 ]);
 
 /** ¿Este proveedor tiene un logo de marca? (si no, el llamante pinta su icono/gradiente genérico). */
@@ -101,6 +102,15 @@ function GoogleDriveLogo({ size }: { size: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" role="img" aria-label="Google Drive" xmlns="http://www.w3.org/2000/svg" fill="#4285F4">
       <path d={siGoogledrive.path} />
+    </svg>
+  );
+}
+
+function SentryLogo({ size }: { size: number }) {
+  // Marca real de Sentry (simple-icons, monocromo en su morado de marca).
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" role="img" aria-label="Sentry" xmlns="http://www.w3.org/2000/svg" fill="#362D59">
+      <path d={siSentry.path} />
     </svg>
   );
 }
@@ -243,6 +253,8 @@ export function ProviderLogo({ provider, size = 18 }: { provider: string | undef
       return <ShopifyLogo size={size} />;
     case 'postgres':
       return <PostgresLogo size={size} />;
+    case 'sentry':
+      return <SentryLogo size={size} />;
     default:
       return null;
   }
