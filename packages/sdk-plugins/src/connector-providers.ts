@@ -29,6 +29,11 @@ export interface ConnectorProvider {
    * Google, así que apuntan a `google` → una sola pareja `GOOGLE_CLIENT_ID/SECRET`.
    */
   configProvider?: string;
+  /**
+   * Cliente PÚBLICO con PKCE (S256) en vez de client secret (p. ej. Sentry). Cuando es true: el flujo añade
+   * `code_challenge`/`code_verifier` y NO envía `client_secret`; basta con `*_CLIENT_ID` configurado.
+   */
+  pkce?: boolean;
 }
 
 /**
@@ -108,6 +113,8 @@ export function connectorProviders(selfBase = 'http://localhost:3001'): Record<s
       requiresConfig: true,
       tokenExchange: 'form',
       tokenPath: 'access_token',
+      // Sentry emite clientes PÚBLICOS con PKCE (sin client secret): solo requiere SENTRY_CLIENT_ID.
+      pkce: true,
     },
     // --- Google (M28): un solo cliente OAuth de Google (`GOOGLE_CLIENT_ID/SECRET`) sirve a las 3 apps vía
     // `configProvider: 'google'`. `access_type=offline` + `prompt=consent` para obtener refresh token. ---

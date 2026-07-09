@@ -1,6 +1,6 @@
 import { Injectable, Inject, BadRequestException, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import type { ConnectorRecord } from '@core/engine';
 import { getConnectorProvider, providerEnvKeys, tokenBlobFromResponse, serializeTokenBlob, resolveConnectorToken, listDriveFolders, listSlackChannels } from '@core/sdk-plugins';
 import { setCurrentWorkspace } from '@core/infra';
@@ -13,9 +13,23 @@ interface OAuthState {
   kind: 'oauth_state';
   /** Nonce single-use (anti-replay del callback). */
   jti: string;
+  /**
+   * PKCE code_verifier (solo clientes públicos, p. ej. Sentry). Viaja dentro del state JWT FIRMADO y de vida
+   * corta (5 min) + single-use: se mantiene el diseño stateless (sin store por-flujo, funciona con varias
+   * instancias) y el intercambio de token ocurre server-side sobre HTTPS.
+   */
+  cv?: string;
 }
 
 const STATE_TTL_MS = 5 * 60_000;
+
+const b64url = (buf: Buffer): string => buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+/** PKCE (RFC 7636, S256): verifier aleatorio y su challenge = base64url(sha256(verifier)). */
+function pkcePair(): { verifier: string; challenge: string } {
+  const verifier = b64url(randomBytes(32));
+  const challenge = b64url(createHash('sha256').update(verifier).digest());
+  return { verifier, challenge };
+}
 
 const secretKeyFor = (connectorId: string) => `connector:${connectorId}:oauth`;
 
@@ -73,7 +87,8 @@ export class ConnectorsService {
     if (!prov) return false;
     if (!prov.requiresConfig) return true;
     const { id, secret } = providerEnvKeys(this.credProvider(provider));
-    return !!process.env[id] && !!process.env[secret];
+    // Cliente público (PKCE): basta el client_id, no hay secret.
+    return !!process.env[id] && (prov.pkce === true || !!process.env[secret]);
   }
 
   async create(workspaceId: string, provider: string, key: string): Promise<ConnectorRecord> {
@@ -121,10 +136,13 @@ export class ConnectorsService {
     if (!provider) throw new BadRequestException('Proveedor desconocido.');
     if (!this.isConfigured(provider.provider)) {
       const { id, secret } = providerEnvKeys(this.credProvider(provider.provider));
-      throw new BadRequestException(`El proveedor «${provider.label}» requiere ${id} y ${secret} configurados en el servidor.`);
+      const need = provider.pkce ? id : `${id} y ${secret}`;
+      throw new BadRequestException(`El proveedor «${provider.label}» requiere ${need} configurado en el servidor.`);
     }
+    // PKCE (clientes públicos, p. ej. Sentry): el verifier se guarda dentro del state firmado; el challenge va en la URL.
+    const pkce = provider.pkce ? pkcePair() : null;
     const state = this.jwt.sign(
-      { cid: id, ws: workspaceId, kind: 'oauth_state', jti: randomBytes(12).toString('hex') } satisfies OAuthState,
+      { cid: id, ws: workspaceId, kind: 'oauth_state', jti: randomBytes(12).toString('hex'), ...(pkce ? { cv: pkce.verifier } : {}) } satisfies OAuthState,
       { expiresIn: '5m' },
     );
     const { clientId } = this.creds(provider.provider);
@@ -134,6 +152,7 @@ export class ConnectorsService {
       redirect_uri: `${this.selfBase()}/connectors/callback`,
       scope: provider.scopes.join(' '),
       state,
+      ...(pkce ? { code_challenge: pkce.challenge, code_challenge_method: 'S256' } : {}),
       ...(provider.extraAuthorizeParams ?? {}),
     });
     return { authorizeUrl: `${provider.authorizeUrl}?${params.toString()}` };
@@ -162,14 +181,15 @@ export class ConnectorsService {
     if (!provider) throw new BadRequestException('Proveedor desconocido.');
 
     // Intercambio code→token contra el endpoint del proveedor. Formato y credenciales según catálogo:
-    // Slack/GitHub usan form-urlencoded; Atlassian/dev usan JSON. Se incluye client_id/secret.
+    // Slack/GitHub usan form-urlencoded; Atlassian/dev usan JSON. Confidencial → client_secret;
+    // público (PKCE, p. ej. Sentry) → code_verifier del state y SIN client_secret.
     const { clientId, clientSecret } = this.creds(provider.provider);
     const fields: Record<string, string> = {
       grant_type: 'authorization_code',
       code,
       redirect_uri: `${this.selfBase()}/connectors/callback`,
       client_id: clientId,
-      client_secret: clientSecret,
+      ...(provider.pkce ? { code_verifier: payload.cv ?? '' } : { client_secret: clientSecret }),
     };
     const res =
       provider.tokenExchange === 'form'

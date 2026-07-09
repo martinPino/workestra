@@ -46,6 +46,8 @@ export class ConnectorsController {
         configured: this.svc.isConfigured(p.provider),
         // Proveedor del que salen las credenciales (varias apps de Google comparten `google`); para el hint.
         configProvider: p.configProvider ?? p.provider,
+        // Cliente público (PKCE): el hint pide solo el CLIENT_ID (no hay secret).
+        pkce: p.pkce ?? false,
       }));
   }
 

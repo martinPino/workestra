@@ -303,7 +303,7 @@ export const api = {
   // --- Conectores (OAuth + dispatch saliente, M11) ---
   listConnectorProviders: () =>
     fetch(`${API}/connectors/providers`, { headers: authHeaders() }).then((r) =>
-      json<Array<{ provider: string; label: string; scopes: string[]; requiresConfig: boolean; configured: boolean; configProvider: string }>>(r),
+      json<Array<{ provider: string; label: string; scopes: string[]; requiresConfig: boolean; configured: boolean; configProvider: string; pkce?: boolean }>>(r),
     ),
   listConnectors: () =>
     fetch(`${API}/connectors`, { headers: authHeaders() }).then((r) =>

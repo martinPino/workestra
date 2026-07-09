@@ -94,8 +94,8 @@ function ConnectorsManager() {
                       ) : p.configured ? (
                         <span className="text-xs text-txt-secondary">{t('sin conectar')}</span>
                       ) : (
-                        <span className="flex items-center gap-1 text-xs text-txt-disabled" title={`${t('Configura')} ${p.configProvider.toUpperCase()}_CLIENT_ID ${t('y')} ${p.configProvider.toUpperCase()}_CLIENT_SECRET ${t('en el servidor')}`}>
-                          <Lock size={11} /> {t('falta')} {p.configProvider.toUpperCase()}_CLIENT_ID/SECRET
+                        <span className="flex items-center gap-1 text-xs text-txt-disabled" title={p.pkce ? `${t('Configura')} ${p.configProvider.toUpperCase()}_CLIENT_ID ${t('en el servidor')}` : `${t('Configura')} ${p.configProvider.toUpperCase()}_CLIENT_ID ${t('y')} ${p.configProvider.toUpperCase()}_CLIENT_SECRET ${t('en el servidor')}`}>
+                          <Lock size={11} /> {t('falta')} {p.configProvider.toUpperCase()}_CLIENT_ID{p.pkce ? '' : '/SECRET'}
                         </span>
                       )}
                     </div>
