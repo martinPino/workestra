@@ -21,11 +21,13 @@ export const ExecutionEventSchema = z.discriminatedUnion('type', [
   base.extend({ type: z.literal('execution.queued') }),
   base.extend({ type: z.literal('execution.started') }),
   base.extend({ type: z.literal('execution.status'), status: ExecutionStatus }),
-  base.extend({ type: z.literal('node.started'), nodeKey: z.string(), stepKey: z.string() }),
+  // `input`: vista compacta de la ENTRADA del paso (su config interpolable) para depurar en el replay (M77).
+  base.extend({ type: z.literal('node.started'), nodeKey: z.string(), stepKey: z.string(), input: z.unknown().optional() }),
   base.extend({
     type: z.literal('node.succeeded'),
     nodeKey: z.string(),
     stepKey: z.string(),
+    // `output`: `{ data?, usage? }` — `data` es la SALIDA del paso (recortada); `usage` sus tokens/coste.
     output: z.unknown().optional(),
   }),
   base.extend({

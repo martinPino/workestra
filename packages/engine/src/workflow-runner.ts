@@ -11,6 +11,26 @@ import type {
   IWorkspaceUsageRepository,
 } from './ports';
 
+/** Vista compacta de un valor para el LOG de eventos (M77): estructura si cabe, si no un recorte legible. */
+function eventPreview(value: unknown, max = 800): unknown {
+  if (value === undefined || value === null) return undefined;
+  let s: string;
+  try {
+    s = typeof value === 'string' ? value : JSON.stringify(value);
+  } catch {
+    s = String(value);
+  }
+  if (s.length <= max) return value;
+  return { preview: s.slice(0, max) + '…', truncated: true, length: s.length };
+}
+
+/** La SALIDA de este nodo vive en `context.variables` bajo `<tipo>:<nodeKey>` (agent:/connector:/http:/file:…). */
+function nodeOutputFromContext(context: ExecutionContext, nodeKey: string): unknown {
+  const vars = (context as { variables?: Record<string, unknown> }).variables ?? {};
+  const key = Object.keys(vars).find((k) => k.endsWith(`:${nodeKey}`));
+  return key ? vars[key] : undefined;
+}
+
 export interface RunnerDeps {
   executions: IExecutionRepository;
   context: IContextStore;
@@ -132,7 +152,8 @@ export class WorkflowRunner {
 
     for (let attempt = 1; ; attempt++) {
       const stepKey = `${executionId}:${key}:${attempt}`; // idempotencia por (exec, nodo, intento)
-      await this.emit(executionId, { type: 'node.started', nodeKey: key, stepKey });
+      // M77: adjunta la ENTRADA del paso (su config) para que el replay muestre con qué se ejecutó.
+      await this.emit(executionId, { type: 'node.started', nodeKey: key, stepKey, input: eventPreview(node.config) });
 
       if (!executor) {
         await this.deps.executions.appendLog({ executionId, nodeKey: key, stepKey, level: 'warn', status: 'skipped' });
@@ -167,11 +188,12 @@ export class WorkflowRunner {
         // Cuota por workspace (M33): los tokens de EJECUCIÓN (agentes/router) también cuentan hacia el tope
         // diario. Best-effort: no rompe la ejecución si el contador falla.
         if (tokens > 0 && this.deps.usage) await this.deps.usage.add(this.workspaceId, tokens).catch(() => undefined);
+        // M77: adjunta la SALIDA real del paso (recortada) además del uso, para verla en el replay.
         await this.emit(executionId, {
           type: 'node.succeeded',
           nodeKey: key,
           stepKey,
-          output: result.usage ? { usage: result.usage } : undefined,
+          output: { data: eventPreview(nodeOutputFromContext(result.context, key)), usage: result.usage },
         });
         return { ok: true, nodeKey: key, context: result.context, control: result.control };
       } catch (err) {

@@ -1055,4 +1055,8 @@ export const EN: Record<string, string> = {
   "tu@empresa.com": "you@company.com",
   "Empezar desde una plantilla": "Start from a template",
   "Explora equipos, agentes y automatizaciones en el Marketplace.": "Explore teams, agents, and automations in the Marketplace.",
+  "Entrada": "Input",
+  "Salida": "Output",
+  "Error de la ejecución": "Execution error",
+  "toca un paso para ver detalle": "tap a step to see detail",
 };

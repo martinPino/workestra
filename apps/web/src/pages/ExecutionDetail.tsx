@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Radio,
+  ChevronDown,
   Coins,
   CircleDollarSign,
   Loader2,
@@ -106,6 +107,36 @@ function eventDetail(e: ExecutionEvent): string {
   }
   if ('nodeKey' in e && e.nodeKey) return String(e.nodeKey);
   return '';
+}
+
+type Detail = { label: string; value: unknown; danger?: boolean };
+
+/** Campos de detalle de un evento para el panel expandible (M77): entrada, salida y error de cada paso. */
+function eventExtras(e: ExecutionEvent): Detail[] {
+  const out: Detail[] = [];
+  if (e.type === 'node.started' && e.input !== undefined) out.push({ label: 'Entrada', value: e.input });
+  if (e.type === 'node.succeeded') {
+    const o = e.output as { data?: unknown; usage?: unknown } | undefined;
+    if (o?.data !== undefined) out.push({ label: 'Salida', value: o.data });
+  }
+  if (e.type === 'subtask.succeeded' && e.output) out.push({ label: 'Salida', value: e.output });
+  if (e.type === 'node.failed') out.push({ label: 'Error', value: e.error, danger: true });
+  if (e.type === 'execution.failed') out.push({ label: 'Error', value: e.error, danger: true });
+  if (e.type === 'subtask.failed') out.push({ label: 'Error', value: e.error, danger: true });
+  if (e.type === 'plan.execution_failed') out.push({ label: 'Error', value: e.error, danger: true });
+  if (e.type === 'browser.action' && !e.ok && e.error) out.push({ label: 'Error', value: e.error, danger: true });
+  return out;
+}
+
+/** Formatea un valor de detalle para el `<pre>`: string tal cual; objeto en JSON legible. */
+function fmtDetail(v: unknown): string {
+  if (v === undefined || v === null) return '—';
+  if (typeof v === 'string') return v;
+  try {
+    return JSON.stringify(v, null, 2);
+  } catch {
+    return String(v);
+  }
 }
 
 /** Narración humana de cada tipo de evento del motor (M25): «node.succeeded» → «Paso completado». */
@@ -237,6 +268,14 @@ export function ExecutionDetail() {
   const { id } = useParams<{ id: string }>();
   const [cursor, setCursor] = useState<number | null>(null); // null = en vivo (todos los eventos)
   const [playing, setPlaying] = useState(false);
+  const [openEv, setOpenEv] = useState<Set<number>>(new Set()); // filas del timeline con su detalle desplegado (M77)
+  const toggleEv = (i: number) =>
+    setOpenEv((s) => {
+      const n = new Set(s);
+      if (n.has(i)) n.delete(i);
+      else n.add(i);
+      return n;
+    });
 
   const qc = useQueryClient();
   // Carga inicial (grafo anclado, contexto, reviews, primer tramo de eventos). NO se re-sondea aquí:
@@ -447,6 +486,18 @@ export function ExecutionDetail() {
             </div>
           )}
 
+          {/* M77: error de la ejecución COMPLETO y siempre visible (antes se recortaba a 40 chars). */}
+          {state.error && (
+            <div className="border-b border-border p-3">
+              <div className="mb-2 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-danger">
+                <AlertTriangle size={12} /> {t('Error de la ejecución')}
+              </div>
+              <pre className="max-h-44 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-danger/20 bg-danger/[0.06] p-2.5 text-[11px] leading-relaxed text-danger">
+                {state.error}
+              </pre>
+            </div>
+          )}
+
           {/* M25: errores de conector que no paran el flujo, sacados a la luz (el nodo «completa» con 4xx). */}
           {(() => {
             const warns = connectorWarnings(data.context);
@@ -489,7 +540,7 @@ export function ExecutionDetail() {
 
           <div className="flex items-center justify-between border-b border-border px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-txt-disabled">
             <span>Timeline · {events.length} {t('eventos')}</span>
-            {state.error && <span className="normal-case text-danger">{state.error.slice(0, 40)}</span>}
+            <span className="normal-case text-txt-disabled">{t('toca un paso para ver detalle')}</span>
           </div>
           <div ref={timelineRef} className="min-h-0 flex-1 overflow-y-auto">
             {events.length === 0 ? (
@@ -502,10 +553,17 @@ export function ExecutionDetail() {
                   // Una acción del navegador fallida se pinta en rojo aunque su tipo base sea 'accent' (M72).
                   const tone = e.type === 'browser.action' && !e.ok ? 'danger' : EVENT_TONE[e.type] ?? 'default';
                   const shotId = e.type === 'browser.action' ? e.screenshotFileId : undefined;
+                  const extras = eventExtras(e); // M77: entrada / salida / error del paso
+                  const open = openEv.has(i);
                   return (
                     <li key={`${e.seq}-${i}`} data-current={isCurrent}>
                       <button
-                        onClick={() => { setPlaying(false); const n = i + 1; setCursor(n >= events.length ? null : n); }}
+                        onClick={() => {
+                          setPlaying(false);
+                          const n = i + 1;
+                          setCursor(n >= events.length ? null : n);
+                          if (extras.length) toggleEv(i);
+                        }}
                         className={cn(
                           'flex w-full items-center gap-2 border-b border-border/50 px-3 py-1.5 text-left text-xs transition-colors hover:bg-elevated/60',
                           !included && 'opacity-35',
@@ -515,8 +573,23 @@ export function ExecutionDetail() {
                         <span className="w-8 shrink-0 text-right font-mono text-[10px] text-txt-disabled">{e.seq}</span>
                         <Badge tone={tone}><span title={e.type}>{t(eventLabel(e.type))}</span></Badge>
                         <span className="min-w-0 flex-1 truncate text-txt-secondary">{eventDetail(e)}</span>
+                        {extras.length > 0 && (
+                          <ChevronDown size={12} className={cn('shrink-0 text-txt-disabled transition-transform', open && 'rotate-180')} />
+                        )}
                         <span className="shrink-0 font-mono text-[10px] text-txt-disabled">{fmtTime(e.at)}</span>
                       </button>
+                      {/* M77: detalle desplegable — entrada, salida y error del paso (JSON legible, con scroll). */}
+                      {open &&
+                        extras.map((x, xi) => (
+                          <div key={xi} className="border-b border-border/50 bg-bg/40 px-3 pb-2 pt-1.5">
+                            <div className={cn('mb-1 text-[10px] font-semibold uppercase tracking-wide', x.danger ? 'text-danger' : 'text-txt-disabled')}>
+                              {t(x.label)}
+                            </div>
+                            <pre className={cn('max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-surface p-2 text-[11px] leading-relaxed', x.danger ? 'text-danger' : 'text-txt-secondary')}>
+                              {fmtDetail(x.value)}
+                            </pre>
+                          </div>
+                        ))}
                       {/* Miniatura de la captura (M72): solo se pide/pinta cuando el evento ya entró en el replay. */}
                       {shotId && included && id && <BrowserShot execId={id} fileId={shotId} />}
                     </li>
