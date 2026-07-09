@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Search, CornerDownLeft, Sun, Moon, Plus } from 'lucide-react';
-import { NAV } from './nav';
+import { visibleNav } from './nav';
+import { useAuth } from '../lib/auth';
 import { useUI } from './ui-store';
 import { cn } from '../lib/cn';
 import { useT } from '../i18n';
@@ -47,8 +48,9 @@ export function CommandPalette() {
     }
   }, [open]);
 
+  const role = useAuth((s) => s.role);
   const actions: Action[] = useMemo(() => {
-    const nav: Action[] = NAV.map((n) => ({
+    const nav: Action[] = visibleNav(role).map((n) => ({
       id: `nav-${n.to}`,
       label: `${t('Ir a')} ${t(n.label)}`,
       hint: t('Navegación'),
@@ -66,7 +68,7 @@ export function CommandPalette() {
       },
       ...nav,
     ];
-  }, [navigate, theme, toggleTheme, t]);
+  }, [navigate, theme, toggleTheme, t, role]);
 
   const filtered = useMemo(
     () => actions.filter((a) => a.label.toLowerCase().includes(query.toLowerCase())),

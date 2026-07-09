@@ -13,7 +13,9 @@ import { ExecutionDetail } from './pages/ExecutionDetail';
 import { Marketplace } from './pages/Marketplace';
 import { Integrations } from './pages/Integrations';
 import { SettingsPage } from './pages/Settings';
+import { Team } from './pages/Team';
 import { Login, Register } from './pages/Auth';
+import { AcceptInvite } from './pages/AcceptInvite';
 import { ensureDevSession, useAuth, isExpired } from './lib/auth';
 import { api } from './lib/api';
 import './index.css';
@@ -42,6 +44,7 @@ void ensureDevSession(api.base).finally(() => {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/invite/:token" element={<AcceptInvite />} />
             <Route
               element={
                 <ProtectedRoute>
@@ -57,6 +60,7 @@ void ensureDevSession(api.base).finally(() => {
               <Route path="/executions/:id" element={<ExecutionDetail />} />
               <Route path="/marketplace" element={<Marketplace />} />
               <Route path="/integrations" element={<Integrations />} />
+              <Route path="/team" element={<Team />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Route>
           </Routes>

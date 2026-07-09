@@ -69,6 +69,32 @@ export interface ReviewDto {
   expiresAt: string | null;
 }
 
+/** Miembro del equipo (M74). Fechas como ISO string. */
+export interface TeamMemberDto {
+  userId: string;
+  email: string;
+  name: string;
+  role: Role;
+  disabledAt: string | null;
+  joinedAt: string;
+}
+/** Invitación pendiente (M74). */
+export interface TeamInvitationDto {
+  id: string;
+  email: string;
+  role: Role;
+  invitedByUserId: string;
+  createdAt: string;
+  expiresAt: string;
+  acceptedAt: string | null;
+}
+export interface TeamDataDto {
+  members: TeamMemberDto[];
+  invitations: TeamInvitationDto[];
+  emailConfigured: boolean;
+  me: { userId: string; role: Role };
+}
+
 /** Detalle de una ejecución (M6): grafo anclado + stream durable de eventos para el replay. */
 export interface ExecutionDetailDto {
   executionId: string;
@@ -359,6 +385,24 @@ export const api = {
       json<{ accessToken: string; user: SessionUser }>(r),
     ),
   me: () => fetch(`${API}/auth/me`, { headers: authHeaders() }).then((r) => json<{ sub: string; email: string; role: Role; workspaceId: string }>(r)),
+
+  // --- Equipo (M74): miembros e invitaciones ---
+  getTeam: () => fetch(`${API}/team/members`, { headers: authHeaders() }).then((r) => json<TeamDataDto>(r)),
+  inviteMember: (input: { email: string; role: Role }) =>
+    fetch(`${API}/team/invitations`, { method: 'POST', headers: authHeaders(), body: JSON.stringify(input) }).then((r) =>
+      json<{ invitation: TeamInvitationDto; acceptUrl: string; emailSent: boolean }>(r),
+    ),
+  revokeInvite: (id: string) =>
+    fetch(`${API}/team/invitations/${id}`, { method: 'DELETE', headers: authHeaders() }).then((r) => json<{ revoked: boolean }>(r)),
+  updateMember: (userId: string, patch: { role?: Role; disabled?: boolean }) =>
+    fetch(`${API}/team/members/${userId}`, { method: 'PATCH', headers: authHeaders(), body: JSON.stringify(patch) }).then((r) => json<TeamMemberDto>(r)),
+  // Públicos (invitado sin sesión): rawFetch, sin recuperación 401.
+  getInvite: (token: string) =>
+    rawFetch(`${API}/team/invite/${token}`, { headers }).then((r) => json<{ email: string; role: Role }>(r)),
+  acceptInvite: (token: string, input: { name: string; password: string }) =>
+    rawFetch(`${API}/team/invite/${token}/accept`, { method: 'POST', headers, body: JSON.stringify(input) }).then((r) =>
+      json<{ accessToken: string; user: SessionUser }>(r),
+    ),
 
   // --- Escalado humano (M5-B) ---
   devToken: (role: Role, sub = `dev_${role.toLowerCase()}`) =>

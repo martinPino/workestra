@@ -48,3 +48,26 @@ export const LoginSchema = z.object({
   password: z.string().min(1).max(200),
 });
 export type LoginDto = z.infer<typeof LoginSchema>;
+
+/** Roles asignables a un miembro del equipo (M74): OWNER nunca se asigna por API (uno por equipo, en el alta). */
+export const AssignableRole = z.enum(['ADMIN', 'EDITOR', 'VIEWER']);
+
+/** Invitar a un miembro al equipo (M74). */
+export const InviteMemberSchema = z.object({
+  email: z.string().trim().toLowerCase().email(),
+  role: AssignableRole.default('EDITOR'),
+});
+export type InviteMemberDto = z.infer<typeof InviteMemberSchema>;
+
+/** Actualizar un miembro (M74): cambiar rol y/o cerrar/reabrir su cuenta. Al menos un campo. */
+export const UpdateMemberSchema = z
+  .object({ role: AssignableRole.optional(), disabled: z.boolean().optional() })
+  .refine((v) => v.role !== undefined || v.disabled !== undefined, { message: 'Nada que actualizar.' });
+export type UpdateMemberDto = z.infer<typeof UpdateMemberSchema>;
+
+/** Aceptar una invitación (M74): el invitado fija su nombre y contraseña. */
+export const AcceptInviteSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres.').max(200),
+});
+export type AcceptInviteDto = z.infer<typeof AcceptInviteSchema>;

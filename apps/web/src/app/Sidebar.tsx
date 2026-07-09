@@ -1,14 +1,16 @@
 import { NavLink } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { PanelLeftClose, PanelLeft, Command } from 'lucide-react';
-import { NAV } from './nav';
+import { visibleNav } from './nav';
 import { useUI } from './ui-store';
+import { useAuth } from '../lib/auth';
 import { cn } from '../lib/cn';
 import { useMediaQuery } from '../lib/useMediaQuery';
 import { useT } from '../i18n';
 
 export function Sidebar() {
   const t = useT();
+  const role = useAuth((s) => s.role);
   const collapsed = useUI((s) => s.collapsed);
   const toggleCollapsed = useUI((s) => s.toggleCollapsed);
   const mobileNav = useUI((s) => s.mobileNav);
@@ -68,7 +70,7 @@ export function Sidebar() {
 
         {/* Navegación */}
         <nav className="mt-3 flex-1 space-y-0.5 px-3">
-          {NAV.map((item) => (
+          {visibleNav(role).map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

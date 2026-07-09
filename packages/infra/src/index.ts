@@ -22,4 +22,7 @@ export * from './adapters/mcp-http-client';
 export * from './adapters/mcp-tool-resolver';
 export * from './adapters/file-store';
 export * from './adapters/auth-repo';
+export * from './adapters/identity-store';
+export * from './adapters/team-repo';
+export * from './adapters/email';
 export * from './password';

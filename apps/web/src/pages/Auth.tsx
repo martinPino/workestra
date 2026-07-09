@@ -12,8 +12,8 @@ function cleanError(e: unknown): string {
   return msg.replace(/^HTTP \d+:\s*/, '');
 }
 
-/** Marco visual compartido por Login y Registro: tarjeta centrada con la marca. */
-function AuthShell({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
+/** Marco visual compartido por Login, Registro y Aceptar invitación: tarjeta centrada con la marca. */
+export function AuthShell({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   const t = useT();
   return (
     <div className="flex min-h-dvh items-center justify-center bg-surface px-4 py-10">

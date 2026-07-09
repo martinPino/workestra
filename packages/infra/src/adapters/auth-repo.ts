@@ -1,6 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 import type { IAuthRepository, AuthAccount } from '@core/engine';
 import type { Role } from '@core/contracts';
+import { InMemoryIdentityStore, type IdentitySeed } from './identity-store';
 
 /** Genera un slug único de workspace a partir del email (para el @@unique([organizationId, slug])). */
 function slugFromEmail(email: string): string {
@@ -9,47 +10,28 @@ function slugFromEmail(email: string): string {
 }
 
 /**
- * Acceso a usuarios/pertenencias en memoria (M73) — para dev/tests sin Postgres. Cada alta crea su propia
- * organización+workspace y deja al usuario como OWNER, igual que el adaptador Prisma.
+ * Acceso a usuarios/pertenencias en memoria (M73) — para dev/tests sin Postgres. Delega en un
+ * InMemoryIdentityStore COMPARTIDO con el repo de equipo (para que una invitación aceptada sea visible al
+ * login). Acepta un array de seed (crea su propio store) o un store ya existente para compartirlo.
  */
 export class InMemoryAuthRepository implements IAuthRepository {
-  private readonly byEmail = new Map<string, AuthAccount>();
-  private seq = 0;
+  private readonly store: InMemoryIdentityStore;
 
-  constructor(seed: Array<{ email: string; passwordHash: string; name: string; workspaceId?: string; organizationId?: string; role?: Role }> = []) {
-    for (const s of seed) {
-      const email = s.email.toLowerCase();
-      this.byEmail.set(email, {
-        id: `user_${++this.seq}`,
-        email,
-        name: s.name,
-        passwordHash: s.passwordHash,
-        workspaceId: s.workspaceId ?? `ws_${this.seq}`,
-        organizationId: s.organizationId ?? `org_${this.seq}`,
-        role: s.role ?? 'OWNER',
-      });
-    }
+  constructor(seedOrStore: IdentitySeed[] | InMemoryIdentityStore = []) {
+    this.store = seedOrStore instanceof InMemoryIdentityStore ? seedOrStore : new InMemoryIdentityStore(seedOrStore);
+  }
+
+  /** El store subyacente, para que el repo de equipo comparta la misma identidad in-memory. */
+  get identityStore(): InMemoryIdentityStore {
+    return this.store;
   }
 
   async findByEmail(email: string): Promise<AuthAccount | null> {
-    return this.byEmail.get(email.toLowerCase()) ?? null;
+    return this.store.findByEmail(email);
   }
 
   async createAccount(input: { email: string; passwordHash: string; name: string }): Promise<AuthAccount> {
-    const email = input.email.toLowerCase();
-    if (this.byEmail.has(email)) throw new Error('EMAIL_TAKEN');
-    const n = ++this.seq;
-    const account: AuthAccount = {
-      id: `user_${n}`,
-      email,
-      name: input.name,
-      passwordHash: input.passwordHash,
-      workspaceId: `ws_${n}`,
-      organizationId: `org_${n}`,
-      role: 'OWNER',
-    };
-    this.byEmail.set(email, account);
-    return account;
+    return this.store.createAccount(input);
   }
 }
 
@@ -69,7 +51,7 @@ export class PrismaAuthRepository implements IAuthRepository {
     });
     if (!user) return null;
     // Pertenencia primaria: preferimos una OWNER; si no, la primera con workspace.
-    const memberships = user.memberships as Array<{ organizationId: string; workspaceId: string | null; role: Role }>;
+    const memberships = user.memberships as Array<{ organizationId: string; workspaceId: string | null; role: Role; disabledAt: Date | null }>;
     const m = memberships.find((x) => x.role === 'OWNER') ?? memberships[0];
     if (!m || !m.workspaceId) return null; // usuario sin workspace válido → no puede iniciar sesión
     return {
@@ -80,6 +62,7 @@ export class PrismaAuthRepository implements IAuthRepository {
       workspaceId: m.workspaceId,
       organizationId: m.organizationId,
       role: m.role,
+      disabledAt: m.disabledAt ?? null,
     };
   }
 

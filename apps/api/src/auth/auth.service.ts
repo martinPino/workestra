@@ -33,6 +33,13 @@ export class EmailTakenError extends Error {
   }
 }
 
+/** Se lanza cuando la cuenta está «cerrada» (M74): contraseña correcta pero acceso desactivado (403). */
+export class AccountDisabledError extends Error {
+  constructor() {
+    super('ACCOUNT_DISABLED');
+  }
+}
+
 // El token de SESIÓN vive más que el de dev (1h) para no obligar a re-login cada hora sin tabla de refresh.
 const SESSION_TTL = '7d';
 
@@ -69,7 +76,7 @@ export class AuthService {
       if (e instanceof Error && (e.message === 'EMAIL_TAKEN' || /unique|P2002/i.test(e.message))) throw new EmailTakenError();
       throw e;
     }
-    return this.sessionFor(account);
+    return this.issueSession(account);
   }
 
   /**
@@ -85,10 +92,13 @@ export class AuthService {
     }
     const ok = await verifyPassword(dto.password, account.passwordHash);
     if (!ok) return null;
-    return this.sessionFor(account);
+    // Cuenta cerrada por un admin (M74): contraseña correcta pero acceso revocado → 403 explícito.
+    if (account.disabledAt) throw new AccountDisabledError();
+    return this.issueSession(account);
   }
 
-  private sessionFor(account: { id: string; email: string; name: string; role: Role; workspaceId: string }): SessionResult {
+  /** Firma un JWT de sesión (7d) para una cuenta ya resuelta. Lo usan login, registro y aceptar invitación. */
+  issueSession(account: { id: string; email: string; name: string; role: Role; workspaceId: string }): SessionResult {
     const payload: JwtPayload = { sub: account.id, email: account.email, role: account.role, workspaceId: account.workspaceId };
     const accessToken = this.jwt.sign(payload, { expiresIn: SESSION_TTL });
     return { accessToken, user: { id: account.id, email: account.email, name: account.name, role: account.role, workspaceId: account.workspaceId } };

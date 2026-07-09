@@ -17,6 +17,8 @@ import type {
   IWorkspaceUsageRepository,
   IFileStore,
   IAuthRepository,
+  ITeamRepository,
+  IEmailService,
 } from '@core/engine';
 import type { MemoryEvent } from '@core/contracts';
 import IORedis from 'ioredis';
@@ -56,6 +58,9 @@ import {
   RedisFileStore,
   InMemoryAuthRepository,
   PrismaAuthRepository,
+  InMemoryTeamRepository,
+  PrismaTeamRepository,
+  createEmailService,
   hashPassword,
 } from '@core/infra';
 
@@ -89,6 +94,10 @@ export interface PersistenceBundle {
   files: IFileStore;
   /** Usuarios/pertenencias para login+registro con email+contraseña (M73). */
   auth: IAuthRepository;
+  /** Gestión de equipo: miembros e invitaciones (M74). */
+  team: ITeamRepository;
+  /** Envío de correo transaccional (invitaciones); best-effort, intercambiable (M74). */
+  email: IEmailService;
   prisma?: PrismaClient;
 }
 
@@ -189,10 +198,13 @@ async function buildPersistence(): Promise<PersistenceBundle> {
       usage: new RedisWorkspaceUsageRepository(redis),
       // Ficheros efímeros en Redis (compartido con el worker; TTL 48h). M48.
       files: new RedisFileStore(redis),
-      // Usuarios/pertenencias durables para login+registro (M73).
+      // Usuarios/pertenencias durables para login+registro (M73) y gestión de equipo (M74).
       auth: new PrismaAuthRepository(prisma),
+      team: new PrismaTeamRepository(prisma),
+      email: createEmailService(),
     };
   }
+  const memOwnerHash = await hashPassword('owner@acme.dev');
   return {
     mode,
     workflows: new InMemoryWorkflowRepository(),
@@ -211,11 +223,14 @@ async function buildPersistence(): Promise<PersistenceBundle> {
     apiKeys: new InMemoryApiKeyRepository(),
     usage: new InMemoryWorkspaceUsageRepository(),
     files: new InMemoryFileStore(),
-    // Auth in-memory (dev/tests): siembra owner@acme.dev (contraseña = su email) en ws_dev para poder
-    // probar login/registro sin Postgres. En dev, además, sigue disponible el minter tras AUTH_MODE.
-    auth: new InMemoryAuthRepository([
-      { email: 'owner@acme.dev', name: 'Owner', passwordHash: await hashPassword('owner@acme.dev'), workspaceId: DEFAULT_WORKSPACE, organizationId: 'org_dev', role: 'OWNER' },
-    ]),
+    // Auth + equipo in-memory (dev/tests): comparten un ÚNICO store de identidad, sembrado con owner@acme.dev
+    // (contraseña = su email) en ws_dev, para poder probar login/registro/equipo sin Postgres.
+    ...(() => {
+      const authRepo = new InMemoryAuthRepository([
+        { email: 'owner@acme.dev', name: 'Owner', passwordHash: memOwnerHash, workspaceId: DEFAULT_WORKSPACE, organizationId: 'org_dev', role: 'OWNER' },
+      ]);
+      return { auth: authRepo, team: new InMemoryTeamRepository(authRepo.identityStore), email: createEmailService() };
+    })(),
   };
 }
 

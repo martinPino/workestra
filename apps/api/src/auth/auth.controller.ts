@@ -1,7 +1,7 @@
 import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, Post, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import type { Role } from '@core/contracts';
 import { RegisterSchema, LoginSchema } from '@core/contracts';
-import { AuthService, EmailTakenError, type JwtPayload } from './auth.service';
+import { AuthService, EmailTakenError, AccountDisabledError, type JwtPayload } from './auth.service';
 import { Public } from './public.decorator';
 import { AuthRateLimitGuard } from './auth-rate-limit.guard';
 
@@ -51,7 +51,13 @@ export class AuthController {
   async login(@Body() body: unknown) {
     const parsed = LoginSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException(parsed.error.issues.map((i) => i.message).join('; '));
-    const session = await this.auth.login(parsed.data);
+    let session;
+    try {
+      session = await this.auth.login(parsed.data);
+    } catch (e) {
+      if (e instanceof AccountDisabledError) throw new ForbiddenException('Tu cuenta está desactivada. Contacta con un administrador del equipo.');
+      throw e;
+    }
     if (!session) throw new UnauthorizedException('Email o contraseña incorrectos.');
     return session;
   }

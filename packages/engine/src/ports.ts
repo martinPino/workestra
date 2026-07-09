@@ -70,6 +70,8 @@ export interface AuthAccount {
   workspaceId: string;
   organizationId: string;
   role: Role;
+  /** Si la pertenencia primaria está «cerrada» (M74): el login se bloquea aunque la contraseña sea correcta. */
+  disabledAt?: Date | null;
 }
 
 /**
@@ -82,6 +84,84 @@ export interface IAuthRepository {
   findByEmail(email: string): Promise<AuthAccount | null>;
   /** Alta atómica: usuario + org + workspace propio + membership OWNER. Lanza si el email ya existe. */
   createAccount(input: { email: string; passwordHash: string; name: string }): Promise<AuthAccount>;
+}
+
+/** Un correo transaccional (M74): destinatario, asunto y cuerpo (html + texto plano de respaldo). */
+export interface EmailMessage {
+  to: string;
+  subject: string;
+  html: string;
+  text?: string;
+}
+
+/**
+ * Envío de correo transaccional (M74): invitaciones de equipo, etc. Intercambiable (Resend/SES/consola).
+ * `send` es BEST-EFFORT y nunca lanza: devuelve true si se entregó, false si no hay proveedor o falló, para
+ * que el flujo de invitación no dependa del correo (siempre queda el enlace copiable). `configured` indica
+ * si hay un proveedor real (la UI lo usa para decir «te enviamos un email» vs «copia y comparte el enlace»).
+ */
+export interface IEmailService {
+  readonly configured: boolean;
+  send(msg: EmailMessage): Promise<boolean>;
+}
+
+/** Un miembro del equipo (M74): su usuario + rol + estado en la organización. */
+export interface TeamMember {
+  userId: string;
+  email: string;
+  name: string;
+  role: Role;
+  disabledAt: Date | null;
+  joinedAt: Date;
+}
+
+/** Una invitación pendiente/aceptada (M74). */
+export interface TeamInvitation {
+  id: string;
+  email: string;
+  role: Role;
+  invitedByUserId: string;
+  createdAt: Date;
+  expiresAt: Date;
+  acceptedAt: Date | null;
+}
+
+/**
+ * Gestión de equipo (M74): miembros e invitaciones de una organización. Las REGLAS (quién puede tocar a
+ * quién, proteger al OWNER, etc.) viven en el servicio; este puerto solo persiste. Adaptadores Prisma/memoria.
+ */
+export interface ITeamRepository {
+  /** Miembros de la organización (para la página de equipo). */
+  listMembers(organizationId: string): Promise<TeamMember[]>;
+  /** La pertenencia de un usuario en la org (para comprobaciones de permiso). null si no pertenece. */
+  getMembership(organizationId: string, userId: string): Promise<TeamMember | null>;
+  /** Fija el rol de un miembro (el servicio ya validó las reglas). */
+  setRole(organizationId: string, userId: string, role: Role): Promise<void>;
+  /** Cierra (disabled=true) o reabre (false) la cuenta de un miembro. */
+  setDisabled(organizationId: string, userId: string, disabled: boolean): Promise<void>;
+
+  /** Invitaciones NO aceptadas de la org (incluye caducadas, que la UI puede señalar). */
+  listInvitations(organizationId: string): Promise<TeamInvitation[]>;
+  /** Crea una invitación (el token ya viene hasheado). */
+  createInvitation(input: {
+    organizationId: string;
+    workspaceId: string;
+    email: string;
+    role: Role;
+    tokenHash: string;
+    invitedByUserId: string;
+    expiresAt: Date;
+  }): Promise<TeamInvitation>;
+  /** Borra una invitación pendiente de la org. Devuelve false si no existía ahí. */
+  revokeInvitation(organizationId: string, invitationId: string): Promise<boolean>;
+  /** Busca una invitación por hash de token (para aceptarla). Incluye org+workspace destino. */
+  findInvitationByTokenHash(tokenHash: string): Promise<(TeamInvitation & { organizationId: string; workspaceId: string }) | null>;
+  /**
+   * Acepta la invitación creando el usuario NUEVO (passwordHash+name) y su Membership(role) en la
+   * org+workspace de la invitación, y marca `acceptedAt` — todo atómico. Lanza `EMAIL_TAKEN` si el email
+   * ya tiene cuenta (en v1 las invitaciones son solo para usuarios nuevos) y `INVITE_CONSUMED` si ya se usó.
+   */
+  acceptInvitation(input: { invitationId: string; passwordHash: string; name: string }): Promise<AuthAccount>;
 }
 
 /**

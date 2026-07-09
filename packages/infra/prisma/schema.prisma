@@ -21,6 +21,7 @@ model Organization {
   createdAt   DateTime     @default(now())
   workspaces  Workspace[]
   memberships Membership[]
+  invitations Invitation[]
 }
 
 model Workspace {
@@ -67,11 +68,32 @@ model Membership {
   organizationId String
   workspaceId    String?
   role           Role         @default(VIEWER)
+  // Cuenta «cerrada» (M74): al desactivar a un miembro se marca aquí; bloquea su login y se puede revertir.
+  disabledAt     DateTime?
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   org            Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([userId, organizationId, workspaceId])
   @@index([organizationId])
+}
+
+// Invitación a un equipo (M74): un OWNER/ADMIN invita por email con un rol. El token en claro viaja en el
+// enlace; en BD solo su hash. Al aceptar se crea/añade la Membership en la org+workspace y se marca acceptedAt.
+model Invitation {
+  id              String       @id @default(cuid())
+  organizationId  String
+  org             Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspaceId     String
+  email           String // destinatario, en minúsculas
+  role            Role // rol con el que se unirá (OWNER nunca es invitable)
+  tokenHash       String       @unique // sha256(tokenEnClaro) hex; el token en claro nunca se guarda
+  invitedByUserId String
+  createdAt       DateTime     @default(now())
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+
+  @@index([organizationId])
+  @@index([email])
 }
 
 // ----------------------------- Workflows -----------------------------
