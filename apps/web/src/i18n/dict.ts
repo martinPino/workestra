@@ -1059,4 +1059,5 @@ export const EN: Record<string, string> = {
   "Salida": "Output",
   "Error de la ejecución": "Execution error",
   "toca un paso para ver detalle": "tap a step to see detail",
+  "Este agente ya no existe.": "This agent no longer exists.",
 };

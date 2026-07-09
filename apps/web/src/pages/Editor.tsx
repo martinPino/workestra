@@ -25,6 +25,7 @@ import { CommentNode } from '../nodes/CommentNode';
 import { AnimatedEdge } from '../edges/AnimatedEdge';
 import { PropertiesPanel } from '../components/PropertiesPanel';
 import { AiChatPanel } from '../components/AiChatPanel';
+import { AgentForm } from './Agents';
 import { SubtaskTree } from '../components/SubtaskTree';
 import { docToReactFlow, docToWorkflowGraph, workflowGraphToDoc, STARTER_DOC } from '../graph';
 import { listNodeTypes } from '../editor/node-types';
@@ -117,6 +118,10 @@ export function Editor() {
   const connectorsQuery = useConnectors();
   const agents = agentsQuery.data;
   const connectors = connectorsQuery.data;
+  // M78: ventana de edición del AGENTE, abierta desde su nodo (botón «Editar agente» / doble clic).
+  const editAgentId = useEditorStore((s) => s.editAgentId);
+  const setEditAgentId = useEditorStore((s) => s.setEditAgentId);
+  const editAgent = editAgentId ? agents?.find((a) => a.id === editAgentId) : undefined;
   const agentsError = agentsQuery.isError;
   const connectorsError = connectorsQuery.isError;
   const setupIssues = useMemo(
@@ -549,6 +554,23 @@ export function Editor() {
         {/* Chat de IA (M30): panel derecho para seguir modificando el flujo conversando. Solo con edición. */}
         {canEdit && aiChatOpen && <AiChatPanel onClose={() => setAiChatOpen(false)} />}
       </div>
+
+      {/* M78: ventana de edición del AGENTE (rol, objetivo, modelo, herramientas), abierta desde su nodo.
+          Reutiliza el mismo formulario que la página Asistentes; al guardar refresca los agentes → el nodo se actualiza. */}
+      {editAgentId && (
+        <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto p-4 sm:p-8" role="dialog" aria-modal="true">
+          <button type="button" aria-label={t('Cerrar')} className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setEditAgentId(null)} />
+          <div className="relative z-10 w-full max-w-2xl">
+            {editAgent ? (
+              <AgentForm key={editAgent.id} initial={editAgent} onDone={() => setEditAgentId(null)} onCancel={() => setEditAgentId(null)} />
+            ) : (
+              <div className="rounded-2xl border border-border bg-elevated p-8 text-center text-sm text-txt-secondary shadow-pop">
+                {agentsQuery.isLoading ? t('Cargando…') : t('Este agente ya no existe.')}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

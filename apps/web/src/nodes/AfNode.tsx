@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
-import { Square, Crown, TriangleAlert, Settings2, Power, Copy, Trash2, Clock, UserRound, Webhook } from 'lucide-react';
+import { Square, Crown, TriangleAlert, Settings2, Power, Copy, Trash2, Clock, UserRound, Webhook, Pencil } from 'lucide-react';
 import type { AfNodeData } from '../graph';
 import { getNodeType } from '../editor/node-types';
 import { nodeSetupIssues } from '../editor/node-issues';
@@ -107,6 +107,14 @@ export function AfNode({ id, data, selected }: NodeProps<AfNodeData>) {
 
   return (
     <div
+      onDoubleClick={
+        data.editable && (data.kind === 'agent' || data.kind === 'router') && data.config?.agentId
+          ? (e) => {
+              e.stopPropagation();
+              useEditorStore.getState().setEditAgentId(String(data.config?.agentId));
+            }
+          : undefined
+      }
       className={cn(
         'group relative min-w-[156px] max-w-[220px] rounded-xl border bg-elevated px-2.5 py-2 text-xs text-txt-primary shadow-card transition-all duration-200',
         borderCls,
@@ -147,6 +155,21 @@ export function AfNode({ id, data, selected }: NodeProps<AfNodeData>) {
             >
               <Settings2 size={13} />
             </button>
+            {/* Editar agente (M78): abre la ventana de edición del AGENTE (rol, objetivo, modelo, herramientas). */}
+            {(data.kind === 'agent' || data.kind === 'router') && !!data.config?.agentId && (
+              <button
+                type="button"
+                title={t('Editar agente')}
+                aria-label={t('Editar agente')}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  useEditorStore.getState().setEditAgentId(String(data.config?.agentId));
+                }}
+                className={TOOL_BTN}
+              >
+                <Pencil size={13} />
+              </button>
+            )}
             {!structural && (
               <button
                 type="button"

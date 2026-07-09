@@ -141,7 +141,7 @@ export function Agents() {
  * los campos se siembran de `initial` (edición) o, si no, de `seed`. El padre remonta el form (key) por
  * cada borrador nuevo, así los `useState` se re-inicializan.
  */
-function AgentForm({ initial, seed, onDone, onCancel }: { initial: AgentDto | null; seed?: AgentDraft; onDone: () => void; onCancel: () => void }) {
+export function AgentForm({ initial, seed, onDone, onCancel }: { initial: AgentDto | null; seed?: AgentDraft; onDone: () => void; onCancel: () => void }) {
   const t = useT();
   const qc = useQueryClient();
   const [role, setRole] = useState(initial?.name ?? seed?.name ?? '');

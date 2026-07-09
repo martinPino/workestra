@@ -49,6 +49,8 @@ interface EditorState {
   nodeErrors: Record<string, string>;
   plan?: PlanState;
   lastError: string | null;
+  /** M78: id del agente a editar en una ventana (se abre al pulsar «Editar agente» en un nodo Agente). */
+  editAgentId: string | null;
 
   canUndo: boolean;
   canRedo: boolean;
@@ -82,6 +84,8 @@ interface EditorState {
   removeCommentById(id: string): void;
   applyLayout(positions: Record<string, { x: number; y: number }>): void;
   setError(msg: string | null): void;
+  /** M78: abre/cierra la ventana de edición de un agente desde su nodo. */
+  setEditAgentId(id: string | null): void;
 
   beginExec(): void;
   applyExec(status: string, nodeStatus: Record<string, NodeRunStatus>, nodeErrors: Record<string, string>, plan?: PlanState): void;
@@ -101,6 +105,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   nodeStatus: {},
   nodeErrors: {},
   lastError: null,
+  editAgentId: null,
   canUndo: false,
   canRedo: false,
 
@@ -243,6 +248,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   setError: (msg) => set({ lastError: msg }),
+  setEditAgentId: (id) => set({ editAgentId: id }),
 
   beginExec: () => set({ execStatus: 'RUNNING', nodeStatus: {}, nodeErrors: {}, plan: undefined, lastError: null }),
   applyExec: (status, nodeStatus, nodeErrors, plan) => set({ execStatus: status, nodeStatus, nodeErrors, plan }),
