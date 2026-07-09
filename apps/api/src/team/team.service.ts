@@ -80,11 +80,20 @@ export class TeamService {
     });
 
     const acceptUrl = `${appUrl()}/invite/${rawToken}`;
+    // El correo de invitación va en INGLÉS (audiencia internacional del producto).
+    const role = roleLabel(dto.role);
     const emailSent = await this.p.email.send({
       to: email,
-      subject: 'Te han invitado a un equipo en AgentFlow',
-      html: `<p>Hola,</p><p>Te han invitado a unirte a un equipo en <strong>AgentFlow</strong> con el rol <strong>${roleLabel(dto.role)}</strong>.</p><p><a href="${acceptUrl}">Acepta la invitación y crea tu cuenta</a> (el enlace caduca en 7 días).</p><p>Si no esperabas esto, ignora este correo.</p>`,
-      text: `Te han invitado a un equipo en AgentFlow (${roleLabel(dto.role)}). Acepta aquí: ${acceptUrl} (caduca en 7 días).`,
+      subject: "You've been invited to a team on AgentFlow",
+      html: `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#1a1a1a">
+  <h2 style="margin:0 0 12px;font-size:20px">You've been invited to AgentFlow</h2>
+  <p style="margin:0 0 20px;color:#444;line-height:1.5">You've been invited to join a team on <strong>AgentFlow</strong> as <strong>${role}</strong>.</p>
+  <p style="margin:0 0 24px"><a href="${acceptUrl}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-weight:600">Accept invitation</a></p>
+  <p style="margin:0 0 6px;color:#888;font-size:13px">Or paste this link into your browser:</p>
+  <p style="margin:0 0 20px;font-size:13px;word-break:break-all"><a href="${acceptUrl}" style="color:#4f46e5">${acceptUrl}</a></p>
+  <p style="margin:0;color:#aaa;font-size:12px">This link expires in 7 days. If you weren't expecting this, you can ignore this email.</p>
+</div>`,
+      text: `You've been invited to join a team on AgentFlow as ${role}. Accept your invitation and create your account: ${acceptUrl} (this link expires in 7 days). If you weren't expecting this, you can ignore this email.`,
     });
     // El enlace se devuelve SIEMPRE para poder copiarlo/compartirlo aunque no haya proveedor de correo.
     return { invitation, acceptUrl, emailSent };
@@ -146,6 +155,7 @@ export class TeamService {
   }
 }
 
+// Etiquetas de rol EN INGLÉS (se usan solo en el correo de invitación, que va en inglés).
 function roleLabel(role: Role): string {
-  return { OWNER: 'Propietario', ADMIN: 'Administrador', EDITOR: 'Miembro', VIEWER: 'Solo lectura' }[role] ?? role;
+  return { OWNER: 'Owner', ADMIN: 'Admin', EDITOR: 'Member', VIEWER: 'Viewer' }[role] ?? role;
 }
