@@ -58,16 +58,23 @@ export interface IntegrationPreset {
   name: string;
   url: string;
   provider: string;
+  /** Color de marca para la insignia del logo (mismo uso que `McpPreset.color`). */
+  color: string;
+  darkText?: boolean;
 }
 
 export const INTEGRATION_PRESETS: IntegrationPreset[] = [
-  { key: 'atlassian', name: 'Atlassian', url: 'integration://atlassian', provider: 'jira' },
+  { key: 'atlassian', name: 'Atlassian', url: 'integration://atlassian', provider: 'jira', color: '#0052CC' },
 ];
 
 export const isIntegrationUrl = (url: string): boolean => url.startsWith('integration://');
 
 export const integrationPresetForUrl = (url: string): IntegrationPreset | undefined =>
   INTEGRATION_PRESETS.find((p) => p.url === url);
+
+/** Empareja una ref de servidor con una integración por URL o por nombre (para el logo de marca). */
+export const integrationPresetFor = (server: { url?: string; name?: string }): IntegrationPreset | undefined =>
+  INTEGRATION_PRESETS.find((p) => p.url === server.url || (!!server.name && p.name === server.name));
 
 export const mcpPresetFor = (server: { url?: string; name?: string }): McpPreset | undefined =>
   MCP_PRESETS.find((p) => p.url === server.url) ?? (server.name ? MCP_PRESETS.find((p) => p.name === server.name) : undefined);

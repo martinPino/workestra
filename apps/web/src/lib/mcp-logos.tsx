@@ -1,6 +1,6 @@
 import { Boxes } from 'lucide-react';
 import { siGithub, siNotion, siLinear, siSentry, siAtlassian, siStripe, siHuggingface } from 'simple-icons';
-import { mcpPresetFor } from './tools';
+import { mcpPresetFor, integrationPresetFor } from './tools';
 
 /**
  * Logo de un servidor MCP (M42/M44): hace el menú y los sub-nodos más reconocibles. Usa las marcas REALES de
@@ -20,7 +20,9 @@ const BRAND_ICON: Record<string, { path: string }> = {
 
 /** Insignia cuadrada con el color de marca (`box` = tamaño del cuadro). */
 export function McpLogo({ server, box = 30 }: { server: { url?: string; name?: string }; box?: number }) {
-  const preset = mcpPresetFor(server);
+  // Las INTEGRACIONES (M76) no están en MCP_PRESETS (Atlassian se quitó de ahí a propósito); resuélvelas por
+  // su propia lista para que muestren su marca (p. ej. el logo de Atlassian) en vez del icono genérico.
+  const preset = integrationPresetFor(server) ?? mcpPresetFor(server);
   if (!preset) return <Boxes size={Math.round(box * 0.66)} className="text-primary" aria-hidden="true" />;
   const icon = BRAND_ICON[preset.name];
   const mark = preset.darkText ? '#1a1a1a' : '#fff';
