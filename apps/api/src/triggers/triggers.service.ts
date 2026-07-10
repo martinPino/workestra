@@ -328,15 +328,18 @@ export class TriggersService {
    */
   async ingestSentryEvent(rawBody: Buffer, signature: string | undefined, resource: string | undefined, payload: unknown): Promise<{ started: string[] }> {
     const secret = process.env.SENTRY_APP_CLIENT_SECRET ?? '';
-    if (!verifySentryWebhookSignature(rawBody, signature, secret)) throw new UnauthorizedException('Firma inválida.');
-    if (resource !== 'issue') return { started: [] }; // solo nos interesan los webhooks de issue
-
+    const validSig = verifySentryWebhookSignature(rawBody, signature, secret);
     const parsed = parseSentryIssueWebhook(payload);
+    // Observabilidad (M80): un log por webhook entrante para poder depurar el enrutado en producción.
+    console.log(`[sentry-hook] resource=${resource ?? '-'} action=${parsed.action || '-'} project=${parsed.project ?? '-'} sig=${validSig ? 'ok' : 'BAD'}`);
+    if (!validSig) throw new UnauthorizedException('Firma inválida.');
+    if (resource !== 'issue') return { started: [] }; // solo nos interesan los webhooks de issue
     if (parsed.action !== 'created' || !parsed.project) return { started: [] };
 
     const bindings = (await this.p.triggerBindings.listActive()).filter(
       (b) => b.eventId === 'sentry.issue_created' && String(b.params.project ?? '') === parsed.project,
     );
+    console.log(`[sentry-hook] project=${parsed.project} bindings=${bindings.length}`);
     // Contexto amigable: `{{issue.title}}`, `{{issue.permalink}}`… + el payload crudo.
     const issue = { ...parsed.issue, webhook: payload };
     const started: string[] = [];
