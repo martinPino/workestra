@@ -2,7 +2,7 @@ import { Injectable, Inject, BadRequestException, NotFoundException } from '@nes
 import { JwtService } from '@nestjs/jwt';
 import { randomBytes, createHash } from 'node:crypto';
 import type { ConnectorRecord } from '@core/engine';
-import { getConnectorProvider, providerEnvKeys, tokenBlobFromResponse, serializeTokenBlob, resolveConnectorToken, listDriveFolders, listSlackChannels, listSentryProjects } from '@core/sdk-plugins';
+import { getConnectorProvider, providerEnvKeys, tokenBlobFromResponse, serializeTokenBlob, resolveConnectorToken, listDriveFolders, listSlackChannels, listSentryProjects, exchangeSentryAppCode } from '@core/sdk-plugins';
 import { setCurrentWorkspace } from '@core/infra';
 import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
 import { assertInWorkspace } from '../tenant/tenant.util';
@@ -139,6 +139,23 @@ export class ConnectorsService {
     const resolved = await resolveConnectorToken(this.p.connectors, this.p.secrets, connectorId, workspaceId);
     if (!resolved) throw new BadRequestException('El conector de Sentry no está conectado (vuelve a conectarlo).');
     return listSentryProjects({ token: resolved.token });
+  }
+
+  /**
+   * Callback de instalación de la Sentry App (M80): Sentry redirige aquí tras instalar con `code` + `installationId`.
+   * Autoriza la instalación (intercambia el code) — best-effort: aunque falle (code caducado), la instalación ya
+   * existe y los webhooks se enrutan por contenido. Siempre redirige a la app para no dejar al usuario en un 404.
+   */
+  async sentryAppCallback(installationId: string, code: string): Promise<{ redirectTo: string }> {
+    const web = this.webBase();
+    const clientId = process.env.SENTRY_APP_CLIENT_ID ?? '';
+    const clientSecret = process.env.SENTRY_APP_CLIENT_SECRET ?? '';
+    let ok = false;
+    if (installationId && code && clientId && clientSecret) {
+      const r = await exchangeSentryAppCode({ installationId, code, clientId, clientSecret }).catch(() => ({ ok: false }));
+      ok = r.ok;
+    }
+    return { redirectTo: `${web}/integrations?sentry=${ok ? 'installed' : 'installed_check'}` };
   }
 
   /** Inicia el flujo OAuth: devuelve la URL de autorización con un `state` firmado (10 min). */

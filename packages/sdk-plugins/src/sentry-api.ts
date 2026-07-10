@@ -19,6 +19,25 @@ export function sentryAppInstallUrl(slug: string): string {
 }
 
 /**
+ * Autoriza una instalación de la Sentry App: intercambia el `code` (que Sentry devuelve tras instalar) por un
+ * token en `/sentry-app-installations/{id}/authorizations/`. Confirma que la instalación es legítima. Server-side.
+ */
+export async function exchangeSentryAppCode(opts: {
+  installationId: string;
+  code: string;
+  clientId: string;
+  clientSecret: string;
+}): Promise<{ ok: boolean; token?: string; status: number }> {
+  const res = await fetch(`${SENTRY_API}/sentry-app-installations/${encodeURIComponent(opts.installationId)}/authorizations/`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify({ grant_type: 'authorization_code', code: opts.code, client_id: opts.clientId, client_secret: opts.clientSecret }),
+  });
+  const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  return { ok: res.ok, token: typeof body.token === 'string' ? body.token : undefined, status: res.status };
+}
+
+/**
  * Verifica la firma de un webhook de Sentry (`Sentry-Hook-Signature`): HMAC-SHA256 del cuerpo CRUDO con el
  * Client Secret de la integración, en hex. Comparación en tiempo constante. `false` ante cualquier duda.
  */

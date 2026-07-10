@@ -113,6 +113,21 @@ export class ConnectorsController {
     const { redirectTo } = await this.svc.callback(code, state);
     res.redirect(redirectTo);
   }
+
+  /**
+   * Callback de instalación de la Sentry App (M80, PÚBLICO): Sentry redirige aquí con `code` + `installationId`
+   * tras instalar la Public Integration. Autoriza la instalación y redirige a la app (evita el 404 post-install).
+   */
+  @Public()
+  @Get('sentry-app/callback')
+  async sentryAppCallback(
+    @Query('installationId') installationId: string,
+    @Query('code') code: string,
+    @Res() res: Redirectable,
+  ) {
+    const { redirectTo } = await this.svc.sentryAppCallback(installationId, code);
+    res.redirect(redirectTo);
+  }
 }
 
 /**
