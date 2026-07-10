@@ -1,0 +1,845 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Workestra — The Operating System for AI Teams</title>
+<meta name="description" content="Design, orchestrate, and supervise AI teams that collaborate across your entire company." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96' fill='none'%3E%3Crect width='96' height='96' rx='20' fill='%230d0d12'/%3E%3Cg stroke='%23ededf0' stroke-width='7' stroke-linecap='round'%3E%3Cpath d='M24 28 C 44 30, 55 44, 66 48'/%3E%3Cpath d='M24 48 H66'/%3E%3Cpath d='M24 68 C 44 66, 55 52, 66 48'/%3E%3C/g%3E%3Ccircle cx='24' cy='28' r='6' fill='%23ededf0'/%3E%3Ccircle cx='24' cy='48' r='6' fill='%23ededf0'/%3E%3Ccircle cx='24' cy='68' r='6' fill='%23ededf0'/%3E%3Ccircle cx='70' cy='48' r='9' fill='%234F7CFF'/%3E%3C/svg%3E" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: {
+      extend: {
+        colors: {
+          ink: '#08080b',
+          panel: '#0d0d12',
+          panel2: '#121218',
+          line: 'rgba(255,255,255,0.08)',
+          txt: '#ededf0',
+          muted: '#9b9ba6',
+          faint: '#6a6a76',
+          accent: '#4F7CFF',
+          accent2: '#8FB0FF',
+          done: '#4ade80',
+        },
+        fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
+        maxWidth: { content: '1140px' },
+      },
+    },
+  };
+</script>
+<style>
+  :root { color-scheme: dark; }
+  * { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  html { scroll-behavior: smooth; }
+  body { background: #08080b; font-family: 'Inter', sans-serif; letter-spacing: -0.011em; }
+  ::selection { background: rgba(79,124,255,0.35); }
+  .tight { letter-spacing: -0.03em; }
+  .tighter { letter-spacing: -0.045em; }
+  /* subtle grain-free radial glow */
+  .glow-hero { background:
+      radial-gradient(60% 50% at 50% 0%, rgba(79,124,255,0.16), transparent 70%),
+      radial-gradient(40% 40% at 80% 10%, rgba(120,190,255,0.06), transparent 70%); }
+  .glass { background: rgba(18,18,24,0.6); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+  .panel-border { border: 1px solid rgba(255,255,255,0.08); }
+  .hairline { border: 1px solid rgba(255,255,255,0.06); }
+  .grid-bg {
+    background-image: linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 46px 46px;
+    -webkit-mask-image: radial-gradient(70% 60% at 50% 40%, #000 30%, transparent 80%);
+            mask-image: radial-gradient(70% 60% at 50% 40%, #000 30%, transparent 80%);
+  }
+  .card-hover { transition: transform .35s cubic-bezier(.2,.7,.2,1), border-color .35s, background .35s; }
+  .card-hover:hover { transform: translateY(-4px); border-color: rgba(255,255,255,0.16); background: rgba(255,255,255,0.02); }
+  .btn-accent { background: linear-gradient(180deg,#6E94FF,#3E6BE8); box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 8px 24px -8px rgba(79,124,255,0.6); transition: transform .2s, box-shadow .2s, filter .2s; }
+  .btn-accent:hover { transform: translateY(-1px); filter: brightness(1.06); box-shadow: 0 1px 0 rgba(255,255,255,0.3) inset, 0 12px 30px -8px rgba(79,124,255,0.7); }
+  .btn-ghost { transition: background .2s, border-color .2s, transform .2s; }
+  .btn-ghost:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.2); transform: translateY(-1px); }
+  /* reveal on scroll */
+  .reveal { opacity: 0; transform: translateY(22px); transition: opacity .9s cubic-bezier(.2,.7,.2,1), transform .9s cubic-bezier(.2,.7,.2,1); }
+  .reveal.in { opacity: 1; transform: none; }
+  /* node graph */
+  .node { transition: border-color .5s, box-shadow .5s, background .5s, color .5s; }
+  .node.working { border-color: rgba(79,124,255,0.7); box-shadow: 0 0 0 1px rgba(79,124,255,0.4), 0 0 32px -6px rgba(79,124,255,0.55); background: rgba(79,124,255,0.08); }
+  .node.done { border-color: rgba(74,222,128,0.55); box-shadow: 0 0 22px -8px rgba(74,222,128,0.5); }
+  .dot { transition: background .4s, box-shadow .4s; }
+  .node.working .dot { background:#4F7CFF; box-shadow:0 0 10px 1px rgba(79,124,255,0.9); animation: pulse 1.1s ease-in-out infinite; }
+  .node.done .dot { background:#4ade80; box-shadow:0 0 8px 1px rgba(74,222,128,0.8); animation: none; }
+  @keyframes pulse { 0%,100%{ transform:scale(1); opacity:1 } 50%{ transform:scale(1.5); opacity:.6 } }
+  .edge { stroke: rgba(255,255,255,0.12); stroke-width: 1.5; fill: none; transition: stroke .5s; }
+  .edge.active { stroke: rgba(79,124,255,0.5); stroke-dasharray: 5 7; animation: flow 1s linear infinite; }
+  .edge.done { stroke: rgba(74,222,128,0.35); }
+  @keyframes flow { to { stroke-dashoffset: -24; } }
+  .marquee { animation: scrollx 40s linear infinite; }
+  @keyframes scrollx { to { transform: translateX(-50%); } }
+  .ticker-row { animation: fadeup .5s ease both; }
+  @keyframes fadeup { from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none} }
+  .live-dot { width:7px;height:7px;border-radius:50%; background:#4ade80; box-shadow:0 0 0 0 rgba(74,222,128,0.6); animation: livepulse 1.8s infinite; }
+  @keyframes livepulse { 0%{box-shadow:0 0 0 0 rgba(74,222,128,0.5)} 70%{box-shadow:0 0 0 8px rgba(74,222,128,0)} 100%{box-shadow:0 0 0 0 rgba(74,222,128,0)} }
+  .fade-x { -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
+  a { text-underline-offset: 3px; }
+  .link-muted { transition: color .2s; }
+  .link-muted:hover { color: #ededf0; }
+</style>
+</head>
+<body class="bg-ink text-txt antialiased">
+
+<!-- NAV -->
+<header class="fixed top-0 inset-x-0 z-50">
+  <div class="glass border-b border-line">
+    <nav class="max-w-content mx-auto px-6 h-16 flex items-center justify-between">
+      <a href="#" class="flex items-center gap-2.5">
+        <svg width="26" height="26" viewBox="0 0 96 96" fill="none" class="text-txt" role="img" aria-label="Workestra"><g stroke="currentColor" stroke-width="6" stroke-linecap="round"><path d="M20 24 C 42 26, 54 42, 66 48"/><path d="M20 48 H66"/><path d="M20 72 C 42 70, 54 54, 66 48"/></g><circle cx="20" cy="24" r="6" fill="currentColor"/><circle cx="20" cy="48" r="6" fill="currentColor"/><circle cx="20" cy="72" r="6" fill="currentColor"/><circle cx="72" cy="48" r="9" fill="#4F7CFF"/></svg>
+        <span class="text-[15px] font-semibold tracking-tight">Workestra</span>
+      </a>
+      <div class="hidden md:flex items-center gap-8 text-[13.5px] text-muted">
+        <a href="#teams" class="link-muted">Product</a>
+        <a href="#features" class="link-muted">Features</a>
+        <a href="#connectors" class="link-muted">Connectors</a>
+        <a href="#marketplace" class="link-muted">Marketplace</a>
+        <a href="#mcp" class="link-muted">MCP</a>
+      </div>
+      <div class="flex items-center gap-2.5">
+        <a href="https://appweb-production-1a37.up.railway.app" target="_blank" rel="noopener" class="hidden sm:inline-flex text-[13.5px] text-muted link-muted px-3 py-2">Sign in</a>
+        <a href="https://appweb-production-1a37.up.railway.app" target="_blank" rel="noopener" class="btn-accent text-white text-[13.5px] font-medium rounded-lg px-4 py-2">Start Free</a>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="relative overflow-hidden pt-16">
+  <div class="absolute inset-0 glow-hero pointer-events-none"></div>
+  <div class="absolute inset-0 grid-bg pointer-events-none opacity-70"></div>
+  <div class="relative max-w-content mx-auto px-6 pt-20 pb-20 text-center">
+    <div class="reveal inline-flex items-center gap-2 rounded-full hairline glass px-3.5 py-1.5 text-[12.5px] text-muted mb-8">
+      <span class="live-dot"></span>
+      Your AI works alone. Your business doesn't.
+    </div>
+    <h1 class="reveal tighter text-[44px] leading-[1.05] sm:text-[64px] md:text-[74px] font-semibold max-w-4xl mx-auto">
+      The Operating System<br class="hidden sm:block"/> for <span class="bg-clip-text text-transparent" style="background-image:linear-gradient(100deg,#fff, #B9CDFF)">AI Teams</span>
+    </h1>
+    <p class="reveal mt-7 text-[17px] sm:text-[19px] leading-relaxed text-muted max-w-2xl mx-auto">
+      Design, orchestrate, and supervise AI teams that collaborate across your entire company — autonomous departments that execute work, coordinate with each other, and integrate with every tool you already use.
+    </p>
+    <div class="reveal mt-9 flex items-center justify-center gap-3">
+      <a href="https://appweb-production-1a37.up.railway.app" target="_blank" rel="noopener" class="btn-accent text-white text-[15px] font-medium rounded-xl px-5 py-3">Start Free</a>
+      <a href="mailto:schwarzboeckmartin@gmail.com?subject=Workestra%20demo" class="btn-ghost hairline text-[15px] font-medium rounded-xl px-5 py-3 text-txt">Book Demo</a>
+    </div>
+    <p class="reveal mt-5 text-[12.5px] text-faint">No coding required · No credit card · Deploy in minutes</p>
+
+    <!-- HERO VISUAL -->
+    <div class="reveal mt-16">
+      <div class="relative mx-auto max-w-5xl">
+        <div class="glass panel-border rounded-2xl overflow-hidden">
+          <div class="flex items-center justify-between px-4 h-11 border-b border-line">
+            <div class="flex items-center gap-2 text-[12px] text-faint">
+              <span class="h-2.5 w-2.5 rounded-full bg-white/10"></span>
+              <span class="h-2.5 w-2.5 rounded-full bg-white/10"></span>
+              <span class="h-2.5 w-2.5 rounded-full bg-white/10"></span>
+              <span class="ml-2">Acme Corp · AI Operations</span>
+            </div>
+            <div class="flex items-center gap-2 text-[12px] text-done"><span class="live-dot"></span> Live</div>
+          </div>
+          <div class="grid md:grid-cols-[1fr_260px]">
+            <!-- graph stage -->
+            <div class="relative p-4 sm:p-6 overflow-hidden">
+              <div id="stageWrap" class="relative w-full" style="aspect-ratio: 900/440;">
+                <div id="stage" class="absolute top-0 left-0" style="width:900px;height:440px;transform-origin:top left;">
+                  <svg class="absolute inset-0" width="900" height="440" viewBox="0 0 900 440" fill="none">
+                    <!-- Leader -> agents -->
+                    <path class="edge" data-edge="l0" d="M174 220 C 240 220, 240 62, 300 62"/>
+                    <path class="edge" data-edge="l1" d="M174 220 C 240 220, 240 150, 300 150"/>
+                    <path class="edge" data-edge="l2" d="M174 220 C 240 220, 240 238, 300 238"/>
+                    <path class="edge" data-edge="l3" d="M174 220 C 240 220, 240 326, 300 326"/>
+                    <!-- agents -> tools -->
+                    <path class="edge" data-edge="a0" d="M450 62 C 505 62, 505 62, 560 62"/>
+                    <path class="edge" data-edge="a1" d="M450 150 C 505 150, 505 150, 560 150"/>
+                    <path class="edge" data-edge="a2" d="M450 238 C 505 238, 505 238, 560 238"/>
+                    <path class="edge" data-edge="a3" d="M450 326 C 505 326, 505 326, 560 326"/>
+                    <!-- tools -> completed -->
+                    <path class="edge" data-edge="t0" d="M710 62 C 745 62, 745 220, 770 220"/>
+                    <path class="edge" data-edge="t1" d="M710 150 C 748 150, 748 220, 770 220"/>
+                    <path class="edge" data-edge="t2" d="M710 238 C 748 238, 748 220, 770 220"/>
+                    <path class="edge" data-edge="t3" d="M710 326 C 745 326, 745 220, 770 220"/>
+                  </svg>
+                  <!-- nodes -->
+                  <div class="node absolute rounded-xl hairline bg-panel2 flex items-center gap-2.5 px-3" data-node="leader" style="left:24px;top:193px;width:150px;height:54px">
+                    <span class="dot h-2 w-2 rounded-full bg-white/25"></span>
+                    <div class="text-left leading-tight"><div class="text-[13px] font-medium">Leader Agent</div><div class="text-[10.5px] text-faint">Orchestrator</div></div>
+                  </div>
+                  <!-- agents -->
+                  <div class="node absolute rounded-xl hairline bg-panel2 flex items-center gap-2 px-3" data-node="a0" style="left:300px;top:40px;width:150px;height:44px"><span class="dot h-2 w-2 rounded-full bg-white/25"></span><div class="text-[12.5px] font-medium">Research Agent</div></div>
+                  <div class="node absolute rounded-xl hairline bg-panel2 flex items-center gap-2 px-3" data-node="a1" style="left:300px;top:128px;width:150px;height:44px"><span class="dot h-2 w-2 rounded-full bg-white/25"></span><div class="text-[12.5px] font-medium">Support Agent</div></div>
+                  <div class="node absolute rounded-xl hairline bg-panel2 flex items-center gap-2 px-3" data-node="a2" style="left:300px;top:216px;width:150px;height:44px"><span class="dot h-2 w-2 rounded-full bg-white/25"></span><div class="text-[12.5px] font-medium">Finance Agent</div></div>
+                  <div class="node absolute rounded-xl hairline bg-panel2 flex items-center gap-2 px-3" data-node="a3" style="left:300px;top:304px;width:150px;height:44px"><span class="dot h-2 w-2 rounded-full bg-white/25"></span><div class="text-[12.5px] font-medium">Marketing Agent</div></div>
+                  <!-- tools -->
+                  <div class="node absolute rounded-xl hairline bg-panel flex items-center gap-2 px-3" data-node="t0" style="left:560px;top:40px;width:150px;height:44px"><span class="dot h-2 w-2 rounded-full bg-white/25"></span><div class="text-[12.5px] text-muted">Browser</div></div>
+                  <div class="node absolute rounded-xl hairline bg-panel flex items-center gap-2 px-3" data-node="t1" style="left:560px;top:128px;width:150px;height:44px"><span class="dot h-2 w-2 rounded-full bg-white/25"></span><div class="text-[12.5px] text-muted">Slack</div></div>
+                  <div class="node absolute rounded-xl hairline bg-panel flex items-center gap-2 px-3" data-node="t2" style="left:560px;top:216px;width:150px;height:44px"><span class="dot h-2 w-2 rounded-full bg-white/25"></span><div class="text-[12.5px] text-muted">Jira</div></div>
+                  <div class="node absolute rounded-xl hairline bg-panel flex items-center gap-2 px-3" data-node="t3" style="left:560px;top:304px;width:150px;height:44px"><span class="dot h-2 w-2 rounded-full bg-white/25"></span><div class="text-[12.5px] text-muted">Google Workspace</div></div>
+                  <!-- completed -->
+                  <div class="node absolute rounded-xl hairline bg-panel2 flex flex-col items-center justify-center" data-node="done" style="left:770px;top:186px;width:106px;height:68px">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" class="mb-0.5"><path d="M20 6 9 17l-5-5" stroke="#4ade80" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <div class="text-[12px] font-medium">Completed</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- live activity -->
+            <div class="border-t md:border-t-0 md:border-l border-line p-4 sm:p-5">
+              <div class="text-[11px] uppercase tracking-wider text-faint mb-3">Live activity</div>
+              <div id="ticker" class="flex flex-col gap-2.5"></div>
+            </div>
+          </div>
+        </div>
+        <div class="absolute -inset-x-10 -bottom-10 h-24 bg-accent/10 blur-3xl rounded-full pointer-events-none"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRUST -->
+<section class="border-y border-line bg-panel/40">
+  <div class="max-w-content mx-auto px-6 py-14">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-y-10 gap-x-6">
+      <div class="reveal text-center md:text-left"><div class="tight text-[34px] font-semibold" data-count="10" data-suffix="M+">0</div><div class="text-[13px] text-muted mt-1">Tasks Executed</div></div>
+      <div class="reveal text-center md:text-left"><div class="tight text-[34px] font-semibold">99.99<span class="text-muted">%</span></div><div class="text-[13px] text-muted mt-1">Platform Uptime</div></div>
+      <div class="reveal text-center md:text-left"><div class="tight text-[34px] font-semibold" data-count="120" data-suffix="+">0</div><div class="text-[13px] text-muted mt-1">Connectors</div></div>
+      <div class="reveal text-center md:text-left"><div class="tight text-[34px] font-semibold">Thousands</div><div class="text-[13px] text-muted mt-1">AI Workers Running</div></div>
+    </div>
+    <div class="mt-12 flex flex-col items-center gap-5">
+      <div class="text-[12px] text-faint uppercase tracking-wider">Trusted by modern teams · Enterprise Ready · Secure by Design</div>
+      <div class="fade-x w-full overflow-hidden">
+        <div class="flex gap-14 marquee w-max opacity-50">
+          <!-- placeholder wordmarks x2 -->
+          <div class="flex gap-14 items-center text-[19px] font-semibold text-muted tracking-tight">
+            <span>Northwind</span><span>Vertex</span><span>Lumen</span><span>Cobalt</span><span>Aperture</span><span>Meridian</span><span>Halcyon</span>
+          </div>
+          <div class="flex gap-14 items-center text-[19px] font-semibold text-muted tracking-tight" aria-hidden="true">
+            <span>Northwind</span><span>Vertex</span><span>Lumen</span><span>Cobalt</span><span>Aperture</span><span>Meridian</span><span>Halcyon</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- VALUE PROPS -->
+<section class="max-w-content mx-auto px-6 py-28">
+  <div class="text-center max-w-2xl mx-auto mb-14">
+    <div class="reveal text-[13px] font-medium text-accent2 mb-3">Why teams switch</div>
+    <h2 class="reveal tighter text-[36px] sm:text-[46px] font-semibold leading-[1.08]">No code. No lock-in.<br/>No starting over.</h2>
+  </div>
+  <div class="grid md:grid-cols-3 gap-4">
+
+    <div class="reveal card-hover rounded-2xl hairline bg-panel/60 p-7 flex flex-col">
+      <div class="text-[16px] font-medium mb-2">Built for non-developers</div>
+      <p class="text-[13.5px] text-muted leading-relaxed mb-5 flex-1">Describe what you need in plain language — the AI chat and the visual canvas do the rest. Made for operations, support and marketing teams, not just engineers.</p>
+      <div class="rounded-xl hairline bg-ink/50 p-4">
+        <div class="rounded-lg bg-accent/10 border border-accent/25 px-3 py-2 text-[12px] text-accent2">"When a ticket arrives, summarize it and post to Slack."</div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint mx-auto my-2"><path d="M12 5v14M6 13l6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="flex items-center justify-center gap-1.5 text-[11px]">
+          <span class="rounded-md hairline bg-panel2 px-2 py-1">Trigger</span><span class="text-faint">→</span>
+          <span class="rounded-md hairline bg-panel2 px-2 py-1">AI Agent</span><span class="text-faint">→</span>
+          <span class="rounded-md hairline bg-panel2 px-2 py-1 inline-flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 122.8 122.8" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M25.8 77.6c0 7.1-5.8 12.9-12.9 12.9S0 84.7 0 77.6s5.8-12.9 12.9-12.9h12.9v12.9zM32.3 77.6c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9v32.3c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V77.6z" fill="#E01E5A"/><path d="M45.2 25.8c-7.1 0-12.9-5.8-12.9-12.9S38.1 0 45.2 0s12.9 5.8 12.9 12.9v12.9H45.2zM45.2 32.3c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H12.9C5.8 58.1 0 52.3 0 45.2s5.8-12.9 12.9-12.9h32.3z" fill="#36C5F0"/><path d="M97 45.2c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9-5.8 12.9-12.9 12.9H97V45.2zM90.5 45.2c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V12.9C64.7 5.8 70.5 0 77.6 0s12.9 5.8 12.9 12.9v32.3z" fill="#2EB67D"/><path d="M77.6 97c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9-12.9-5.8-12.9-12.9V97h12.9zM77.6 90.5c-7.1 0-12.9-5.8-12.9-12.9s5.8-12.9 12.9-12.9h32.3c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H77.6z" fill="#ECB22E"/></svg> Slack</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="reveal card-hover rounded-2xl hairline bg-panel/60 p-7 flex flex-col">
+      <div class="text-[16px] font-medium mb-2">Your AI, your choice</div>
+      <p class="text-[13.5px] text-muted leading-relaxed mb-5 flex-1">You decide which model powers each agent — OpenAI, Claude, Gemini, Mistral, Llama, DeepSeek. Switch anytime, bring your own keys, stay independent of any AI provider.</p>
+      <div class="rounded-xl hairline bg-ink/50 p-4">
+        <div class="grid grid-cols-3 gap-1.5 text-[11.5px] text-center">
+          <span class="rounded-md hairline bg-panel2 px-2 py-1.5">OpenAI</span>
+          <span class="rounded-md bg-accent/15 border border-accent/30 px-2 py-1.5 text-accent2 font-medium inline-flex items-center justify-center gap-1"><svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M20 6 9 17l-5-5" stroke="#4ade80" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg> Claude</span>
+          <span class="rounded-md hairline bg-panel2 px-2 py-1.5">Gemini</span>
+          <span class="rounded-md hairline bg-panel2 px-2 py-1.5">Mistral</span>
+          <span class="rounded-md hairline bg-panel2 px-2 py-1.5">Llama</span>
+          <span class="rounded-md hairline bg-panel2 px-2 py-1.5">DeepSeek</span>
+        </div>
+        <div class="mt-3 text-center text-[11px] text-faint">Per-agent model choice · Bring your own keys</div>
+      </div>
+    </div>
+
+    <div class="reveal card-hover rounded-2xl hairline bg-panel/60 p-7 flex flex-col">
+      <div class="text-[16px] font-medium mb-2">Migrate in minutes</div>
+      <p class="text-[13.5px] text-muted leading-relaxed mb-5 flex-1">Already automated elsewhere? Describe your existing workflows and Workestra rebuilds them — agents, connectors and triggers included. No starting from zero.</p>
+      <div class="rounded-xl hairline bg-ink/50 p-4">
+        <div class="flex items-center justify-center gap-2 text-[11.5px]">
+          <span class="rounded-md hairline bg-panel2 px-2 py-1.5">Zapier</span>
+          <span class="rounded-md hairline bg-panel2 px-2 py-1.5">Make</span>
+          <span class="rounded-md hairline bg-panel2 px-2 py-1.5">n8n</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="text-faint shrink-0"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="rounded-md bg-accent/15 border border-accent/30 px-2.5 py-1.5 text-accent2 font-medium inline-flex items-center gap-1.5"><svg width="12" height="12" viewBox="0 0 96 96" fill="none"><g stroke="#ededf0" stroke-width="8" stroke-linecap="round"><path d="M20 24 C 42 26, 54 42, 66 48"/><path d="M20 48 H66"/><path d="M20 72 C 42 70, 54 54, 66 48"/></g><circle cx="20" cy="24" r="7" fill="#ededf0"/><circle cx="20" cy="48" r="7" fill="#ededf0"/><circle cx="20" cy="72" r="7" fill="#ededf0"/><circle cx="72" cy="48" r="10" fill="#4F7CFF"/></svg> Workestra</span>
+        </div>
+        <div class="mt-3 text-center text-[11px] text-faint">Your existing automations, upgraded to AI teams</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- BUILD AI TEAMS -->
+<section id="teams" class="max-w-content mx-auto px-6 py-28">
+  <div class="max-w-2xl">
+    <div class="reveal text-[13px] font-medium text-accent2 mb-3">Organize AI like you organize people</div>
+    <h2 class="reveal tighter text-[36px] sm:text-[46px] font-semibold leading-[1.08]">Build AI teams,<br/>not just workflows.</h2>
+    <p class="reveal mt-5 text-[17px] text-muted leading-relaxed">Every team has a leader that plans and delegates, specialized workers that execute, and the tools they need to get real work done — structured exactly like a department in your company.</p>
+  </div>
+
+  <div id="teamsGrid" class="mt-14 grid sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+</section>
+
+<!-- LIVE TEAM VISUALIZATION -->
+<section class="relative border-y border-line bg-panel/30 overflow-hidden">
+  <div class="absolute inset-0 grid-bg opacity-40 pointer-events-none"></div>
+  <div class="relative max-w-content mx-auto px-6 py-24">
+    <div class="text-center max-w-2xl mx-auto">
+      <div class="reveal text-[13px] font-medium text-accent2 mb-3">Collaboration, visualized</div>
+      <h2 class="reveal tighter text-[34px] sm:text-[44px] font-semibold leading-tight">Watch a team think and execute</h2>
+      <p class="reveal mt-4 text-[16px] text-muted">Agents plan, hand off work, and coordinate — nodes pulse as they work and connections light up as decisions flow.</p>
+    </div>
+    <div class="reveal mt-14 glass panel-border rounded-2xl p-6 sm:p-10">
+      <div id="chainWrap" class="relative w-full" style="aspect-ratio: 980/120;">
+        <div id="chain" class="absolute top-0 left-0" style="width:980px;height:120px;transform-origin:top left;">
+          <svg class="absolute inset-0" width="980" height="120" viewBox="0 0 980 120">
+            <path class="cedge edge" data-c="0" d="M140 60 H168"/>
+            <path class="cedge edge" data-c="1" d="M278 60 H306"/>
+            <path class="cedge edge" data-c="2" d="M416 60 H444"/>
+            <path class="cedge edge" data-c="3" d="M554 60 H582"/>
+            <path class="cedge edge" data-c="4" d="M692 60 H720"/>
+            <path class="cedge edge" data-c="5" d="M830 60 H858"/>
+          </svg>
+          <!-- chain nodes generated inline -->
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features" class="max-w-content mx-auto px-6 py-28">
+  <div class="max-w-2xl mb-14">
+    <div class="reveal text-[13px] font-medium text-accent2 mb-3">Everything an AI workforce needs</div>
+    <h2 class="reveal tighter text-[36px] sm:text-[46px] font-semibold leading-[1.08]">Powerful by default,<br/>enterprise by design.</h2>
+  </div>
+  <div id="featuresGrid" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+</section>
+
+<!-- CONNECTORS -->
+<section id="connectors" class="border-y border-line bg-panel/30">
+  <div class="max-w-content mx-auto px-6 py-24">
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+      <div class="max-w-xl">
+        <div class="reveal text-[13px] font-medium text-accent2 mb-3">Integrations</div>
+        <h2 class="reveal tighter text-[34px] sm:text-[44px] font-semibold leading-tight">Connected to your entire stack</h2>
+      </div>
+      <p class="reveal text-[15px] text-muted max-w-sm">Native connectors, browser automation, webhooks and REST — your AI teams act inside the tools you already run on.</p>
+    </div>
+    <div id="connGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"></div>
+  </div>
+</section>
+
+<!-- LIVE EXECUTION -->
+<section class="max-w-content mx-auto px-6 py-28">
+  <div class="grid lg:grid-cols-2 gap-14 items-center">
+    <div>
+      <div class="reveal text-[13px] font-medium text-accent2 mb-3">Real-time execution</div>
+      <h2 class="reveal tighter text-[34px] sm:text-[44px] font-semibold leading-tight">See every step as it happens</h2>
+      <p class="reveal mt-5 text-[16px] text-muted leading-relaxed">A live timeline of every trigger, decision, and tool call across your workforce — with status updating the moment work moves forward.</p>
+      <div class="reveal mt-8 flex flex-wrap gap-6">
+        <div><div class="tight text-[24px] font-semibold">4.2s</div><div class="text-[12.5px] text-muted">Avg. handoff</div></div>
+        <div><div class="tight text-[24px] font-semibold">Real-time</div><div class="text-[12.5px] text-muted">Status stream</div></div>
+        <div><div class="tight text-[24px] font-semibold">Every step</div><div class="text-[12.5px] text-muted">Fully traced</div></div>
+      </div>
+    </div>
+    <div class="reveal glass panel-border rounded-2xl p-5 sm:p-7">
+      <div class="flex items-center justify-between mb-5">
+        <div class="text-[13px] font-medium">Execution #4821</div>
+        <div class="flex items-center gap-2 text-[12px] text-done"><span class="live-dot"></span> Running</div>
+      </div>
+      <div id="execTimeline" class="flex flex-col"></div>
+    </div>
+  </div>
+</section>
+
+<!-- MARKETPLACE -->
+<section id="marketplace" class="border-y border-line bg-panel/30">
+  <div class="max-w-content mx-auto px-6 py-28">
+    <div class="text-center max-w-2xl mx-auto mb-14">
+      <div class="reveal text-[13px] font-medium text-accent2 mb-3">Marketplace</div>
+      <h2 class="reveal tighter text-[36px] sm:text-[46px] font-semibold leading-[1.08]">Install AI teams in seconds</h2>
+      <p class="reveal mt-4 text-[16px] text-muted">Production-ready departments — agents, workflows, connectors and memory — deployed with one click.</p>
+    </div>
+    <div id="mktGrid" class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+  </div>
+</section>
+
+<!-- EXECUTION REPLAY + AUDIT -->
+<section class="max-w-content mx-auto px-6 py-28">
+  <div class="grid lg:grid-cols-2 gap-6">
+    <!-- replay -->
+    <div class="reveal glass panel-border rounded-2xl p-6 sm:p-8">
+      <div class="text-[13px] font-medium text-accent2 mb-2">Execution Replay</div>
+      <h3 class="tight text-[26px] font-semibold mb-1">Rewind any run, step by step</h3>
+      <p class="text-[14.5px] text-muted mb-6">Scrub the full timeline of a decision and see exactly what each agent did.</p>
+      <div class="rounded-xl hairline bg-ink/60 p-4">
+        <div class="flex items-center justify-between text-[12px] text-muted mb-3">
+          <span>Replay · Leader decision → Tool execution</span><span id="replayPct">00:00</span>
+        </div>
+        <div class="h-1.5 rounded-full bg-white/10 overflow-hidden mb-4"><div id="replayBar" class="h-full rounded-full" style="width:0%;background:linear-gradient(90deg,#4F7CFF,#8FB0FF)"></div></div>
+        <div class="grid grid-cols-5 gap-2">
+          <div class="replay-step rounded-lg hairline bg-panel2 py-2 text-center text-[11px]">Timeline</div>
+          <div class="replay-step rounded-lg hairline bg-panel2 py-2 text-center text-[11px]">Leader</div>
+          <div class="replay-step rounded-lg hairline bg-panel2 py-2 text-center text-[11px]">Tool</div>
+          <div class="replay-step rounded-lg hairline bg-panel2 py-2 text-center text-[11px]">Browser</div>
+          <div class="replay-step rounded-lg hairline bg-panel2 py-2 text-center text-[11px]">Done</div>
+        </div>
+      </div>
+    </div>
+    <!-- audit -->
+    <div class="reveal glass panel-border rounded-2xl p-6 sm:p-8">
+      <div class="text-[13px] font-medium text-accent2 mb-2">Audit &amp; Observability</div>
+      <h3 class="tight text-[26px] font-semibold mb-1">Understand every decision</h3>
+      <p class="text-[14.5px] text-muted mb-6">Enterprise-grade traceability for every prompt, model and tool call.</p>
+      <div class="rounded-xl hairline bg-ink/60 divide-y divide-line text-[13px]" id="auditRows"></div>
+    </div>
+  </div>
+</section>
+
+<!-- MCP -->
+<section id="mcp" class="relative border-y border-line bg-panel/30 overflow-hidden">
+  <div class="absolute inset-0 glow-hero opacity-60 pointer-events-none"></div>
+  <div class="relative max-w-content mx-auto px-6 py-28">
+    <div class="grid lg:grid-cols-2 gap-14 items-center">
+      <div>
+        <div class="reveal text-[13px] font-medium text-accent2 mb-3">AI chat · Native MCP</div>
+        <h2 class="reveal tighter text-[34px] sm:text-[44px] font-semibold leading-tight">Create workflows by chatting</h2>
+        <p class="reveal mt-5 text-[16px] text-muted leading-relaxed">Describe what you need in plain language and Workestra builds the team for you — from the <span class="text-txt">built-in AI chat</span>, or straight from your favorite AI assistant through <span class="text-txt">native MCP</span>: Claude, ChatGPT, Codex, Gemini, Cursor and more.</p>
+        <div class="reveal mt-8 flex flex-wrap items-center gap-2.5">
+          <div class="hairline rounded-lg px-3 py-2 text-[13px]">Claude</div>
+          <div class="hairline rounded-lg px-3 py-2 text-[13px]">ChatGPT</div>
+          <div class="hairline rounded-lg px-3 py-2 text-[13px]">Codex</div>
+          <div class="hairline rounded-lg px-3 py-2 text-[13px]">Gemini</div>
+          <div class="hairline rounded-lg px-3 py-2 text-[13px]">Cursor</div>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="text-faint"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div class="btn-accent text-white rounded-lg px-3 py-2 text-[13px] font-medium">Workestra MCP</div>
+        </div>
+      </div>
+      <div class="reveal glass panel-border rounded-2xl overflow-hidden">
+        <div class="px-4 h-10 border-b border-line flex items-center gap-2 text-[12px] text-faint">
+          <span class="h-2.5 w-2.5 rounded-full bg-white/10"></span><span class="h-2.5 w-2.5 rounded-full bg-white/10"></span><span class="h-2.5 w-2.5 rounded-full bg-white/10"></span>
+          <span class="ml-2" id="mcpSource">Workestra · AI Chat</span>
+        </div>
+        <div class="p-5 space-y-4 text-[13.5px]">
+          <div class="flex justify-end"><div class="max-w-[80%] rounded-2xl rounded-br-md px-4 py-2.5 bg-accent/15 border border-accent/25">"<span id="mcpTyped"></span><span id="mcpCaret" class="inline-block w-[2px] h-3.5 bg-accent2 align-middle animate-pulse" style="display:none"></span>"</div></div>
+          <div class="flex gap-2.5">
+            <div class="h-7 w-7 shrink-0 rounded-lg hairline bg-panel2 flex items-center justify-center"><svg width="16" height="16" viewBox="0 0 96 96" fill="none" class="text-txt"><g stroke="currentColor" stroke-width="7" stroke-linecap="round"><path d="M20 24 C 42 26, 54 42, 66 48"/><path d="M20 48 H66"/><path d="M20 72 C 42 70, 54 54, 66 48"/></g><circle cx="20" cy="24" r="7" fill="currentColor"/><circle cx="20" cy="48" r="7" fill="currentColor"/><circle cx="20" cy="72" r="7" fill="currentColor"/><circle cx="72" cy="48" r="10" fill="#4F7CFF"/></svg></div>
+            <div class="rounded-2xl rounded-bl-md hairline bg-panel2 px-4 py-3 w-full">
+              <div class="text-muted mb-2.5 text-[12.5px]">Provisioning <span class="text-txt font-medium">Customer Support Team</span>…</div>
+              <div id="mcpBuild" class="grid grid-cols-2 gap-1.5 text-[12px]"></div>
+              <div id="mcpReady" class="mt-3 flex items-center gap-1.5 text-[12.5px] text-done opacity-0 transition-opacity duration-500"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M20 6 9 17l-5-5" stroke="#4ade80" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg> Ready to execute</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BROWSER AUTOMATION -->
+<section class="max-w-content mx-auto px-6 py-28">
+  <div class="grid lg:grid-cols-2 gap-14 items-center">
+    <div class="reveal order-2 lg:order-1 glass panel-border rounded-2xl overflow-hidden">
+      <div class="px-4 h-10 border-b border-line flex items-center gap-3 text-[12px] text-faint">
+        <div class="flex gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-white/10"></span><span class="h-2.5 w-2.5 rounded-full bg-white/10"></span><span class="h-2.5 w-2.5 rounded-full bg-white/10"></span></div>
+        <div class="flex-1 rounded-md bg-ink/70 hairline px-3 py-1 text-[11.5px] flex items-center gap-2"><svg width="11" height="11" viewBox="0 0 24 24" fill="none"><rect x="4" y="11" width="16" height="9" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 11V8a4 4 0 018 0v3" stroke="currentColor" stroke-width="1.8"/></svg>app.internal.acme.com/admin</div>
+      </div>
+      <div class="p-6 relative min-h-[260px]">
+        <div class="grid grid-cols-2 gap-3">
+          <div class="rounded-lg hairline bg-panel2 h-10"></div>
+          <div class="rounded-lg hairline bg-panel2 h-10"></div>
+          <div class="col-span-2 rounded-lg hairline bg-panel2 h-10 flex items-center px-3 text-[12px] text-muted"><span id="baType">new.user@acme.com</span><span class="ml-0.5 inline-block w-[2px] h-4 bg-accent animate-pulse"></span></div>
+          <div class="rounded-lg hairline bg-panel2 h-10"></div>
+          <div class="rounded-lg hairline bg-panel2 h-10"></div>
+        </div>
+        <div class="mt-4 flex justify-end"><div class="btn-accent text-white rounded-lg px-4 py-2 text-[12.5px] font-medium">Create user</div></div>
+        <!-- cursor -->
+        <div id="baCursor" class="absolute transition-all duration-700 ease-out" style="left:60%;top:70%;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff" style="filter:drop-shadow(0 2px 4px rgba(0,0,0,0.6))"><path d="M5 3l14 8-6 1.5L10 20 5 3z"/></svg>
+        </div>
+      </div>
+    </div>
+    <div class="order-1 lg:order-2">
+      <div class="reveal text-[13px] font-medium text-accent2 mb-3">Browser Automation</div>
+      <h2 class="reveal tighter text-[34px] sm:text-[44px] font-semibold leading-tight">Your agents can use any website</h2>
+      <p class="reveal mt-5 text-[16px] text-muted leading-relaxed">A first-class capability: agents log in, fill forms, run QA, and pull reports from tools without APIs — interacting exactly like a human would.</p>
+      <div id="baChips" class="reveal mt-7 flex flex-wrap gap-2"></div>
+    </div>
+  </div>
+</section>
+
+<!-- WHY WORKESTRA -->
+<section class="border-y border-line bg-panel/30">
+  <div class="max-w-content mx-auto px-6 py-28">
+    <div class="text-center max-w-2xl mx-auto mb-14">
+      <div class="reveal text-[13px] font-medium text-accent2 mb-3">Why Workestra</div>
+      <h2 class="reveal tighter text-[36px] sm:text-[46px] font-semibold leading-[1.08]">Beyond automation</h2>
+    </div>
+    <div class="grid md:grid-cols-2 gap-4 max-w-4xl mx-auto">
+      <div class="reveal rounded-2xl hairline bg-panel/60 p-7">
+        <div class="text-[13px] text-faint uppercase tracking-wider mb-5">Traditional Automation</div>
+        <ul id="tradList" class="space-y-3.5 text-[15px] text-muted"></ul>
+      </div>
+      <div class="reveal rounded-2xl p-7 panel-border relative overflow-hidden" style="background:linear-gradient(180deg,rgba(79,124,255,0.08),rgba(79,124,255,0.02))">
+        <div class="absolute inset-0 glow-hero opacity-40 pointer-events-none"></div>
+        <div class="relative">
+          <div class="text-[13px] text-accent2 uppercase tracking-wider mb-5 font-medium">Workestra</div>
+          <ul id="wkList" class="space-y-3.5 text-[15px]"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section class="relative overflow-hidden">
+  <div class="absolute inset-0 glow-hero pointer-events-none"></div>
+  <div class="absolute inset-0 grid-bg opacity-50 pointer-events-none"></div>
+  <div class="relative max-w-content mx-auto px-6 py-32 text-center">
+    <h2 class="reveal tighter text-[40px] sm:text-[58px] font-semibold leading-[1.05] max-w-3xl mx-auto">Build your AI workforce today</h2>
+    <p class="reveal mt-6 text-[18px] text-muted max-w-xl mx-auto">Create AI teams that collaborate, reason, and execute work across your entire company.</p>
+    <div class="reveal mt-9 flex items-center justify-center gap-3">
+      <a href="https://appweb-production-1a37.up.railway.app" target="_blank" rel="noopener" class="btn-accent text-white text-[15px] font-medium rounded-xl px-6 py-3.5">Start Free</a>
+      <a href="mailto:schwarzboeckmartin@gmail.com?subject=Workestra%20demo" class="btn-ghost hairline text-[15px] font-medium rounded-xl px-6 py-3.5 text-txt">Book Demo</a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="border-t border-line bg-ink">
+  <div class="max-w-content mx-auto px-6 py-16">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-10">
+      <div class="col-span-2 md:col-span-1">
+        <a href="#" class="flex items-center gap-2.5 mb-4">
+          <svg width="26" height="26" viewBox="0 0 96 96" fill="none" class="text-txt" role="img" aria-label="Workestra"><g stroke="currentColor" stroke-width="6" stroke-linecap="round"><path d="M20 24 C 42 26, 54 42, 66 48"/><path d="M20 48 H66"/><path d="M20 72 C 42 70, 54 54, 66 48"/></g><circle cx="20" cy="24" r="6" fill="currentColor"/><circle cx="20" cy="48" r="6" fill="currentColor"/><circle cx="20" cy="72" r="6" fill="currentColor"/><circle cx="72" cy="48" r="9" fill="#4F7CFF"/></svg>
+          <span class="text-[15px] font-semibold tracking-tight">Workestra</span>
+        </a>
+        <p class="text-[13px] text-faint leading-relaxed max-w-[220px]">The operating system for AI teams.</p>
+      </div>
+      <div><div class="text-[12px] uppercase tracking-wider text-faint mb-4">Product</div><ul class="space-y-2.5 text-[13.5px] text-muted"><li><a class="link-muted" href="https://appweb-production-1a37.up.railway.app/marketplace" target="_blank" rel="noopener">Marketplace</a></li><li><a class="link-muted" href="#marketplace">Templates</a></li><li><a class="link-muted" href="mailto:schwarzboeckmartin@gmail.com?subject=Workestra%20pricing">Pricing</a></li><li><a class="link-muted" href="#mcp">MCP</a></li></ul></div>
+      <div><div class="text-[12px] uppercase tracking-wider text-faint mb-4">Company</div><ul class="space-y-2.5 text-[13.5px] text-muted"><li><a class="link-muted" href="https://github.com/martinPino/agentflow/blob/main/ROADMAP.md" target="_blank" rel="noopener">Blog</a></li><li><a class="link-muted" href="https://github.com/martinPino/agentflow/blob/main/docs/design/08-security-marketplace-api.md" target="_blank" rel="noopener">Security</a></li><li><a class="link-muted" href="mailto:schwarzboeckmartin@gmail.com">Contact</a></li></ul></div>
+      <div><div class="text-[12px] uppercase tracking-wider text-faint mb-4">Legal</div><ul class="space-y-2.5 text-[13.5px] text-muted"><li><a class="link-muted" href="privacy.html">Privacy</a></li><li><a class="link-muted" href="terms.html">Terms</a></li></ul></div>
+    </div>
+    <div class="mt-14 pt-8 border-t border-line flex flex-col sm:flex-row items-center justify-between gap-4 text-[12.5px] text-faint">
+      <span>© 2026 Workestra, Inc. All rights reserved.</span>
+      <div class="flex items-center gap-2"><span class="live-dot"></span> All systems operational</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* ---------- data ---------- */
+const teams = [
+  { name:'Customer Support Team', leader:'Support Lead', workers:['Triage','Resolver','Escalation'], tools:['Zendesk','Slack','Browser'], result:'−63% response time' },
+  { name:'Marketing Team', leader:'Campaign Lead', workers:['Researcher','Copywriter','Designer'], tools:['HubSpot','Notion','Analytics'], result:'4× content output' },
+  { name:'Sales Team', leader:'Revenue Lead', workers:['Prospector','SDR','Closer'], tools:['Salesforce','Gmail','LinkedIn'], result:'+38% pipeline' },
+  { name:'Finance Team', leader:'Finance Lead', workers:['Invoicing','Reconciler','Reporting'], tools:['Stripe','Sheets','QuickBooks'], result:'Books closed 5× faster' },
+  { name:'HR Team', leader:'People Lead', workers:['Sourcer','Screener','Onboarding'], tools:['Greenhouse','Slack','Docs'], result:'−50% time-to-hire' },
+  { name:'Operations Team', leader:'Ops Lead', workers:['Monitor','Responder','Analyst'], tools:['Jira','PagerDuty','Browser'], result:'99.99% SLA held' },
+];
+const features = [
+  ['AI Team Leader','Coordinates and delegates work automatically.','M4 15c3-8 5-8 8 0s5 8 8 0'],
+  ['Specialized Workers','Each agent owns a specific, well-scoped role.','M12 3l8 4v6c0 5-3.5 7.5-8 8-4.5-.5-8-3-8-8V7z'],
+  ['Visual Builder','Design complex systems on a visual canvas.','M4 6h16M4 12h10M4 18h7'],
+  ['Marketplace','Install complete AI teams in one click.','M4 7h16l-1 4H5zM6 11v7h12v-7'],
+  ['Execution Replay','Replay every run step-by-step.','M11 5v14l-8-7zM13 5l8 7-8 7'],
+  ['Audit Trail','Understand every decision made.','M6 4h9l3 3v13H6zM9 12h6M9 16h6'],
+  ['Browser Automation','Control any website like a human.','M4 11h16M4 11a8 8 0 0116 0M4 11a8 8 0 0016 0'],
+  ['Human Approval','Humans stay in control of key steps.','M20 6 9 17l-5-5'],
+  ['Multi-Model','OpenAI · Claude · Gemini · Mistral · Llama · DeepSeek','M12 3v18M3 12h18'],
+  ['Native MCP','Drive Workestra from Claude, ChatGPT & Cursor.','M5 12h14M13 6l6 6-6 6'],
+  ['Memory','Persistent knowledge for every team.','M12 3a5 5 0 015 5v8a5 5 0 01-10 0V8a5 5 0 015-5z'],
+  ['Observability','Logs, traces and metrics for every run.','M4 19V5M4 19h16M8 15l3-4 3 3 4-6'],
+];
+const connectors = [
+  {n:'Slack', svg:'<svg width="18" height="18" viewBox="0 0 122.8 122.8" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M25.8 77.6c0 7.1-5.8 12.9-12.9 12.9S0 84.7 0 77.6s5.8-12.9 12.9-12.9h12.9v12.9zM32.3 77.6c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9v32.3c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V77.6z" fill="#E01E5A"/><path d="M45.2 25.8c-7.1 0-12.9-5.8-12.9-12.9S38.1 0 45.2 0s12.9 5.8 12.9 12.9v12.9H45.2zM45.2 32.3c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H12.9C5.8 58.1 0 52.3 0 45.2s5.8-12.9 12.9-12.9h32.3z" fill="#36C5F0"/><path d="M97 45.2c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9-5.8 12.9-12.9 12.9H97V45.2zM90.5 45.2c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V12.9C64.7 5.8 70.5 0 77.6 0s12.9 5.8 12.9 12.9v32.3z" fill="#2EB67D"/><path d="M77.6 97c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9-12.9-5.8-12.9-12.9V97h12.9zM77.6 90.5c-7.1 0-12.9-5.8-12.9-12.9s5.8-12.9 12.9-12.9h32.3c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H77.6z" fill="#ECB22E"/></svg>'},
+  {n:'GitHub', svg:'<svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="#ededf0" d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>'},
+  {n:'Jira', svg:'<svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="#2684FF" d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.762a1.005 1.005 0 0 0-1.005-1.005zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.005 1.005 0 0 0 23.013 0z"/></svg>'},
+  {n:'Google Workspace', svg:'<svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>'},
+  {n:'Notion', svg:'<svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="#ededf0" d="M4.459 4.208c.746.606 1.026.56 2.428.466l13.215-.793c.28 0 .047-.28-.046-.326L17.86 1.968c-.42-.326-.981-.7-2.055-.607L3.01 2.295c-.466.046-.56.28-.374.466zm.793 3.08v13.904c0 .747.373 1.027 1.214.98l14.523-.84c.841-.046.935-.56.935-1.167V6.354c0-.606-.233-.933-.748-.887l-15.177.887c-.56.047-.747.327-.747.933zm14.337.745c.093.42 0 .84-.42.888l-.7.14v10.264c-.608.327-1.168.514-1.635.514-.748 0-.935-.234-1.495-.933l-4.577-7.186v6.952L12.21 19s0 .84-1.168.84l-3.222.186c-.093-.186 0-.653.327-.746l.84-.233V9.854L7.822 9.76c-.094-.42.14-1.026.793-1.073l3.456-.233 4.764 7.279v-6.44l-1.215-.139c-.093-.514.28-.887.747-.933zM1.936 1.035l13.31-.98c1.634-.14 2.055-.047 3.082.7l4.249 2.986c.7.513.934.653.934 1.213v16.378c0 1.026-.373 1.634-1.68 1.726l-15.458.934c-.98.047-1.448-.093-1.962-.747l-3.129-4.06c-.56-.747-.793-1.306-.793-1.96V2.667c0-.839.374-1.54 1.447-1.632z"/></svg>'},
+  {n:'HubSpot', svg:'<svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="#FF7A59" d="M18.164 7.93V5.084a2.198 2.198 0 001.267-1.978v-.067A2.2 2.2 0 0017.238.845h-.067a2.2 2.2 0 00-2.193 2.193v.067a2.196 2.196 0 001.252 1.973l.013.006v2.852a6.22 6.22 0 00-2.969 1.31l.012-.01-7.828-6.095A2.497 2.497 0 104.3 4.656l-.012.006 7.697 5.991a6.176 6.176 0 00-1.038 3.446c0 1.343.425 2.588 1.147 3.607l-.013-.02-2.342 2.343a1.968 1.968 0 00-.58-.095h-.002a2.033 2.033 0 102.033 2.033 1.978 1.978 0 00-.1-.595l.005.014 2.317-2.317a6.247 6.247 0 104.782-11.134l-.036-.005zm-.964 9.378a3.206 3.206 0 113.215-3.207v.002a3.206 3.206 0 01-3.207 3.207z"/></svg>'},
+  {n:'Salesforce', svg:'<svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g fill="#00A1E0"><circle cx="8.5" cy="12.5" r="4"/><circle cx="13" cy="10" r="5"/><circle cx="17" cy="13" r="3.6"/><rect x="6" y="12.5" width="12" height="5" rx="2.5"/></g></svg>'},
+  {n:'Discord', svg:'<svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="#5865F2" d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>'},
+  {n:'Linear', svg:'<svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="#5E6AD2" d="M2.886 4.18A11.982 11.982 0 0 1 11.99 0C18.624 0 24 5.376 24 12.009c0 3.64-1.62 6.903-4.18 9.105L2.887 4.18ZM1.817 5.626l16.556 16.556c-.524.33-1.075.62-1.65.866L.951 7.277c.247-.575.537-1.126.866-1.65ZM.322 9.163l14.515 14.515c-.71.172-1.443.282-2.195.322L0 11.358a12 12 0 0 1 .322-2.195Zm-.17 4.862 9.823 9.824a12.02 12.02 0 0 1-9.824-9.824Z"/></svg>'},
+  {n:'Microsoft', svg:'<svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="1" y="1" width="10" height="10" fill="#F25022"/><rect x="13" y="1" width="10" height="10" fill="#7FBA00"/><rect x="1" y="13" width="10" height="10" fill="#00A4EF"/><rect x="13" y="13" width="10" height="10" fill="#FFB900"/></svg>'},
+  {n:'Browser Automation', svg:'<svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g stroke="#9b9ba6" stroke-width="1.6" fill="none" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.7 3.8 9s-1.3 6.4-3.8 9M12 3c-2.5 2.6-3.8 5.7-3.8 9s1.3 6.4 3.8 9"/></g></svg>'},
+  {n:'Webhooks', svg:'<svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M13 2 3 14h7l-1 8 11-14h-7l1-6z" stroke="#9b9ba6" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>'},
+  {n:'REST APIs', svg:'<svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g stroke="#9b9ba6" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="m8 7-5 5 5 5"/><path d="m16 7 5 5-5 5"/></g></svg>'},
+  {n:'Stripe', svg:'<svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="#635BFF" d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.594-7.305h.003z"/></svg>'},
+  {n:'Figma', svg:'<svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="9.5" cy="5.5" r="3.5" fill="#F24E1E"/><circle cx="14.5" cy="5.5" r="3.5" fill="#FF7262"/><circle cx="9.5" cy="12" r="3.5" fill="#A259FF"/><circle cx="14.5" cy="12" r="3.5" fill="#1ABCFE"/><circle cx="9.5" cy="18.5" r="3.5" fill="#0ACF83"/></svg>'},
+  {n:'+120 more', svg:'<svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>', hl:true}
+];
+const market = [
+  ['Customer Support','Triage, resolve & escalate tickets 24/7.','M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-5a10 10 0 0 1 20 0v5a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3'],
+  ['Sales Assistant','Qualify leads and draft outreach.','M22 7l-8.5 8.5-5-5L2 17M16 7h6v6'],
+  ['Recruitment Team','Source, screen and schedule candidates.','M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6'],
+  ['Marketing Campaign','Plan, write and launch campaigns.','M3 11l18-5v12L3 13v-2zM11.6 16.8a3 3 0 1 1-5.8-1.6'],
+  ['Invoice Processing','Extract, validate and reconcile invoices.','M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM14 2v6h6M16 13H8M16 17H8'],
+  ['Incident Response','Detect, triage and resolve incidents.','M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM12 8v4M12 16h.01'],
+  ['Content Studio','Research, write and publish content.','M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z'],
+  ['Lead Qualification','Score and route inbound leads.','M22 3H2l8 9.46V19l4 2v-8.54L22 3z'],
+];
+const chainNodes = ['Leader','Planner','Researcher','Writer','Reviewer','Slack','Done'];
+const execSteps = [['09:41','Jira Trigger'],['09:41','Leader Agent'],['09:42','Support Agent'],['09:42','Browser Automation'],['09:43','Slack Notification'],['09:43','Completed']];
+const WK_MARK = '<svg width="12" height="12" viewBox="0 0 96 96" fill="none"><g stroke="#ededf0" stroke-width="8" stroke-linecap="round"><path d="M20 24 C 42 26, 54 42, 66 48"/><path d="M20 48 H66"/><path d="M20 72 C 42 70, 54 54, 66 48"/></g><circle cx="20" cy="24" r="7" fill="#ededf0"/><circle cx="20" cy="48" r="7" fill="#ededf0"/><circle cx="20" cy="72" r="7" fill="#ededf0"/><circle cx="72" cy="48" r="10" fill="#4F7CFF"/></svg>';
+const connLogo = (name, size) => { const c = connectors.find(x=>x.n===name); return c ? c.svg.split('width="18" height="18"').join('width="'+size+'" height="'+size+'"') : ''; };
+const mcpItems = [
+  {t:'Leader Agent', logo:WK_MARK},
+  {t:'Specialized Workers', logo:WK_MARK},
+  {t:'Workflow', logo:WK_MARK},
+  {t:'Memory'},
+  {t:'Knowledge'},
+  {t:'Slack Connector', logo:connLogo('Slack',12)},
+  {t:'Jira Connector', logo:connLogo('Jira',12)},
+  {t:'Browser Automation', logo:connLogo('Browser Automation',12)},
+];
+const baChips = ['Login','Fill Forms','Create Users','Run QA Tests','Download Reports','Upload Files','Take Screenshots','Create Jira Issues'];
+const trad = ['Static workflows','Rule-based logic','Limited reasoning','Breaks on change','No collaboration'];
+const wk = ['AI teams with leaders','No code — built for non-technical teams','Any AI provider — bring your own keys, no lock-in','Collaborative agents','Autonomous decisions','Browser automation','Enterprise observability','Human approvals · Native MCP · Marketplace'];
+const tickerEvents = [
+  ['Leader Agent','planned 4 subtasks'],['Research Agent','gathering sources'],['Support Agent','drafted reply'],
+  ['Browser','logged into portal'],['Slack','message sent'],['Finance Agent','reconciled invoice'],['Jira','issue WK-812 created'],['Marketing Agent','campaign scheduled'],
+];
+
+/* ---------- render helpers ---------- */
+const el = (h) => { const t=document.createElement('template'); t.innerHTML=h.trim(); return t.content.firstChild; };
+const arrow = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="text-faint mx-auto my-1"><path d="M12 5v14M6 13l6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+teams.forEach(t => {
+  document.getElementById('teamsGrid').appendChild(el(`
+  <div class="reveal card-hover rounded-2xl hairline bg-panel/60 p-6">
+    <div class="flex items-center justify-between mb-5">
+      <div class="text-[15px] font-medium">${t.name}</div>
+      <span class="text-[11px] text-done rounded-full bg-done/10 px-2 py-0.5 border border-done/20">Active</span>
+    </div>
+    <div class="rounded-xl hairline bg-ink/50 p-3 text-center">
+      <div class="text-[12px] text-accent2 font-medium">${t.leader} · Leader</div>
+      ${arrow}
+      <div class="flex flex-wrap justify-center gap-1.5">${t.workers.map(w=>`<span class="text-[11px] rounded-md hairline bg-panel2 px-2 py-1">${w}</span>`).join('')}</div>
+      ${arrow}
+      <div class="flex flex-wrap justify-center gap-1.5">${t.tools.map(w=>`<span class="text-[11px] rounded-md bg-white/[0.03] hairline px-2 py-1 text-muted">${w}</span>`).join('')}</div>
+    </div>
+    <div class="mt-4 flex items-center gap-2 text-[13px]"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M20 6 9 17l-5-5" stroke="#4ade80" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="text-muted">${t.result}</span></div>
+  </div>`));
+});
+
+features.forEach(f => {
+  document.getElementById('featuresGrid').appendChild(el(`
+  <div class="reveal card-hover rounded-2xl hairline bg-panel/60 p-6">
+    <div class="h-9 w-9 rounded-lg hairline bg-panel2 flex items-center justify-center mb-4">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="${f[2]}" stroke="#8FB0FF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <div class="text-[15px] font-medium mb-1.5">${f[0]}</div>
+    <div class="text-[13.5px] text-muted leading-relaxed">${f[1]}</div>
+  </div>`));
+});
+
+connectors.forEach(c => {
+  const highlight = !!c.hl;
+  document.getElementById('connGrid').appendChild(el(`
+  <div class="reveal card-hover rounded-xl hairline ${highlight?'bg-accent/10 border-accent/25':'bg-panel/60'} px-4 py-4 flex items-center gap-3">
+    <div class="h-8 w-8 shrink-0 rounded-lg ${highlight?'bg-accent/20 text-accent2':'bg-panel2 hairline'} flex items-center justify-center">${c.svg}</div>
+    <span class="text-[13.5px] ${highlight?'text-accent2 font-medium':''}">${c.n}</span>
+  </div>`));
+});
+
+market.forEach(m => {
+  document.getElementById('mktGrid').appendChild(el(`
+  <div class="reveal card-hover rounded-2xl hairline bg-panel/60 p-5 flex flex-col">
+    <div class="h-24 rounded-xl mb-4 relative overflow-hidden hairline flex items-center justify-center" style="background:linear-gradient(135deg,rgba(79,124,255,0.14),rgba(79,124,255,0.02))">
+      <div class="absolute inset-0 grid-bg opacity-50"></div>
+      <div class="relative h-11 w-11 rounded-xl flex items-center justify-center" style="background:linear-gradient(160deg,#6E94FF,#3557C7);box-shadow:0 10px 24px -8px rgba(79,124,255,0.55)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="${m[2]}" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+    </div>
+    <div class="text-[14.5px] font-medium">${m[0]}</div>
+    <div class="text-[12.5px] text-muted mt-1 mb-4 leading-relaxed flex-1">${m[1]}</div>
+    <div class="flex gap-2">
+      <a href="https://appweb-production-1a37.up.railway.app/marketplace" target="_blank" rel="noopener" class="btn-accent text-center text-white text-[12.5px] font-medium rounded-lg px-3 py-1.5 flex-1">Install</a>
+      <a href="https://appweb-production-1a37.up.railway.app/marketplace" target="_blank" rel="noopener" class="btn-ghost hairline text-center text-[12.5px] rounded-lg px-3 py-1.5 flex-1">Preview</a>
+    </div>
+  </div>`));
+});
+
+// exec timeline
+execSteps.forEach((s,i) => {
+  const last = i===execSteps.length-1;
+  document.getElementById('execTimeline').appendChild(el(`
+  <div class="exec-step flex items-start gap-3 opacity-40 transition-all duration-500" data-i="${i}">
+    <div class="flex flex-col items-center">
+      <div class="step-dot h-2.5 w-2.5 rounded-full bg-white/20 mt-1.5"></div>
+      ${last?'':'<div class="w-px flex-1 bg-white/10 my-1" style="min-height:26px"></div>'}
+    </div>
+    <div class="pb-4">
+      <div class="flex items-center gap-2"><span class="text-[11px] text-faint tabular-nums">${s[0]}</span><span class="text-[14px] font-medium">${s[1]}</span></div>
+      <div class="step-status text-[12px] text-faint">Queued</div>
+    </div>
+  </div>`));
+});
+
+// audit rows
+const audit = [['Decision','Escalate ticket to human'],['Reason','Sentiment negative · refund > $500'],['Model','claude-opus-4'],['Provider','Anthropic'],['Tool called','jira.create_issue'],['Duration','1.24s'],['Tokens','3,412'],['Cost','$0.021']];
+audit.forEach(a => document.getElementById('auditRows').appendChild(el(`<div class="flex items-center justify-between px-4 py-2.5"><span class="text-faint">${a[0]}</span><span class="font-medium text-txt tabular-nums">${a[1]}</span></div>`)));
+
+// mcp build items
+mcpItems.forEach((m,i) => document.getElementById('mcpBuild').appendChild(el(`<div class="mcp-item flex items-center gap-1.5 rounded-md hairline bg-ink/50 px-2 py-1.5 opacity-30 transition-all duration-400" data-i="${i}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" class="check opacity-0 shrink-0"><path d="M20 6 9 17l-5-5" stroke="#4ade80" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>${m.logo?`<span class="shrink-0 inline-flex">${m.logo}</span>`:''}<span>${m.t}</span></div>`)));
+
+baChips.forEach(c => document.getElementById('baChips').appendChild(el(`<span class="rounded-lg hairline bg-panel2 px-3 py-1.5 text-[13px] text-muted card-hover">${c}</span>`)));
+trad.forEach(t => document.getElementById('tradList').appendChild(el(`<li class="flex items-center gap-2.5"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6 6 18" stroke="#6a6a76" stroke-width="1.8" stroke-linecap="round"/></svg>${t}</li>`)));
+wk.forEach(t => document.getElementById('wkList').appendChild(el(`<li class="flex items-center gap-2.5"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M20 6 9 17l-5-5" stroke="#4ade80" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>${t}</li>`)));
+
+// chain nodes
+const chain = document.getElementById('chain');
+chainNodes.forEach((n,i) => {
+  const x = 30 + i*138;
+  const done = n==='Done';
+  chain.appendChild(el(`<div class="cnode node absolute rounded-xl hairline bg-panel2 flex items-center gap-2 px-3" data-i="${i}" style="left:${x}px;top:38px;width:${done?90:110}px;height:44px"><span class="dot h-2 w-2 rounded-full bg-white/25"></span><div class="text-[12.5px] font-medium">${n}</div></div>`));
+});
+
+/* ---------- scaling for fixed stages ---------- */
+function fit(id, w) { const wrap=document.getElementById(id+'Wrap'), stage=document.getElementById(id); if(!wrap||!stage) return; const s=wrap.clientWidth/w; stage.style.transform='scale('+s+')'; }
+function fitAll(){ fit('stage',900); fit('chain',980); }
+window.addEventListener('resize', fitAll); fitAll(); setTimeout(fitAll,300);
+
+/* ---------- in-view trigger system (robust: scroll/tick based, resilient to IO throttling) ---------- */
+const _once = [];
+function whenInView(sel, fn, m){ const e = typeof sel==='string'?document.getElementById(sel):sel; if(e) _once.push({e, fn, m:m||0.85, done:false}); }
+function _vis(e, m){ const r=e.getBoundingClientRect(); return r.top < window.innerHeight*m && r.bottom > 0; }
+function tick(){
+  document.querySelectorAll('.reveal:not(.in)').forEach(r=>{ if(_vis(r,0.94)) r.classList.add('in'); });
+  for(const o of _once){ if(!o.done && _vis(o.e,o.m)){ o.done=true; o.fn(); } }
+}
+['scroll','resize','load','orientationchange'].forEach(ev=>window.addEventListener(ev, tick, {passive:true}));
+setInterval(tick, 350); requestAnimationFrame(tick);
+
+/* ---------- count up ---------- */
+document.querySelectorAll('[data-count]').forEach(t=>whenInView(t, ()=>{ const end=+t.dataset.count, suf=t.dataset.suffix||''; let n=0; const step=end/40; const iv=setInterval(()=>{ n+=step; if(n>=end){n=end;clearInterval(iv);} t.textContent=Math.round(n)+suf; },22); }, 0.72));
+
+/* ---------- hero graph orchestration ---------- */
+const q = (s,r=document)=>r.querySelector(s), qa=(s,r=document)=>[...r.querySelectorAll(s)];
+const setNode=(k,st)=>{ const n=q('[data-node="'+k+'"]'); if(!n)return; n.classList.remove('working','done'); if(st)n.classList.add(st); };
+const setEdge=(k,st)=>{ const e=q('[data-edge="'+k+'"]'); if(!e)return; e.classList.remove('active','done'); if(st)e.classList.add(st); };
+const agents=['a0','a1','a2','a3'], tools=['t0','t1','t2','t3'];
+let heroT=[];
+function clearHero(){ heroT.forEach(clearTimeout); heroT=[]; ['leader',...agents,...tools,'done'].forEach(k=>setNode(k,null)); ['l0','l1','l2','l3','a0','a1','a2','a3','t0','t1','t2','t3'].forEach(k=>setEdge(k,null)); }
+function T(fn,ms){ heroT.push(setTimeout(fn,ms)); }
+function runHero(){
+  clearHero();
+  setNode('leader','working');
+  agents.forEach((a,i)=>{ T(()=>{ setEdge('l'+i,'active'); }, 500+i*180); T(()=>{ setNode(a,'working'); }, 700+i*180); });
+  T(()=>setNode('leader','done'), 1500);
+  agents.forEach((a,i)=>{
+    T(()=>{ setEdge('l'+i,'done'); setEdge('a'+i,'active'); setNode(tools[i],'working'); }, 1900+i*200);
+    T(()=>{ setNode(a,'done'); }, 2200+i*200);
+  });
+  tools.forEach((tl,i)=>{ T(()=>{ setEdge('a'+i,'done'); setEdge('t'+i,'active'); }, 3200+i*160); T(()=>{ setNode(tl,'done'); }, 3600+i*160); });
+  T(()=>{ ['t0','t1','t2','t3'].forEach(k=>setEdge(k,'done')); setNode('done','done'); }, 4500);
+  T(runHero, 6800);
+}
+runHero();
+/* logos de apps en los nodos de herramienta del hero */
+Object.entries({t0:'Browser Automation', t1:'Slack', t2:'Jira', t3:'Google Workspace'}).forEach(([id,name])=>{
+  const n = q('[data-node="'+id+'"]'); if(!n) return;
+  const sp = document.createElement('span'); sp.className = 'shrink-0 inline-flex'; sp.innerHTML = connLogo(name,14);
+  n.insertBefore(sp, n.lastElementChild);
+});
+
+/* ---------- live ticker ---------- */
+let tk=0; const tickerBox=document.getElementById('ticker');
+function pushTicker(){
+  const [who,what]=tickerEvents[tk%tickerEvents.length]; tk++;
+  const row=el(`<div class="ticker-row flex items-start gap-2.5"><span class="live-dot mt-1.5" style="animation:none;background:${Math.random()>.4?'#4ade80':'#4F7CFF'}"></span><div class="leading-tight"><div class="text-[12.5px] font-medium">${who}</div><div class="text-[11.5px] text-faint">${what}</div></div></div>`);
+  tickerBox.prepend(row);
+  while(tickerBox.children.length>5) tickerBox.lastChild.remove();
+}
+for(let i=0;i<4;i++) pushTicker(); setInterval(pushTicker, 2200);
+
+/* ---------- chain loop ---------- */
+let chT=[];
+function runChain(){
+  chT.forEach(clearTimeout); chT=[];
+  qa('.cnode').forEach(n=>n.classList.remove('working','done'));
+  qa('.cedge').forEach(e=>e.classList.remove('active','done'));
+  chainNodes.forEach((_,i)=>{
+    chT.push(setTimeout(()=>{
+      const n=q('.cnode[data-i="'+i+'"]'); n.classList.add(i===chainNodes.length-1?'done':'working');
+      if(i>0){ const e=q('.cedge[data-c="'+(i-1)+'"]'); if(e){e.classList.remove('active');e.classList.add('done');} }
+      const ne=q('.cedge[data-c="'+i+'"]'); if(ne) ne.classList.add('active');
+      if(i>0){ const p=q('.cnode[data-i="'+(i-1)+'"]'); p.classList.remove('working'); p.classList.add('done'); }
+    }, 600+i*650));
+  });
+  chT.push(setTimeout(runChain, 600+chainNodes.length*650+1600));
+}
+whenInView('chainWrap', runChain, 0.9);
+
+/* ---------- exec timeline (loops when visible) ---------- */
+let exT=[];
+function runExec(){
+  exT.forEach(clearTimeout); exT=[];
+  qa('.exec-step').forEach(s=>{ s.classList.add('opacity-40'); s.classList.remove('opacity-100'); q('.step-dot',s).className='step-dot h-2.5 w-2.5 rounded-full bg-white/20 mt-1.5'; q('.step-status',s).textContent='Queued'; q('.step-status',s).className='step-status text-[12px] text-faint'; });
+  execSteps.forEach((s,i)=>{
+    exT.push(setTimeout(()=>{
+      const st=q('.exec-step[data-i="'+i+'"]'); st.classList.remove('opacity-40'); st.classList.add('opacity-100');
+      const last=i===execSteps.length-1;
+      q('.step-dot',st).className='step-dot h-2.5 w-2.5 rounded-full mt-1.5 '+(last?'bg-done':'bg-accent');
+      const ss=q('.step-status',st); ss.textContent= last?'Completed ✓':'Running…'; ss.className='step-status text-[12px] '+(last?'text-done':'text-accent2');
+      if(i>0){ const pv=q('.exec-step[data-i="'+(i-1)+'"] .step-status'); pv.textContent='Done'; pv.className='step-status text-[12px] text-faint'; const pd=q('.exec-step[data-i="'+(i-1)+'"] .step-dot'); pd.className='step-dot h-2.5 w-2.5 rounded-full bg-done mt-1.5'; }
+    }, 500+i*700));
+  });
+  exT.push(setTimeout(runExec, 500+execSteps.length*700+2000));
+}
+whenInView('execTimeline', runExec, 0.9);
+
+/* ---------- replay bar ---------- */
+let rp=0; const rbar=document.getElementById('replayBar'), rpct=document.getElementById('replayPct'), rsteps=qa('.replay-step');
+whenInView('replayBar', ()=>{ setInterval(()=>{ rp=(rp+1)%101; rbar.style.width=rp+'%'; rpct.textContent='00:'+String(Math.floor(rp/100*34)).padStart(2,'0'); const active=Math.min(4,Math.floor(rp/20)); rsteps.forEach((s,i)=>{ s.classList.toggle('bg-accent/15',i<=active); s.classList.toggle('border-accent/30',i<=active); }); },90); }, 0.7);
+
+/* ---------- mcp chat build (typing + provisioning, loops; la fuente alterna chat nativo y asistentes MCP) ---------- */
+const MCP_SOURCES = ['Workestra · AI Chat','Claude · Workestra MCP','Gemini · Workestra MCP','Codex · Workestra MCP'];
+let mcpT = [], mcpRun = 0;
+function runMcp(){
+  mcpT.forEach(clearTimeout); mcpT = [];
+  const typed = document.getElementById('mcpTyped'), caret = document.getElementById('mcpCaret'), ready = document.getElementById('mcpReady');
+  document.getElementById('mcpSource').textContent = MCP_SOURCES[mcpRun++ % MCP_SOURCES.length];
+  typed.textContent = ''; caret.style.display = 'inline-block'; ready.classList.add('opacity-0');
+  qa('.mcp-item').forEach(it => { it.classList.add('opacity-30'); it.classList.remove('opacity-100'); q('.check', it).classList.add('opacity-0'); });
+  const msg = 'Create a customer support department.';
+  for (let c = 1; c <= msg.length; c++) mcpT.push(setTimeout(() => { typed.textContent = msg.slice(0, c); }, 300 + c * 42));
+  const t0 = 300 + msg.length * 42 + 350;
+  mcpT.push(setTimeout(() => { caret.style.display = 'none'; }, t0));
+  qa('.mcp-item').forEach((it, i) => mcpT.push(setTimeout(() => { it.classList.remove('opacity-30'); it.classList.add('opacity-100'); q('.check', it).classList.remove('opacity-0'); }, t0 + 200 + i * 240)));
+  const tEnd = t0 + 200 + qa('.mcp-item').length * 240;
+  mcpT.push(setTimeout(() => { ready.classList.remove('opacity-0'); }, tEnd + 250));
+  mcpT.push(setTimeout(runMcp, tEnd + 3400));
+}
+whenInView('mcpBuild', runMcp, 0.7);
+
+/* ---------- browser automation typing + cursor ---------- */
+const baType=document.getElementById('baType'), baCursor=document.getElementById('baCursor');
+const emails=['new.user@acme.com','qa.bot@acme.com','ops.agent@acme.com'];
+let bi=0;
+function typeBa(){ const e=emails[bi%emails.length]; bi++; baType.textContent=''; let c=0; const iv=setInterval(()=>{ baType.textContent=e.slice(0,c++); if(c>e.length){clearInterval(iv); baCursor.style.left='78%'; baCursor.style.top='84%'; setTimeout(()=>{baCursor.style.left='60%';baCursor.style.top='70%';},900);} },55); }
+whenInView('baType', ()=>{ typeBa(); setInterval(typeBa, 3600); }, 0.7);
+</script>
+</body>
+</html>

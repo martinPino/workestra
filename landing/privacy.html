@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Privacy Policy — Workestra</title>
+<meta name="description" content="How Workestra collects, uses, and protects your data." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96' fill='none'%3E%3Crect width='96' height='96' rx='20' fill='%230d0d12'/%3E%3Cg stroke='%23ededf0' stroke-width='7' stroke-linecap='round'%3E%3Cpath d='M24 28 C 44 30, 55 44, 66 48'/%3E%3Cpath d='M24 48 H66'/%3E%3Cpath d='M24 68 C 44 66, 55 52, 66 48'/%3E%3C/g%3E%3Ccircle cx='24' cy='28' r='6' fill='%23ededf0'/%3E%3Ccircle cx='24' cy='48' r='6' fill='%23ededf0'/%3E%3Ccircle cx='24' cy='68' r='6' fill='%23ededf0'/%3E%3Ccircle cx='70' cy='48' r='9' fill='%234F7CFF'/%3E%3C/svg%3E" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { darkMode: 'class', theme: { extend: {
+    colors: { ink:'#08080b', panel:'#0d0d12', panel2:'#121218', line:'rgba(255,255,255,0.08)', txt:'#ededf0', muted:'#9b9ba6', faint:'#6a6a76', accent:'#4F7CFF', accent2:'#8FB0FF' },
+    fontFamily: { sans: ['Inter','ui-sans-serif','system-ui','sans-serif'] }, maxWidth: { content: '760px' },
+  }}};
+</script>
+<style>
+  :root { color-scheme: dark; } * { -webkit-font-smoothing: antialiased; }
+  body { background:#08080b; font-family:'Inter',sans-serif; letter-spacing:-0.011em; }
+  ::selection { background: rgba(79,124,255,0.35); }
+  .glass { background: rgba(18,18,24,0.6); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+  .link-muted { transition: color .2s; } .link-muted:hover { color:#ededf0; }
+  h2 { letter-spacing:-0.02em; }
+</style>
+</head>
+<body class="bg-ink text-txt antialiased">
+
+<header class="fixed top-0 inset-x-0 z-50">
+  <div class="glass border-b border-line">
+    <nav class="max-w-content mx-auto px-6 h-16 flex items-center justify-between">
+      <a href="index.html" class="flex items-center gap-2.5">
+        <svg width="26" height="26" viewBox="0 0 96 96" fill="none" class="text-txt" role="img" aria-label="Workestra"><g stroke="currentColor" stroke-width="6" stroke-linecap="round"><path d="M20 24 C 42 26, 54 42, 66 48"/><path d="M20 48 H66"/><path d="M20 72 C 42 70, 54 54, 66 48"/></g><circle cx="20" cy="24" r="6" fill="currentColor"/><circle cx="20" cy="48" r="6" fill="currentColor"/><circle cx="20" cy="72" r="6" fill="currentColor"/><circle cx="72" cy="48" r="9" fill="#4F7CFF"/></svg>
+        <span class="text-[15px] font-semibold tracking-tight">Workestra</span>
+      </a>
+      <a href="index.html" class="text-[13.5px] text-muted link-muted">← Back to home</a>
+    </nav>
+  </div>
+</header>
+
+<main class="max-w-content mx-auto px-6 pt-32 pb-24">
+  <h1 class="text-[36px] font-semibold tracking-tight">Privacy Policy</h1>
+  <p class="mt-2 text-[13.5px] text-faint">Effective date: July 10, 2026</p>
+
+  <div class="mt-10 space-y-10 text-[15px] leading-relaxed text-muted">
+    <section>
+      <h2 class="text-[19px] font-semibold text-txt mb-3">1. Who we are</h2>
+      <p>Workestra ("we", "us") provides a platform for designing, orchestrating, and supervising AI teams that execute work across your company's tools. This policy explains what data we collect, why, and how we handle it when you use our website and services.</p>
+    </section>
+    <section>
+      <h2 class="text-[19px] font-semibold text-txt mb-3">2. Information we collect</h2>
+      <ul class="list-disc pl-5 space-y-2">
+        <li><span class="text-txt">Account information</span> — name, email address, and password hash when you register.</li>
+        <li><span class="text-txt">Workspace content</span> — workflows, agents, execution logs, and configuration you create in the product.</li>
+        <li><span class="text-txt">Connected services</span> — OAuth tokens for tools you choose to connect (Slack, Jira, Google, etc.). Tokens are encrypted at rest and used only to perform the actions you configure.</li>
+        <li><span class="text-txt">API keys you provide</span> — LLM provider keys you add ("bring your own key") are stored encrypted and used only to run your workflows.</li>
+        <li><span class="text-txt">Usage data</span> — basic telemetry such as feature usage and error reports, used to operate and improve the service.</li>
+      </ul>
+    </section>
+    <section>
+      <h2 class="text-[19px] font-semibold text-txt mb-3">3. How we use your information</h2>
+      <ul class="list-disc pl-5 space-y-2">
+        <li>To provide, operate, and secure the service.</li>
+        <li>To execute the workflows and agent actions you configure.</li>
+        <li>To communicate with you about your account and important service changes.</li>
+        <li>To improve the product based on aggregate usage patterns.</li>
+      </ul>
+      <p class="mt-3">We do not sell your personal data. We do not use your workspace content to train AI models.</p>
+    </section>
+    <section>
+      <h2 class="text-[19px] font-semibold text-txt mb-3">4. Third-party processors</h2>
+      <p>To run your workflows, data you route through Workestra may be processed by the LLM providers and tools you connect (for example Anthropic, OpenAI, Slack, or Atlassian), under their respective terms. Our infrastructure runs on cloud hosting providers; data is encrypted in transit and at rest.</p>
+    </section>
+    <section>
+      <h2 class="text-[19px] font-semibold text-txt mb-3">5. Data retention</h2>
+      <p>We retain account data while your account is active. Execution logs and workspace content can be deleted by you at any time from the product. When you close your account, we delete or anonymize your personal data within a reasonable period, except where retention is required by law.</p>
+    </section>
+    <section>
+      <h2 class="text-[19px] font-semibold text-txt mb-3">6. Security</h2>
+      <p>We follow security best practices, including encryption of credentials and secrets at rest (envelope encryption), tenant isolation, role-based access control, and audit logging. No system is perfectly secure; if we become aware of a breach affecting your data, we will notify you without undue delay.</p>
+    </section>
+    <section>
+      <h2 class="text-[19px] font-semibold text-txt mb-3">7. Your rights</h2>
+      <p>Depending on your jurisdiction (including under the GDPR), you may have the right to access, correct, export, or delete your personal data, and to object to or restrict certain processing. To exercise these rights, contact us at the address below.</p>
+    </section>
+    <section>
+      <h2 class="text-[19px] font-semibold text-txt mb-3">8. Changes to this policy</h2>
+      <p>We may update this policy as the product evolves. We will post the updated version on this page and, for material changes, notify you by email or in the product.</p>
+    </section>
+    <section>
+      <h2 class="text-[19px] font-semibold text-txt mb-3">9. Contact</h2>
+      <p>Questions or requests: <a href="mailto:schwarzboeckmartin@gmail.com" class="text-accent2 link-muted">schwarzboeckmartin@gmail.com</a></p>
+    </section>
+  </div>
+</main>
+
+<footer class="border-t border-line">
+  <div class="max-w-content mx-auto px-6 py-10 flex flex-col sm:flex-row items-center justify-between gap-3 text-[12.5px] text-faint">
+    <span>© 2026 Workestra, Inc. All rights reserved.</span>
+    <div class="flex items-center gap-5">
+      <a href="index.html" class="link-muted">Home</a>
+      <a href="terms.html" class="link-muted">Terms</a>
+    </div>
+  </div>
+</footer>
+</body>
+</html>
