@@ -1,0 +1,24 @@
+# Despliega la landing a Cloudflare Pages en cada push a main que toque landing/**.
+# Requiere el secret CLOUDFLARE_API_TOKEN (token con permiso Account → Cloudflare Pages → Edit).
+# El account id no es sensible (aparece en las URLs del dashboard), por eso va en claro.
+name: Deploy landing
+
+on:
+  push:
+    branches: [main]
+    paths: ['landing/**']
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: 17f37efbe20aedf19b87e142e76a9fce
+          command: pages deploy landing --project-name workestra --branch main
