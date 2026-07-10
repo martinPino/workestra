@@ -47,14 +47,17 @@ describe('pollSentryIssues', () => {
     { id: '2', shortId: 'WEB-2', title: 'nuevo', firstSeen: '2026-01-03T00:00:00Z', level: 'error', count: '1', culprit: 'b', permalink: 'p2' },
   ];
 
-  it('solo devuelve issues con firstSeen posterior al cursor y avanza newSince', async () => {
+  it('resuelve la región (UE) y solo devuelve issues nuevos, avanzando newSince', async () => {
     const res = await pollSentryIssues({
       token: 't',
       project: 'acme/web',
       sinceIso: '2026-01-02T00:00:00Z',
       fetchFn: async (url) => {
-        expect(url).toContain('/projects/acme/web/issues/');
-        expect(url).toContain('sort=new');
+        if (url.includes('/organizations/acme/')) {
+          return { ok: true, status: 200, json: async () => ({ slug: 'acme', links: { regionUrl: 'https://de.sentry.io' } }) };
+        }
+        // Los issues se piden a la región de la org.
+        expect(url).toBe('https://de.sentry.io/api/0/projects/acme/web/issues/?query=is%3Aunresolved&sort=new&limit=25');
         return { ok: true, status: 200, json: async () => issues };
       },
     });
@@ -62,8 +65,16 @@ describe('pollSentryIssues', () => {
     expect(res.newSince).toBe('2026-01-03T00:00:00Z');
   });
 
-  it('en error NO avanza el cursor (reintenta el mismo lote)', async () => {
-    const res = await pollSentryIssues({ token: 't', project: 'o/p', sinceIso: 'C', fetchFn: async () => ({ ok: false, status: 500, json: async () => [] }) });
+  it('en error de issues NO avanza el cursor (reintenta el mismo lote)', async () => {
+    const res = await pollSentryIssues({
+      token: 't',
+      project: 'o/p',
+      sinceIso: 'C',
+      fetchFn: async (url) =>
+        url.includes('/organizations/o/')
+          ? { ok: true, status: 200, json: async () => ({ slug: 'o' }) }
+          : { ok: false, status: 500, json: async () => [] },
+    });
     expect(res).toEqual({ issues: [], newSince: 'C' });
   });
 });

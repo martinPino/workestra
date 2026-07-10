@@ -187,6 +187,15 @@ function toIssue(r: unknown): SentryIssue | null {
  * primera vez visto). Devuelve los nuevos + `newSince` (el `firstSeen` máximo, o `sinceIso` si no hubo). Si la
  * llamada falla NO avanza el cursor (se reintenta el mismo lote). Mismo contrato que `pollDriveFiles`.
  */
+/** Base de API de un org por su slug, resolviendo la REGIÓN (UE → de.sentry.io). Cae a sentry.io si no la sabe. */
+export async function sentryOrgApiBase(token: string, orgSlug: string, fetchFn?: Fetchish): Promise<string> {
+  const f = fetchFn ?? (globalThis.fetch as unknown as Fetchish);
+  const res = await f(`${SENTRY_API}/organizations/${encodeURIComponent(orgSlug)}/`, { headers: auth(token) });
+  if (!res.ok) return SENTRY_API;
+  const org = asRecord(await res.json().catch(() => ({})));
+  return regionApi(String(asRecord(org.links).regionUrl ?? ''));
+}
+
 export async function pollSentryIssues(opts: {
   token: string;
   project: string;
@@ -194,7 +203,9 @@ export async function pollSentryIssues(opts: {
   fetchFn?: Fetchish;
 }): Promise<{ issues: SentryIssue[]; newSince: string }> {
   const fetchFn = opts.fetchFn ?? (globalThis.fetch as unknown as Fetchish);
-  const url = `${SENTRY_API}/projects/${opts.project}/issues/?query=${encodeURIComponent('is:unresolved')}&sort=new&limit=25`;
+  // MULTI-REGIÓN: un org de la UE lista issues en de.sentry.io, no sentry.io.
+  const base = await sentryOrgApiBase(opts.token, opts.project.split('/')[0], fetchFn);
+  const url = `${base}/projects/${opts.project}/issues/?query=${encodeURIComponent('is:unresolved')}&sort=new&limit=25`;
   const res = await fetchFn(url, { headers: auth(opts.token) });
   if (!res.ok) return { issues: [], newSince: opts.sinceIso };
   const data = await res.json().catch(() => []);

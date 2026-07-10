@@ -12,6 +12,7 @@ import {
   PrismaWorkflowRepository,
   PrismaConnectorRepository,
   PrismaScheduleRepository,
+  PrismaTriggerBindingRepository,
   PrismaSecretStore,
   EventStorePublisher,
   InMemoryMemoryStore,
@@ -26,7 +27,7 @@ import {
   McpToolResolver,
   RedisFileStore,
 } from '@core/infra';
-import { createRuntimeRegistry, resolveConnectorToken, pollDriveFiles, fetchDriveFileBytes } from '@core/sdk-plugins';
+import { createRuntimeRegistry, resolveConnectorToken, pollDriveFiles, fetchDriveFileBytes, pollSentryIssues } from '@core/sdk-plugins';
 import { createLlmRouter } from '@core/llm';
 
 /**
@@ -53,6 +54,7 @@ async function main(): Promise<void> {
   // Instancias compartidas: el runtime Y el sondeo de triggers (M52) usan los mismos conectores/secretos/ficheros.
   const connectors = new PrismaConnectorRepository(prisma);
   const secrets = new PrismaSecretStore(prisma);
+  const triggerBindings = new PrismaTriggerBindingRepository(prisma); // M80: sondeo de Sentry (red de seguridad del webhook)
   const fileStore = new RedisFileStore(redis); // M48: mismo almacén de ficheros que la API (Redis compartido)
   const registry = createRuntimeRegistry({
     agents: new PrismaAgentRepository(prisma),
@@ -218,6 +220,58 @@ async function main(): Promise<void> {
     { connection: new IORedis(REDIS_URL, { maxRetriesPerRequest: null }), concurrency: 4 },
   );
   scheduleWorker.on('failed', (job, err) => console.error(`[schedule] fallo (job=${job?.id}): ${err?.message}`));
+
+  // M80: RED DE SEGURIDAD del trigger de Sentry. Cada 60s sondea los proyectos con un trigger
+  // `sentry.issue_created` activo y encola una ejecución por issue NUEVO (cursor por `firstSeen` + dedup por id
+  // en Redis, así no duplica con el webhook si este también llega). Multi-región (UE) vía pollSentryIssues.
+  let sentryPolling = false;
+  async function pollSentryBindings(): Promise<void> {
+    if (sentryPolling) return; // no solapar corridas
+    sentryPolling = true;
+    try {
+      const active = await triggerBindings.listActive();
+      const groups = new Map<string, { connectorId: string; project: string; workspaceId: string; workflowIds: Set<string> }>();
+      for (const b of active) {
+        if (b.eventId !== 'sentry.issue_created') continue;
+        const project = String((b.params as Record<string, unknown>).project ?? '');
+        if (!project) continue;
+        const key = `${b.workspaceId}::${b.connectorId}::${project}`;
+        const g = groups.get(key) ?? { connectorId: b.connectorId, project, workspaceId: b.workspaceId, workflowIds: new Set<string>() };
+        g.workflowIds.add(b.workflowId);
+        groups.set(key, g);
+      }
+      for (const g of groups.values()) {
+        const cursorKey = `af:sentrypoll:${g.workspaceId}:${g.project}`;
+        const cursor = await redis.get(cursorKey);
+        const nowIso = new Date().toISOString();
+        if (!cursor) {
+          await redis.set(cursorKey, nowIso); // línea base «desde ahora»: no dispara por issues preexistentes
+          continue;
+        }
+        const resolved = await resolveConnectorToken(connectors, secrets, g.connectorId, g.workspaceId);
+        if (!resolved) continue;
+        const { issues, newSince } = await pollSentryIssues({ token: resolved.token, project: g.project, sinceIso: cursor });
+        for (const issue of issues) {
+          // Dedup por id (NX): si el webhook ya lo disparó, no repetimos (y evita doble disparo entre corridas).
+          const claimed = await redis.set(`af:sentryissue:${issue.id}`, '1', 'EX', 86_400, 'NX');
+          if (!claimed) continue;
+          for (const wfId of g.workflowIds) {
+            const wf = await workflows.get(wfId);
+            if (!wf) continue;
+            const execId = await enqueueWorkflowRun({ id: wfId, workspaceId: g.workspaceId }, { trigger: 'sentry', issue, issueId: issue.id });
+            console.log(`[sentry-poll] ${g.project} issue ${issue.shortId || issue.id} → ejecución ${execId}`);
+          }
+        }
+        await redis.set(cursorKey, newSince); // avanza el cursor SOLO tras encolar el lote
+      }
+    } catch (e) {
+      console.error('[sentry-poll]', e instanceof Error ? e.message : String(e));
+    } finally {
+      sentryPolling = false;
+    }
+  }
+  setInterval(() => void pollSentryBindings(), 60_000);
+  void pollSentryBindings(); // primera pasada al arrancar (fija la línea base de cada proyecto)
 
   console.log('Worker durable AgentFlow escuchando las colas "execution" y "schedule"…');
 }

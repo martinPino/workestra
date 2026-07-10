@@ -351,7 +351,8 @@ export class TriggersService {
       const r = await this.executions.start(
         b.workflowId,
         b.workspaceId,
-        { issue, variables: { trigger: 'sentry', issueId: issue.id, payload } },
+        // `issue` va DENTRO de variables: interpolate esparce ctx.variables en la raíz, así `{{issue.title}}` resuelve.
+        { variables: { trigger: 'sentry', issue, issueId: issue.id, payload } },
         'webhook',
       );
       started.push(r.executionId);
