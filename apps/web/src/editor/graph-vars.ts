@@ -67,6 +67,13 @@ export const TRIGGER_VARS: VarSuggestion[] = [
   { ref: 'ticket.summary', label: 'Asunto del evento (webhook/Jira)', nodeId: 'trigger', kind: 'trigger' },
   { ref: 'ticket.description', label: 'Descripción del evento (webhook/Jira)', nodeId: 'trigger', kind: 'trigger' },
   { ref: 'ticket.key', label: 'Clave del ticket (Jira)', nodeId: 'trigger', kind: 'trigger' },
+  // Disparador de Sentry (M80): el webhook `issue.created` inyecta `issue` en el contexto.
+  { ref: 'issue.title', label: 'Título del issue (Sentry)', nodeId: 'trigger', kind: 'trigger' },
+  { ref: 'issue.level', label: 'Nivel del issue (Sentry)', nodeId: 'trigger', kind: 'trigger' },
+  { ref: 'issue.culprit', label: 'Causa probable del issue (Sentry)', nodeId: 'trigger', kind: 'trigger' },
+  { ref: 'issue.permalink', label: 'Enlace al issue (Sentry)', nodeId: 'trigger', kind: 'trigger' },
+  { ref: 'issue.shortId', label: 'ID corto del issue (Sentry)', nodeId: 'trigger', kind: 'trigger' },
+  { ref: 'issue.id', label: 'ID del issue (Sentry)', nodeId: 'trigger', kind: 'trigger' },
 ];
 
 /** Sugerencias para el nodo `nodeId`: salidas de sus ancestros (cercanos primero) + del disparador. */
@@ -82,7 +89,7 @@ export function availableVars(doc: GraphDoc, nodeId: string): VarSuggestion[] {
 }
 
 // Raíces que el motor/disparador siempre puede proveer: no las marcamos como desconocidas (evita falsos positivos).
-const BASE_ROOTS = ['ticket', 'repository', 'variables', 'file:trigger', 'driveFile', 'trigger', 'payload', 'issueKey', 'scheduleId', 'webhook'];
+const BASE_ROOTS = ['ticket', 'repository', 'variables', 'file:trigger', 'driveFile', 'trigger', 'payload', 'issueKey', 'scheduleId', 'webhook', 'issue'];
 
 /**
  * Devuelve las referencias `{{...}}` de `text` que NO coinciden con ninguna variable disponible — el caso
