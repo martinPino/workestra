@@ -171,12 +171,12 @@ export function ConnectorForm({ value, onChange }: { value: Record<string, unkno
               <SentryProjectSelect connectorId={connectorId} value={params[f.key] ?? ''} onChange={(v) => onField(f.key, v)} />
             ) : f.insert ? (
               // Solo los campos de CONTENIDO/referencia llevan el insertor «+ Insertar dato de un paso» (M58).
-              <VarField value={params[f.key] ?? ''} onChange={(v) => onField(f.key, v)} vars={vars} multiline={f.multiline} placeholder={f.placeholder} />
+              <VarField value={params[f.key] ?? ''} onChange={(v) => onField(f.key, v)} vars={vars} multiline={f.multiline} placeholder={f.placeholder ? t(f.placeholder) : undefined} />
             ) : f.multiline ? (
               // Identificadores: campo plano, sin insertor (no tiene sentido «insertar un dato de un paso»).
-              <textarea value={params[f.key] ?? ''} placeholder={f.placeholder} onChange={(e) => onField(f.key, e.target.value)} rows={3} className={`${inputBase} resize-none`} />
+              <textarea value={params[f.key] ?? ''} placeholder={f.placeholder ? t(f.placeholder) : undefined} onChange={(e) => onField(f.key, e.target.value)} rows={3} className={`${inputBase} resize-none`} />
             ) : (
-              <input type="text" value={params[f.key] ?? ''} placeholder={f.placeholder} onChange={(e) => onField(f.key, e.target.value)} className={inputBase} />
+              <input type="text" value={params[f.key] ?? ''} placeholder={f.placeholder ? t(f.placeholder) : undefined} onChange={(e) => onField(f.key, e.target.value)} className={inputBase} />
             )}
           </label>
         ))}
