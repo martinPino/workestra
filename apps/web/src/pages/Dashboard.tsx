@@ -61,7 +61,7 @@ export function Dashboard() {
           <Stat label={t('Automatizaciones')} value={workflows.isLoading ? <Skeleton className="h-7 w-10" /> : (workflows.data?.length ?? 0)} icon={<Workflow size={18} />} tone="primary" />
         </button>
         <button onClick={() => navigate('/agents')} className="text-left">
-          <Stat label={t('Asistentes')} value={agents.isLoading ? <Skeleton className="h-7 w-10" /> : (agents.data?.length ?? 0)} icon={<Bot size={18} />} tone="accent" />
+          <Stat label={t('Trabajadores')} value={agents.isLoading ? <Skeleton className="h-7 w-10" /> : (agents.data?.length ?? 0)} icon={<Bot size={18} />} tone="accent" />
         </button>
         <button onClick={() => navigate('/executions')} className="text-left">
           <Stat label={t('Tareas completadas')} value={executions.isLoading ? <Skeleton className="h-7 w-10" /> : doneCount} icon={<CircleCheck size={18} />} tone="success" />

@@ -23,7 +23,7 @@ export interface NavItem {
 export const NAV: NavItem[] = [
   { to: '/', label: 'Inicio', icon: LayoutDashboard },
   { to: '/workflows', label: 'Automatizaciones', icon: Workflow },
-  { to: '/agents', label: 'Asistentes', icon: Bot },
+  { to: '/agents', label: 'Trabajadores', icon: Bot },
   { to: '/executions', label: 'Historial', icon: Activity },
   { to: '/marketplace', label: 'Marketplace', icon: Store },
   { to: '/integrations', label: 'Conexiones', icon: Plug },

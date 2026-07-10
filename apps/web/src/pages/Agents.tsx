@@ -66,12 +66,12 @@ export function Agents() {
   return (
     <Page className="space-y-6">
       <PageHeader
-        title={t('Agentes')}
-        subtitle={t('Especialistas de IA: define su Rol, objetivo, instrucciones y modelo.')}
+        title={t('Trabajadores')}
+        subtitle={t('Trabajadores de IA: define su rol, objetivo, instrucciones y modelo.')}
         actions={
           canWrite && !editing && (
             <Button variant="primary" onClick={() => openNew(null)}>
-              <Plus size={15} /> {t('Nuevo agente')}
+              <Plus size={15} /> {t('Nuevo trabajador')}
             </Button>
           )
         }
@@ -99,12 +99,12 @@ export function Agents() {
         !editing && (
           <EmptyState
             icon={<Bot size={22} />}
-            title={t('Sin agentes')}
-            description={t('Crea agentes especializados con un Rol para tus workflows.')}
+            title={t('Sin trabajadores')}
+            description={t('Crea trabajadores especializados con un rol para tus flujos.')}
             action={
               canWrite ? (
                 <Button variant="primary" onClick={() => openNew(null)}>
-                  <Plus size={15} /> {t('Nuevo agente')}
+                  <Plus size={15} /> {t('Nuevo trabajador')}
                 </Button>
               ) : undefined
             }
@@ -123,8 +123,8 @@ export function Agents() {
         <button
           type="button"
           onClick={() => setChatOpen(true)}
-          aria-label={t('Crear asistente con IA')}
-          title={t('Crear asistente con IA')}
+          aria-label={t('Crear trabajador con IA')}
+          title={t('Crear trabajador con IA')}
           className="group fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full brand-gradient text-white shadow-pop ring-1 ring-white/15 transition-transform hover:scale-105 active:scale-95"
         >
           <Sparkles size={22} className="transition-transform duration-200 group-hover:rotate-12" />
@@ -212,7 +212,7 @@ export function AgentForm({ initial, seed, onDone, onCancel }: { initial: AgentD
   return (
     <Card className="p-5">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-txt-primary">{initial ? t('Editar agente') : t('Nuevo agente')}</h2>
+        <h2 className="text-sm font-semibold text-txt-primary">{initial ? t('Editar trabajador') : t('Nuevo trabajador')}</h2>
         <IconButton onClick={onCancel} aria-label={t('Cerrar')}>
           <X size={16} />
         </IconButton>
@@ -360,7 +360,7 @@ export function AgentForm({ initial, seed, onDone, onCancel }: { initial: AgentD
       <label className="mt-4 flex items-center gap-2.5">
         <Switch checked={isOrchestrator} onChange={setIsOrchestrator} />
         <span className="text-xs text-txt-secondary">
-          {t('Agente coordinador (planifica y delega en otros agentes)')}
+          {t('Trabajador coordinador (planifica y delega en otros trabajadores)')}
         </span>
       </label>
 
@@ -420,7 +420,7 @@ function AgentCard({ agent, index, onEdit }: { agent: AgentDto; index: number; o
               <span className="truncate text-sm font-semibold text-txt-primary">{agent.name}</span>
               {agent.isOrchestrator && <Badge tone="accent">{t('líder')}</Badge>}
             </div>
-            <p className="mt-0.5 line-clamp-2 text-xs text-txt-secondary">{agent.description ?? t('Agente especializado.')}</p>
+            <p className="mt-0.5 line-clamp-2 text-xs text-txt-secondary">{agent.description ?? t('Trabajador especializado.')}</p>
           </div>
           {canWrite && (
             <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
