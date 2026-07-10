@@ -708,7 +708,7 @@ function DriveSection({ wfId }: { wfId: string }) {
 
 // URL de instalación de la Sentry App (Public Integration) de Workestra: el usuario la instala en su org para
 // que Sentry envíe los webhooks. Slug estable de la plataforma.
-const SENTRY_INSTALL_URL = 'https://sentry.io/sentry-apps/workestra/external-install/';
+const SENTRY_INSTALL_URL = 'https://sentry.io/sentry-apps/workestra-labs/external-install/';
 
 /** Sentry (M80): conectar (para listar proyectos) + instalar la app + elegir proyecto → crea el binding de
  *  webhook. El trigger `issue.created` llega en TIEMPO REAL a /hooks/sentry; se enruta por «org/proyecto». */
