@@ -88,6 +88,14 @@ export class ConnectorsController {
     return this.svc.slackChannels(id, workspaceId);
   }
 
+  /** Proyectos del Sentry del conector (M79): pobla el desplegable «Proyecto» del trigger y de las acciones. */
+  @Get(':id/sentry-projects')
+  @UseGuards(ScopesGuard)
+  @RequireScopes('workflow:read')
+  sentryProjects(@Param('id') id: string, @Workspace() workspaceId: string) {
+    return this.svc.sentryProjects(id, workspaceId);
+  }
+
   @Delete(':id')
   @UseGuards(ScopesGuard)
   @RequireScopes('connector:delete') // borrar un conector y sus credenciales OAuth: de ADMIN

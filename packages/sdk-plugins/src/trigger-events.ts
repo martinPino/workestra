@@ -70,6 +70,16 @@ export const TRIGGER_EVENTS: TriggerEventDef[] = [
     provider: 'google-drive',
     triggerEvent: 'cron', // se materializa como un sondeo programado
   },
+  {
+    // M79: la OAuth App pública de Sentry (PKCE) NO puede registrar webhooks → se SONDEA (schedule con `poll`),
+    // como Google Drive. El worker lista los issues nuevos del proyecto y dispara una ejecución por cada uno.
+    id: 'sentry.issue_created',
+    label: 'Cuando aparece un nuevo issue en Sentry',
+    icon: '🔺',
+    kind: 'external',
+    provider: 'sentry',
+    triggerEvent: 'cron', // sondeo programado
+  },
 ];
 
 export function listTriggerEvents(): TriggerEventDef[] {

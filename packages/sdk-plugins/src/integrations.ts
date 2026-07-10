@@ -9,10 +9,11 @@
  */
 import type { JiraFetch } from './jira-webhooks';
 
-/** Contexto que el resolver inyecta a cada herramienta: token (dueño la plataforma) + cloudId + fetch. */
+/** Contexto que el resolver inyecta a cada herramienta: token (dueño la plataforma) + fetch, y `cloudId` solo
+ *  para Atlassian (Sentry y otros proveedores globales no lo usan). */
 export interface IntegrationToolCtx {
   token: string;
-  cloudId: string;
+  cloudId?: string;
   fetch: JiraFetch;
 }
 
@@ -50,8 +51,11 @@ export function integrationKeyFromUrl(url: string): string | null {
 }
 
 const ATLASSIAN_API = 'https://api.atlassian.com';
-const jiraApi = (cloudId: string) => `${ATLASSIAN_API}/ex/jira/${cloudId}/rest/api/3`;
-const confluenceApi = (cloudId: string) => `${ATLASSIAN_API}/ex/confluence/${cloudId}/wiki/rest/api`;
+// El resolver siempre aporta cloudId para Atlassian; el tipo es opcional para compartir el ctx con Sentry.
+const jiraApi = (cloudId: string | undefined) => `${ATLASSIAN_API}/ex/jira/${cloudId ?? ''}/rest/api/3`;
+const confluenceApi = (cloudId: string | undefined) => `${ATLASSIAN_API}/ex/confluence/${cloudId ?? ''}/wiki/rest/api`;
+
+const SENTRY_API = 'https://sentry.io/api/0';
 
 const jsonHeaders = (token: string) => ({
   authorization: `Bearer ${token}`,
@@ -370,6 +374,123 @@ const CONFLUENCE_TOOLS: IntegrationToolDef[] = [
   },
 ];
 
+// --- Herramientas Sentry (base https://sentry.io/api/0; el resolver inyecta el token, sin cloudId) ------
+
+/** Aplana los frames de un stacktrace de Sentry a texto acotado (para no reventar el contexto del modelo). */
+function sentryStackToText(entries: unknown[], cap = 2000): string {
+  const lines: string[] = [];
+  for (const e of entries) {
+    const entry = asRecord(e);
+    if (entry.type !== 'exception') continue;
+    const values = Array.isArray(asRecord(entry.data).values) ? (asRecord(entry.data).values as unknown[]) : [];
+    for (const v of values) {
+      const exc = asRecord(v);
+      if (exc.type || exc.value) lines.push(`${String(exc.type ?? '')}: ${String(exc.value ?? '')}`.slice(0, 300));
+      const frames = Array.isArray(asRecord(exc.stacktrace).frames) ? (asRecord(exc.stacktrace).frames as unknown[]) : [];
+      for (const fr of frames.slice(-15)) {
+        const f = asRecord(fr);
+        lines.push(`  at ${String(f.function ?? '?')} (${String(f.filename ?? f.module ?? '?')}:${String(f.lineNo ?? '')})`);
+      }
+    }
+  }
+  return lines.join('\n').slice(0, cap);
+}
+
+const SENTRY_TOOLS: IntegrationToolDef[] = [
+  {
+    name: 'sentry_list_issues',
+    description: 'Lista los issues (errores) de un proyecto de Sentry. `project` es «orgSlug/projectSlug». Admite una query de Sentry (p. ej. "is:unresolved").',
+    parameters: {
+      type: 'object',
+      properties: {
+        project: { type: 'string', description: 'Proyecto en formato orgSlug/projectSlug.' },
+        query: { type: 'string', description: 'Filtro de búsqueda de Sentry (por defecto "is:unresolved").' },
+        limit: { type: 'number', description: 'Máximo de resultados (por defecto 10, máx 25).' },
+      },
+      required: ['project'],
+    },
+    async run(args, ctx) {
+      const project = String(args.project ?? '').trim();
+      if (!project) return { error: 'invalid_args', detail: 'project (orgSlug/projectSlug) es obligatorio.' };
+      const query = String(args.query ?? 'is:unresolved');
+      const limit = clampInt(args.limit, 10, 25);
+      const res = await ctx.fetch(`${SENTRY_API}/projects/${project}/issues/?query=${encodeURIComponent(query)}&sort=new&limit=${limit}`, {
+        headers: jsonHeaders(ctx.token),
+      });
+      const { ok, status, body } = await readJson(res);
+      if (!ok) return { error: 'sentry_error', status, detail: `HTTP ${status}` };
+      const issues = Array.isArray(body) ? (body as unknown[]) : [];
+      return {
+        issues: issues.map((it) => {
+          const i = asRecord(it);
+          return { id: i.id, shortId: i.shortId, title: String(i.title ?? '').slice(0, 160), level: i.level, count: i.count, firstSeen: i.firstSeen };
+        }),
+      };
+    },
+  },
+  {
+    name: 'sentry_get_issue',
+    description: 'Lee un issue de Sentry por su id: título, nivel, estado y contadores (cuántas veces y a cuántos usuarios ha afectado).',
+    parameters: {
+      type: 'object',
+      properties: { issueId: { type: 'string', description: 'Id numérico del issue de Sentry.' } },
+      required: ['issueId'],
+    },
+    async run(args, ctx) {
+      const issueId = String(args.issueId ?? '').trim();
+      if (!issueId) return { error: 'invalid_args', detail: 'issueId es obligatorio.' };
+      const res = await ctx.fetch(`${SENTRY_API}/issues/${encodeURIComponent(issueId)}/`, { headers: jsonHeaders(ctx.token) });
+      const { ok, status, body } = await readJson(res);
+      if (!ok) return { error: 'sentry_error', status, detail: `HTTP ${status}` };
+      const i = asRecord(body);
+      return {
+        id: i.id,
+        shortId: i.shortId,
+        title: String(i.title ?? '').slice(0, 200),
+        culprit: String(i.culprit ?? '').slice(0, 200),
+        level: i.level,
+        status: i.status,
+        count: i.count,
+        userCount: i.userCount,
+        firstSeen: i.firstSeen,
+        lastSeen: i.lastSeen,
+        permalink: i.permalink,
+      };
+    },
+  },
+  {
+    name: 'sentry_get_issue_logs',
+    description: 'Devuelve el ÚLTIMO evento COMPLETO de un issue de Sentry: mensaje, excepción con stacktrace y breadcrumbs. Úsalo para diagnosticar la causa raíz (son los «logs completos» del error).',
+    parameters: {
+      type: 'object',
+      properties: { issueId: { type: 'string', description: 'Id numérico del issue de Sentry.' } },
+      required: ['issueId'],
+    },
+    async run(args, ctx) {
+      const issueId = String(args.issueId ?? '').trim();
+      if (!issueId) return { error: 'invalid_args', detail: 'issueId es obligatorio.' };
+      const res = await ctx.fetch(`${SENTRY_API}/issues/${encodeURIComponent(issueId)}/events/latest/`, { headers: jsonHeaders(ctx.token) });
+      const { ok, status, body } = await readJson(res);
+      if (!ok) return { error: 'sentry_error', status, detail: `HTTP ${status}` };
+      const ev = asRecord(body);
+      const entries = Array.isArray(ev.entries) ? (ev.entries as unknown[]) : [];
+      const crumbEntry = entries.find((e) => asRecord(e).type === 'breadcrumbs');
+      const crumbs = crumbEntry && Array.isArray(asRecord(asRecord(crumbEntry).data).values) ? (asRecord(asRecord(crumbEntry).data).values as unknown[]) : [];
+      return {
+        eventId: ev.eventID ?? ev.id,
+        message: String(ev.message ?? ev.title ?? '').slice(0, 400),
+        dateCreated: ev.dateCreated,
+        platform: ev.platform,
+        stacktrace: sentryStackToText(entries),
+        breadcrumbs: crumbs.slice(-20).map((c) => {
+          const b = asRecord(c);
+          return `${String(b.category ?? '')} ${String(b.level ?? '')}: ${String(b.message ?? '').slice(0, 160)}`.trim();
+        }),
+      };
+    },
+  },
+];
+
 /** Herramientas que MUTAN (crean/comentan/transicionan): exigen `integration:write`; el resto `integration:read`. */
 const WRITE_TOOLS = new Set(['jira_create_issue', 'jira_add_comment', 'jira_transition_issue', 'confluence_create_page']);
 
@@ -384,6 +505,12 @@ export const INTEGRATIONS: Record<string, IntegrationDef> = {
     label: 'Atlassian',
     provider: 'jira', // una sola conexión OAuth de Atlassian sirve a Jira y Confluence
     tools: withScope([...JIRA_TOOLS, ...CONFLUENCE_TOOLS]),
+  },
+  sentry: {
+    key: 'sentry',
+    label: 'Sentry',
+    provider: 'sentry', // reusa el conector OAuth (PKCE) de Sentry; sin cloudId
+    tools: withScope(SENTRY_TOOLS), // todas de lectura → integration:read
   },
 };
 

@@ -288,12 +288,12 @@ export const api = {
   // --- Triggers programados (cron/intervalo, M7-B) ---
   listSchedules: (workflowId: string) =>
     fetch(`${API}/workflows/${workflowId}/schedules`, { headers: authHeaders() }).then((r) =>
-      json<Array<{ id: string; cron: string | null; everyMs: number | null; active: boolean; poll?: { provider: string; connectorId: string; folderId?: string } | null }>>(r),
+      json<Array<{ id: string; cron: string | null; everyMs: number | null; active: boolean; poll?: { provider: string; connectorId: string; folderId?: string; projectId?: string } | null }>>(r),
     ),
   createSchedule: (
     workflowId: string,
-    // M52: `poll` convierte el schedule en un SONDEO (p. ej. Google Drive: nuevo fichero).
-    spec: { cron?: string; everyMs?: number; poll?: { provider: string; connectorId: string; folderId?: string } },
+    // M52: `poll` convierte el schedule en un SONDEO (Google Drive: nuevo fichero; Sentry: nuevo issue, M79).
+    spec: { cron?: string; everyMs?: number; poll?: { provider: string; connectorId: string; folderId?: string; projectId?: string } },
   ) =>
     fetch(`${API}/workflows/${workflowId}/schedules`, { method: 'POST', headers: authHeaders(), body: JSON.stringify(spec) }).then((r) =>
       json<{ id: string; cron: string | null; everyMs: number | null; active: boolean }>(r),
@@ -322,6 +322,9 @@ export const api = {
   /** Canales del Slack del conector (M57): pobla el desplegable «Canal» del nodo conector. */
   slackChannels: (connectorId: string) =>
     fetch(`${API}/connectors/${connectorId}/slack-channels`, { headers: authHeaders() }).then((r) => json<{ channels: Array<{ id: string; name: string }> }>(r)),
+  /** Proyectos del Sentry del conector (M79): pobla el desplegable «Proyecto» del trigger y de las acciones. */
+  sentryProjects: (connectorId: string) =>
+    fetch(`${API}/connectors/${connectorId}/sentry-projects`, { headers: authHeaders() }).then((r) => json<{ projects: Array<{ id: string; name: string }> }>(r)),
 
   // --- Triggers sin código (recetas + auto-registro en el proveedor, M19) ---
   /** Proyectos de Jira accesibles con un conector (para el desplegable del picker). */

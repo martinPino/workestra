@@ -3,7 +3,7 @@ import { Zap, Plus, Trash2, Plug, Copy, Check, KeyRound, TriangleAlert, Play } f
 import { useQueryClient } from '@tanstack/react-query';
 import { Badge, Button } from '../ui';
 import { api } from '../lib/api';
-import { useWebhooks, useSchedules, useConnectors, useTriggerBindings, useDriveFolders } from '../lib/hooks';
+import { useWebhooks, useSchedules, useConnectors, useTriggerBindings, useDriveFolders, useSentryProjects } from '../lib/hooks';
 import { useAuth, canApprove } from '../lib/auth';
 import { useEditorStore } from '../editor/store';
 import { docToWorkflowGraph } from '../graph';
@@ -26,6 +26,7 @@ const CHOICES: Array<{ id: string; label: string; engine: EngineEvent }> = [
   { id: 'jira.issue_created', label: 'Cuando se crea un ticket de Jira', engine: 'webhook' },
   { id: 'jira.issue_updated', label: 'Cuando se actualiza un ticket de Jira', engine: 'webhook' },
   { id: 'google-drive.file_created', label: 'Cuando llega un fichero nuevo a Google Drive', engine: 'cron' },
+  { id: 'sentry.issue_created', label: 'Cuando aparece un nuevo issue en Sentry', engine: 'cron' },
   { id: 'webhook', label: 'Cuando llega un webhook (avanzado)', engine: 'webhook' },
 ];
 const JIRA_LABELS: Record<string, string> = {
@@ -50,6 +51,9 @@ function choiceOf(config: Record<string, unknown>, bindings?: BindingLite[], sch
   if (ev !== 'cron' && jira) return jira.eventId;
   if (ev === 'cron' && (schedules ?? []).some((s) => s.poll?.provider === 'google-drive') && !(schedules ?? []).some((s) => !s.poll)) {
     return 'google-drive.file_created';
+  }
+  if (ev === 'cron' && (schedules ?? []).some((s) => s.poll?.provider === 'sentry') && !(schedules ?? []).some((s) => !s.poll)) {
+    return 'sentry.issue_created';
   }
   return ev === 'cron' ? 'schedule' : ev === 'webhook' ? 'webhook' : 'manual';
 }
@@ -190,6 +194,7 @@ export function TriggerForm({
           {choice.startsWith('jira.') && <JiraSection wfId={wfId} eventId={choice} />}
           {choice === 'webhook' && <WebhookSection wfId={wfId} />}
           {choice === 'google-drive.file_created' && <DriveSection wfId={wfId} />}
+          {choice === 'sentry.issue_created' && <SentrySection wfId={wfId} />}
           <Leftovers wfId={wfId} choice={choice} />
         </>
       )}
@@ -701,6 +706,136 @@ function DriveSection({ wfId }: { wfId: string }) {
   );
 }
 
+/** Sentry: conectar + proyecto + frecuencia de sondeo → crea el schedule con `poll` (M79). Calco de DriveSection. */
+function SentrySection({ wfId }: { wfId: string }) {
+  const t = useT();
+  const { role } = useAuth();
+  const qc = useQueryClient();
+  const { connected: sentry, busy: connBusy, connect } = useProviderConnection('sentry');
+  const { data: schedules } = useSchedules(wfId);
+  const { data: projectData, isLoading: projLoading, isError: projError } = useSentryProjects(sentry?.id ?? null);
+  const [projectId, setProjectId] = useState('');
+  const [everyMin, setEveryMin] = useState(5);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const projects = projectData?.projects ?? [];
+  const projectName = (id?: string) => (id ? projects.find((p) => p.id === id)?.name ?? id : id ?? '');
+  const polls = (schedules ?? []).filter((s) => s.poll?.provider === 'sentry');
+
+  // Preselecciona el primer proyecto en cuanto carga la lista (si el usuario no eligió aún).
+  useEffect(() => {
+    if (!projectId && projects.length) setProjectId(projects[0].id);
+  }, [projects]);
+
+  const doConnect = async () => {
+    setErr(null);
+    try {
+      await connect();
+    } catch (e) {
+      setErr(e instanceof Error ? t(e.message) : t('Error al conectar'));
+    }
+  };
+
+  const activate = async () => {
+    if (!sentry || !projectId) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await flushGraph(wfId); // el sondeo es un schedule: el Trigger guardado debe ser «cron»
+      await api.createSchedule(wfId, {
+        everyMs: everyMin * 60_000,
+        poll: { provider: 'sentry', connectorId: sentry.id, projectId },
+      });
+      await qc.invalidateQueries({ queryKey: ['schedules', wfId] });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : t('Error al activar'));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const remove = async (id: string) => {
+    setErr(null);
+    try {
+      await api.deleteSchedule(id);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : t('Error al eliminar'));
+    }
+    await qc.invalidateQueries({ queryKey: ['schedules', wfId] });
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-[11px] text-txt-disabled">{t('Workestra vigilará el proyecto y arrancará el flujo por cada issue nuevo, con el issue listo para usar.')}</p>
+      {!sentry ? (
+        <Button size="sm" variant="primary" onClick={doConnect} disabled={!canApprove(role) || connBusy}>
+          <Plug size={13} /> {connBusy ? t('Conectando…') : t('Conectar Sentry')}
+        </Button>
+      ) : (
+        <>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[11px] font-medium text-txt-secondary">{t('Proyecto de Sentry')}</span>
+            {projError ? (
+              <>
+                <input
+                  value={projectId}
+                  onChange={(e) => setProjectId(e.target.value)}
+                  placeholder={t('org/proyecto (p. ej. mi-org/backend)')}
+                  className="h-8 w-full rounded-lg border border-border bg-surface px-2 font-mono text-xs text-txt-primary outline-none placeholder:font-sans placeholder:text-txt-disabled focus:border-primary/60"
+                />
+                <span className="text-[11px] text-txt-disabled">{t('No pudimos listar tus proyectos; escribe org/proyecto.')}</span>
+              </>
+            ) : (
+              <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className={SEL} disabled={projLoading || projects.length === 0}>
+                {projects.length === 0 && <option value="">{projLoading ? t('Cargando proyectos…') : t('— sin proyectos —')}</option>}
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </label>
+          <label className="flex items-center gap-2 text-xs text-txt-secondary">
+            {t('Comprobar cada')}
+            <select value={everyMin} onChange={(e) => setEveryMin(Number(e.target.value))} className={SEL_SM}>
+              {[1, 5, 15, 30].map((n) => (
+                <option key={n} value={n}>
+                  {n} min
+                </option>
+              ))}
+            </select>
+          </label>
+          <Button size="sm" variant="primary" onClick={activate} disabled={busy || !projectId || !canApprove(role)}>
+            <Zap size={13} /> {busy ? t('Activando…') : t('Vigilar el proyecto')}
+          </Button>
+        </>
+      )}
+      {!canApprove(role) && <p className="text-[11px] text-warning">{t('El rol')} {role} {t('no puede crear disparadores (requiere workflow:write).')}</p>}
+      {err && <p className="text-[11px] text-danger">{err}</p>}
+      <div className="space-y-1.5">
+        {polls.length === 0 ? (
+          <p className="text-[11px] text-txt-disabled">{t('Este flujo aún no vigila ningún proyecto de Sentry.')}</p>
+        ) : (
+          polls.map((s) => (
+            <div key={s.id} className={ROW}>
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-white">
+                <ProviderLogo provider="sentry" size={13} />
+              </span>
+              <span className="min-w-0 flex-1 truncate text-txt-secondary">
+                {projectName(s.poll?.projectId)} · {humanEvery(s.everyMs ?? 0)}
+              </span>
+              <button onClick={() => remove(s.id)} className={DEL} disabled={!canApprove(role)} aria-label={t('Eliminar')}>
+                <Trash2 size={13} />
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 /**
  * Restos de OTROS tipos de disparador: si el usuario cambia la elección pero deja horarios/webhooks/
  * eventos activos, SEGUIRÁN disparando. Se listan aquí con su papelera para que no queden fantasmas.
@@ -716,7 +851,9 @@ function Leftovers({ wfId, choice }: { wfId: string; choice: string }) {
 
   const items: Array<{ key: string; label: string; remove: () => Promise<unknown> }> = [];
   for (const s of schedules ?? []) {
-    if (s.poll && choice !== 'google-drive.file_created') {
+    if (s.poll?.provider === 'sentry' && choice !== 'sentry.issue_created') {
+      items.push({ key: `s-${s.id}`, label: `Sentry · ${humanEvery(s.everyMs ?? 0)}`, remove: () => api.deleteSchedule(s.id) });
+    } else if (s.poll?.provider === 'google-drive' && choice !== 'google-drive.file_created') {
       items.push({ key: `s-${s.id}`, label: `Google Drive · ${humanEvery(s.everyMs ?? 0)}`, remove: () => api.deleteSchedule(s.id) });
     } else if (!s.poll && choice !== 'schedule') {
       items.push({ key: `s-${s.id}`, label: s.cron ? humanCron(s.cron, t) : humanEvery(s.everyMs ?? 0), remove: () => api.deleteSchedule(s.id) });

@@ -2,7 +2,7 @@ import { Injectable, Inject, BadRequestException, NotFoundException } from '@nes
 import { JwtService } from '@nestjs/jwt';
 import { randomBytes, createHash } from 'node:crypto';
 import type { ConnectorRecord } from '@core/engine';
-import { getConnectorProvider, providerEnvKeys, tokenBlobFromResponse, serializeTokenBlob, resolveConnectorToken, listDriveFolders, listSlackChannels } from '@core/sdk-plugins';
+import { getConnectorProvider, providerEnvKeys, tokenBlobFromResponse, serializeTokenBlob, resolveConnectorToken, listDriveFolders, listSlackChannels, listSentryProjects } from '@core/sdk-plugins';
 import { setCurrentWorkspace } from '@core/infra';
 import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
 import { assertInWorkspace } from '../tenant/tenant.util';
@@ -126,6 +126,19 @@ export class ConnectorsService {
     const resolved = await resolveConnectorToken(this.p.connectors, this.p.secrets, connectorId, workspaceId);
     if (!resolved) throw new BadRequestException('El conector de Slack no está conectado (vuelve a conectarlo).');
     return listSlackChannels({ token: resolved.token });
+  }
+
+  /**
+   * Lista los proyectos del Sentry del conector (M79): para poblar el desplegable «Proyecto» del trigger y de
+   * las acciones. Mismo patrón que `slackChannels`; aislado por tenant. `id` es «orgSlug/projectSlug».
+   */
+  async sentryProjects(connectorId: string, workspaceId: string): Promise<{ projects: Array<{ id: string; name: string }> }> {
+    const c = await this.p.connectors.getInWorkspace(connectorId, workspaceId);
+    if (!c) throw new NotFoundException('Conector no encontrado.');
+    if (c.provider !== 'sentry') throw new BadRequestException('El conector no es de Sentry.');
+    const resolved = await resolveConnectorToken(this.p.connectors, this.p.secrets, connectorId, workspaceId);
+    if (!resolved) throw new BadRequestException('El conector de Sentry no está conectado (vuelve a conectarlo).');
+    return listSentryProjects({ token: resolved.token });
   }
 
   /** Inicia el flujo OAuth: devuelve la URL de autorización con un `state` firmado (10 min). */

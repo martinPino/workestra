@@ -10,9 +10,9 @@ export interface ActionField {
   default?: string;
   /**
    * Fuente de un DESPLEGABLE con datos reales del proveedor (M57), en vez de un campo de texto/insertor de
-   * variables. `slack-channel` → lista los canales del Slack conectado (como los proyectos de Jira).
+   * variables. `slack-channel` → canales del Slack conectado; `sentry-project` → proyectos del Sentry conectado.
    */
-  source?: 'slack-channel';
+  source?: 'slack-channel' | 'sentry-project';
   /**
    * Muestra el insertor «+ Insertar dato de un paso» (M58): SOLO en campos de CONTENIDO/referencia (mensaje,
    * comentario, título…), no en identificadores (canal, ID de hoja, emoji…) donde no tiene sentido.
@@ -222,6 +222,31 @@ export const CONNECTOR_ACTIONS: Record<string, ConnectorAction[]> = {
         path: '/drive/v3/files',
         body: JSON.stringify({ name: p.name, mimeType: 'application/vnd.google-apps.folder', ...(p.parentId ? { parents: [p.parentId] } : {}) }),
       }),
+    },
+  ],
+  sentry: [
+    {
+      id: 'list-issues',
+      label: 'Listar issues de un proyecto',
+      fields: [
+        { key: 'project', label: 'Proyecto', placeholder: 'org/proyecto', source: 'sentry-project' },
+        { key: 'query', label: 'Filtro (opcional · sintaxis Sentry)', placeholder: 'is:unresolved', default: 'is:unresolved' },
+      ],
+      // El JSON queda en {{connector:nodo.json}} (array de issues) para leer cada uno o avisar.
+      build: (p) => ({ method: 'GET', path: `/projects/${p.project}/issues/?query=${encodeURIComponent(p.query || 'is:unresolved')}&sort=new&limit=25` }),
+    },
+    {
+      id: 'get-issue',
+      label: 'Ver un issue (detalle)',
+      fields: [{ key: 'issueId', label: 'ID del issue', placeholder: '{{issue.id}}', default: '{{issue.id}}', insert: true }],
+      build: (p) => ({ method: 'GET', path: `/issues/${p.issueId}/` }),
+    },
+    {
+      id: 'get-issue-logs',
+      label: 'Ver los logs completos de un issue (último evento)',
+      fields: [{ key: 'issueId', label: 'ID del issue', placeholder: '{{issue.id}}', default: '{{issue.id}}', insert: true }],
+      // El último evento trae la excepción + stacktrace + breadcrumbs (los «logs completos» del error).
+      build: (p) => ({ method: 'GET', path: `/issues/${p.issueId}/events/latest/` }),
     },
   ],
   dev: [

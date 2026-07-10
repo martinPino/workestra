@@ -412,9 +412,10 @@ export interface IWebhookRepository {
 
 /** M52: config de SONDEO de un schedule (p. ej. «Google Drive: nuevo fichero»): al disparar, lista y encola. */
 export interface SchedulePoll {
-  provider: string; // p. ej. 'google-drive'
+  provider: string; // p. ej. 'google-drive' | 'sentry'
   connectorId: string; // conector conectado del que sacar el token
-  folderId?: string; // carpeta a vigilar (opcional)
+  folderId?: string; // Google Drive: carpeta a vigilar (opcional)
+  projectId?: string; // Sentry: proyecto a vigilar, «orgSlug/projectSlug» (M79)
 }
 
 export interface ScheduleRecord {

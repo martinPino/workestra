@@ -41,9 +41,13 @@ export class IntegrationToolResolver implements IMcpToolResolver {
     if (!connector) return []; // integración no conectada → sin herramientas (la UI pide conectar)
     const resolved = await resolveConnectorToken(this.connectors, this.secrets, connector.id, workspaceId, this.now());
     if (!resolved) return [];
-    const sites = await jiraAccessibleResources(resolved.token, this.fetchFn).catch(() => []);
-    const cloudId = sites[0]?.id;
-    if (!cloudId) return [];
+    // Atlassian necesita resolver el cloudId del sitio; el resto de proveedores (Sentry…) operan solo con el token.
+    let cloudId: string | undefined;
+    if (def.provider === 'jira') {
+      const sites = await jiraAccessibleResources(resolved.token, this.fetchFn).catch(() => []);
+      cloudId = sites[0]?.id;
+      if (!cloudId) return [];
+    }
     const ctx: IntegrationToolCtx = { token: resolved.token, cloudId, fetch: this.fetchFn };
     return def.tools.map((tool) => ({
       name: tool.name,

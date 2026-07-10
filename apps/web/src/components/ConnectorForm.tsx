@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { CONNECTOR_ACTIONS, type ConnectorAction } from '../editor/connector-actions';
 import { ProviderLogo, hasProviderLogo } from '../lib/provider-logos';
-import { useConnectors, useSlackChannels } from '../lib/hooks';
+import { useConnectors, useSlackChannels, useSentryProjects } from '../lib/hooks';
 import { VarField, useAvailableVars } from './VarField';
 import { useT } from '../i18n';
 
@@ -43,6 +43,37 @@ function SlackChannelSelect({ connectorId, value, onChange }: { connectorId: str
       {channels.map((c) => (
         <option key={c.id} value={c.id}>
           #{c.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/**
+ * Desplegable de proyectos REALES del Sentry conectado (M79): igual que el picker de canales de Slack. El
+ * valor guardado es «orgSlug/projectSlug». Preserva un valor previo y cae a input de texto si el listado falla.
+ */
+function SentryProjectSelect({ connectorId, value, onChange }: { connectorId: string; value: string; onChange: (v: string) => void }) {
+  const t = useT();
+  const { data, isLoading, isError } = useSentryProjects(connectorId || null);
+  const projects = data?.projects ?? [];
+
+  if (isError) {
+    return (
+      <>
+        <input type="text" value={value} placeholder="org/proyecto" onChange={(e) => onChange(e.target.value)} className={`${inputBase} font-mono`} />
+        <span className="text-[11px] text-txt-disabled">{t('No pudimos listar tus proyectos; escribe org/proyecto.')}</span>
+      </>
+    );
+  }
+  const known = projects.some((p) => p.id === value);
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)} className={inputBase} disabled={isLoading}>
+      <option value="">{isLoading ? t('Cargando proyectos…') : t('— elige un proyecto —')}</option>
+      {!known && value && <option value={value}>{value}</option>}
+      {projects.map((p) => (
+        <option key={p.id} value={p.id}>
+          {p.name}
         </option>
       ))}
     </select>
@@ -135,6 +166,9 @@ export function ConnectorForm({ value, onChange }: { value: Record<string, unkno
             {f.source === 'slack-channel' ? (
               // Desplegable de canales reales (M57).
               <SlackChannelSelect connectorId={connectorId} value={params[f.key] ?? ''} onChange={(v) => onField(f.key, v)} />
+            ) : f.source === 'sentry-project' ? (
+              // Desplegable de proyectos reales de Sentry (M79).
+              <SentryProjectSelect connectorId={connectorId} value={params[f.key] ?? ''} onChange={(v) => onField(f.key, v)} />
             ) : f.insert ? (
               // Solo los campos de CONTENIDO/referencia llevan el insertor «+ Insertar dato de un paso» (M58).
               <VarField value={params[f.key] ?? ''} onChange={(v) => onField(f.key, v)} vars={vars} multiline={f.multiline} placeholder={f.placeholder} />

@@ -75,6 +75,16 @@ export const useSlackChannels = (connectorId: string | null) =>
     staleTime: 60_000,
   });
 
+/** Proyectos del Sentry de un conector conectado (M79): pobla el desplegable «Proyecto» del trigger y acciones. */
+export const useSentryProjects = (connectorId: string | null) =>
+  useQuery({
+    queryKey: ['sentryProjects', connectorId],
+    queryFn: () => api.sentryProjects(connectorId as string),
+    enabled: !!connectorId,
+    retry: false,
+    staleTime: 60_000,
+  });
+
 /** Catálogo de proveedores de conectores (M11). */
 export const useConnectorProviders = () =>
   useQuery({ queryKey: ['connector-providers'], queryFn: api.listConnectorProviders, retry: false });

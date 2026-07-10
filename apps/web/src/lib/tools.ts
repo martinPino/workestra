@@ -37,9 +37,8 @@ export const MCP_PRESETS: McpPreset[] = [
   { name: 'GitHub', url: 'https://api.githubcopilot.com/mcp/', color: '#181717' },
   { name: 'Notion', url: 'https://mcp.notion.com/mcp', color: '#000000' },
   { name: 'Linear', url: 'https://mcp.linear.app/mcp', color: '#5E6AD2' },
-  { name: 'Sentry', url: 'https://mcp.sentry.dev/mcp', color: '#362D59' },
-  // Atlassian NO va aquí: es una INTEGRACIÓN de primera clase (OAuth de la plataforma), no un MCP con token
-  // pegado. Su MCP remoto exige OAuth y una API key no lo autentica. Ver INTEGRATION_PRESETS (M76).
+  // Atlassian y Sentry NO van aquí: son INTEGRACIONES de primera clase (OAuth de la plataforma), no un MCP con
+  // token pegado. Su acceso se resuelve server-side desde el conector conectado. Ver INTEGRATION_PRESETS (M76/M79).
   { name: 'Stripe', url: 'https://mcp.stripe.com', color: '#635BFF' },
   { name: 'Salesforce', url: 'https://mcp.salesforce.com/mcp', color: '#00A1E0' },
   { name: 'Hugging Face', url: 'https://huggingface.co/mcp', color: '#FFD21E', darkText: true },
@@ -65,6 +64,7 @@ export interface IntegrationPreset {
 
 export const INTEGRATION_PRESETS: IntegrationPreset[] = [
   { key: 'atlassian', name: 'Atlassian', url: 'integration://atlassian', provider: 'jira', color: '#0052CC' },
+  { key: 'sentry', name: 'Sentry', url: 'integration://sentry', provider: 'sentry', color: '#362D59' },
 ];
 
 export const isIntegrationUrl = (url: string): boolean => url.startsWith('integration://');

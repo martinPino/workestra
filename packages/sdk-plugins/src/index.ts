@@ -23,6 +23,7 @@ export * from './integration-tool-resolver';
 export * from './trigger-events';
 export * from './drive-poll';
 export * from './slack-api';
+export * from './sentry-api';
 export * from './interpolate';
 export * from './handoff';
 export * from './runtime-registry';
