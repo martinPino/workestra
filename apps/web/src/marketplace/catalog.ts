@@ -569,20 +569,21 @@ export const MARKETPLACE: MarketItem[] = [
   {
     id: 'auto-sentry-triage',
     kind: 'automation',
-    name: 'Triaje de issues de Sentry',
-    tagline: 'Cuando Sentry reporta un error nuevo, la IA lo triaja al instante.',
+    name: 'Sentry → Ticket de Jira',
+    tagline: 'Cuando Sentry reporta un error, la IA lo triaja y crea el ticket en Jira.',
     description:
-      'Arranca en tiempo real en cuanto aparece un nuevo issue en Sentry. La IA resume el error, indica su gravedad y sugiere un primer paso para investigarlo, y lo deja anotado. Perfecto para PROBAR el disparador de Sentry de punta a punta: instálalo, elige tu proyecto y provoca un error.',
+      'Arranca en tiempo real en cuanto aparece un nuevo issue en Sentry. La IA resume el error y su gravedad, y automáticamente crea una incidencia en tu board de Jira con el triaje y el enlace al issue. Perfecto para no perder ningún error y probar el disparador de Sentry de punta a punta.',
     icon: '🔺',
     gradient: 'from-violet-500 to-purple-700',
     category: 'Engineering',
     difficulty: 'Fácil',
-    setupMinutes: 4,
-    connectors: ['sentry'],
+    setupMinutes: 5,
+    connectors: ['sentry', 'jira'],
     mcps: [],
     tools: [],
-    useCases: ['Triaje de errores', 'Guardia on-call', 'Probar el disparador de Sentry'],
-    requirements: ['Sentry conectado + la app de Workestra instalada en tu organización'],
+    useCases: ['Errores → tickets', 'Triaje de guardia', 'Probar el disparador de Sentry'],
+    variables: [{ key: 'projectKey', label: 'Clave del proyecto de Jira', example: 'KAN' }],
+    requirements: ['Sentry conectado + la app de Workestra instalada en tu org', 'Jira conectado'],
     rating: 4.9,
     installs: 640,
     author: 'workestra',
@@ -590,7 +591,7 @@ export const MARKETPLACE: MarketItem[] = [
     collections: ['new'],
     install: {
       workflow: {
-        name: 'Triaje de issues de Sentry',
+        name: 'Sentry → Ticket de Jira',
         doc: {
           nodes: [
             node('trigger', 'trigger', 40, 160, { event: 'webhook', eventId: 'sentry.issue_created' }),
@@ -599,10 +600,33 @@ export const MARKETPLACE: MarketItem[] = [
               prompt: 'Eres un ingeniero de guardia. En 2-3 frases: resume el error, di su gravedad (alta/media/baja) y un primer paso concreto para investigarlo.',
               input: 'Issue: {{issue.title}}\nNivel: {{issue.level}}\nCausa probable: {{issue.culprit}}\nEnlace: {{issue.permalink}}',
             }),
-            node('note', 'tool', 600, 160, { message: '🔺 Sentry {{issue.shortId}} — {{issue.title}}\nTriaje: {{agent:triage.output}}\n{{issue.permalink}}' }),
-            node('end', 'end', 860, 160, {}),
+            node('jira', 'connector', 600, 160, {
+              provider: 'jira',
+              connectorId: null,
+              method: 'POST',
+              // El runtime resuelve {cloudid} del sitio de Jira. Cambia «KAN» por la clave de tu proyecto.
+              path: '/ex/jira/{cloudid}/rest/api/3/issue',
+              body: JSON.stringify({
+                fields: {
+                  project: { key: 'KAN' },
+                  summary: 'Sentry {{issue.shortId}}: {{issue.title}}',
+                  issuetype: { name: 'Task' },
+                  description: {
+                    type: 'doc',
+                    version: 1,
+                    content: [
+                      { type: 'paragraph', content: [{ type: 'text', text: 'Nuevo issue de Sentry (nivel {{issue.level}}).' }] },
+                      { type: 'paragraph', content: [{ type: 'text', text: 'Triaje: {{agent:triage.output}}' }] },
+                      { type: 'paragraph', content: [{ type: 'text', text: 'Enlace: {{issue.permalink}}' }] },
+                    ],
+                  },
+                },
+              }),
+            }),
+            node('note', 'tool', 880, 160, { message: '🔺 Sentry {{issue.shortId}} → Jira {{connector:jira.json.key}}' }),
+            node('end', 'end', 1160, 160, {}),
           ],
-          edges: [edge('trigger', 'triage'), edge('triage', 'note'), edge('note', 'end')],
+          edges: [edge('trigger', 'triage'), edge('triage', 'jira'), edge('jira', 'note'), edge('note', 'end')],
           comments: [],
         },
       },
