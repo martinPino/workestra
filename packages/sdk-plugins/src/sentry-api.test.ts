@@ -5,29 +5,39 @@ import { listSentryProjects, pollSentryIssues, getSentryIssueLatestEvent, verify
 const ok = (body: unknown) => async () => ({ ok: true, status: 200, json: async () => body });
 
 describe('listSentryProjects', () => {
-  it('mapea a «orgSlug/projectSlug» y ordena por nombre', async () => {
+  it('descubre orgs y lista proyectos EN LA REGIÓN de cada una (UE → de.sentry.io)', async () => {
+    const calls: string[] = [];
     const res = await listSentryProjects({
       token: 'tok',
       fetchFn: async (url, init) => {
-        expect(url).toContain('/projects/');
+        calls.push(url);
         expect(init?.headers?.authorization).toBe('Bearer tok');
-        return { ok: true, status: 200, json: async () => [
-          { slug: 'web', name: 'Web', organization: { slug: 'acme' } },
-          { slug: 'api', name: 'API', organization: { slug: 'acme' } },
-        ] };
+        if (url.includes('/organizations/?')) {
+          // Silo de control: la org está en la UE (regionUrl = de.sentry.io).
+          return { ok: true, status: 200, json: async () => [{ slug: 'acme', links: { regionUrl: 'https://de.sentry.io' } }] };
+        }
+        return { ok: true, status: 200, json: async () => [{ slug: 'web', name: 'Web' }, { slug: 'api', name: 'API' }] };
       },
     });
+    // Los proyectos se piden a la región de la org, no a sentry.io.
+    expect(calls.some((u) => u.startsWith('https://de.sentry.io/api/0/organizations/acme/projects/'))).toBe(true);
     expect(res.projects).toEqual([
       { id: 'acme/api', name: 'API' },
       { id: 'acme/web', name: 'Web' },
     ]);
   });
 
-  it('descarta filas sin org/slug y en error devuelve []', async () => {
+  it('sin regionUrl usa sentry.io; en error de orgs devuelve []', async () => {
+    const usRes = await listSentryProjects({
+      token: 't',
+      fetchFn: async (url) =>
+        url.includes('/organizations/?')
+          ? { ok: true, status: 200, json: async () => [{ slug: 'o' }] }
+          : { ok: url.startsWith('https://sentry.io/api/0/organizations/o/projects/'), status: 200, json: async () => [{ slug: 'p', name: 'P' }] },
+    });
+    expect(usRes.projects).toEqual([{ id: 'o/p', name: 'P' }]);
     const bad = await listSentryProjects({ token: 't', fetchFn: async () => ({ ok: false, status: 401, json: async () => ({}) }) });
     expect(bad.projects).toEqual([]);
-    const partial = await listSentryProjects({ token: 't', fetchFn: ok([{ slug: 'x' }, { organization: { slug: 'o' } }]) });
-    expect(partial.projects).toEqual([]);
   });
 });
 

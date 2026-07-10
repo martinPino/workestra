@@ -115,28 +115,44 @@ export interface SentryProject {
   name: string;
 }
 
+/** Base de API de una org según su región (Sentry es MULTI-REGIÓN: la UE va por `de.sentry.io`, no `sentry.io`). */
+function regionApi(regionUrl: string | undefined): string {
+  const base = (regionUrl ?? '').replace(/\/$/, '');
+  return base ? `${base}/api/0` : SENTRY_API;
+}
+
 /**
- * Lista los proyectos accesibles con el token (para el desplegable del trigger/acciones). Devuelve hasta 100,
- * ordenados por nombre. `id` es «orgSlug/projectSlug». En error devuelve [] (el llamante cae a input de texto).
+ * Lista los proyectos accesibles con el token (para el desplegable del trigger/acciones). `id` es
+ * «orgSlug/projectSlug». MULTI-REGIÓN: descubre las orgs en el silo de control (`sentry.io`) con su `regionUrl`
+ * y lista los proyectos EN LA REGIÓN de cada org — si no, una org de la UE saldría vacía. En error devuelve [].
  */
 export async function listSentryProjects(opts: { token: string; fetchFn?: Fetchish }): Promise<{ projects: SentryProject[] }> {
   const fetchFn = opts.fetchFn ?? (globalThis.fetch as unknown as Fetchish);
-  const res = await fetchFn(`${SENTRY_API}/projects/?per_page=100`, { headers: auth(opts.token) });
-  if (!res.ok) return { projects: [] };
-  const data = await res.json().catch(() => []);
-  const rows = Array.isArray(data) ? data : [];
-  const projects = rows
-    .map((r) => {
+  const orgsRes = await fetchFn(`${SENTRY_API}/organizations/?per_page=100`, { headers: auth(opts.token) });
+  if (!orgsRes.ok) return { projects: [] };
+  const orgs = await orgsRes.json().catch(() => []);
+  const orgRows = Array.isArray(orgs) ? orgs : [];
+  const projects: SentryProject[] = [];
+  const seen = new Set<string>();
+  for (const o of orgRows) {
+    const org = asRecord(o);
+    const orgSlug = String(org.slug ?? '');
+    if (!orgSlug) continue;
+    const regionUrl = String(asRecord(org.links).regionUrl ?? '');
+    const res = await fetchFn(`${regionApi(regionUrl)}/organizations/${encodeURIComponent(orgSlug)}/projects/?per_page=100`, { headers: auth(opts.token) });
+    if (!res.ok) continue;
+    const rows = await res.json().catch(() => []);
+    for (const r of Array.isArray(rows) ? rows : []) {
       const p = asRecord(r);
-      const org = asRecord(p.organization);
-      const orgSlug = String(org.slug ?? '');
       const slug = String(p.slug ?? '');
-      if (!orgSlug || !slug) return null;
-      return { id: `${orgSlug}/${slug}`, name: String(p.name ?? slug) };
-    })
-    .filter((p): p is SentryProject => !!p)
-    .sort((a, b) => a.name.localeCompare(b.name));
-  return { projects };
+      const id = `${orgSlug}/${slug}`;
+      if (slug && !seen.has(id)) {
+        seen.add(id);
+        projects.push({ id, name: String(p.name ?? slug) });
+      }
+    }
+  }
+  return { projects: projects.sort((a, b) => a.name.localeCompare(b.name)) };
 }
 
 export interface SentryIssue {
