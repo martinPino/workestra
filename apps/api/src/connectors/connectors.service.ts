@@ -2,7 +2,7 @@ import { Injectable, Inject, BadRequestException, NotFoundException } from '@nes
 import { JwtService } from '@nestjs/jwt';
 import { randomBytes, createHash } from 'node:crypto';
 import type { ConnectorRecord } from '@core/engine';
-import { getConnectorProvider, providerEnvKeys, tokenBlobFromResponse, serializeTokenBlob, resolveConnectorToken, listDriveFolders, listSlackChannels, listSentryProjects, exchangeSentryAppCode } from '@core/sdk-plugins';
+import { getConnectorProvider, providerEnvKeys, tokenBlobFromResponse, serializeTokenBlob, resolveConnectorToken, listDriveFolders, listSlackChannels, listSentryProjects, listGithubRepos, exchangeSentryAppCode } from '@core/sdk-plugins';
 import { setCurrentWorkspace } from '@core/infra';
 import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
 import { assertInWorkspace } from '../tenant/tenant.util';
@@ -139,6 +139,20 @@ export class ConnectorsService {
     const resolved = await resolveConnectorToken(this.p.connectors, this.p.secrets, connectorId, workspaceId);
     if (!resolved) throw new BadRequestException('El conector de Sentry no está conectado (vuelve a conectarlo).');
     return listSentryProjects({ token: resolved.token });
+  }
+
+  /**
+   * Lista los repositorios del GitHub del conector: para poblar el desplegable «Repositorio» de las acciones
+   * (en vez de escribir `owner/repo` a mano). Mismo patrón que `slackChannels`; aislado por tenant. El `id` de
+   * cada repo es su `owner/repo` (full_name), que las acciones insertan directamente en la ruta.
+   */
+  async githubRepos(connectorId: string, workspaceId: string): Promise<{ repos: Array<{ id: string; name: string }> }> {
+    const c = await this.p.connectors.getInWorkspace(connectorId, workspaceId);
+    if (!c) throw new NotFoundException('Conector no encontrado.');
+    if (c.provider !== 'github') throw new BadRequestException('El conector no es de GitHub.');
+    const resolved = await resolveConnectorToken(this.p.connectors, this.p.secrets, connectorId, workspaceId);
+    if (!resolved) throw new BadRequestException('El conector de GitHub no está conectado (vuelve a conectarlo).');
+    return listGithubRepos({ token: resolved.token });
   }
 
   /**

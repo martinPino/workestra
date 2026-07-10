@@ -96,6 +96,14 @@ export class ConnectorsController {
     return this.svc.sentryProjects(id, workspaceId);
   }
 
+  /** Repositorios del GitHub del conector: pobla el desplegable «Repositorio» de las acciones. */
+  @Get(':id/github-repos')
+  @UseGuards(ScopesGuard)
+  @RequireScopes('workflow:read')
+  githubRepos(@Param('id') id: string, @Workspace() workspaceId: string) {
+    return this.svc.githubRepos(id, workspaceId);
+  }
+
   @Delete(':id')
   @UseGuards(ScopesGuard)
   @RequireScopes('connector:delete') // borrar un conector y sus credenciales OAuth: de ADMIN

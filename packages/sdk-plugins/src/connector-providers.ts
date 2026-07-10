@@ -34,6 +34,12 @@ export interface ConnectorProvider {
    * `code_challenge`/`code_verifier` y NO envía `client_secret`; basta con `*_CLIENT_ID` configurado.
    */
   pkce?: boolean;
+  /**
+   * Cabeceras estáticas que el nodo de conector añade en CADA llamada saliente (además de `Authorization`).
+   * Algunos APIs las exigen: Notion requiere `Notion-Version`. El executor las fusiona sin permitir que
+   * pisen `authorization` (declarativo por proveedor → Open/Closed, sin hardcodear en el nodo).
+   */
+  extraHeaders?: Record<string, string>;
 }
 
 /**
@@ -218,6 +224,8 @@ export function connectorProviders(selfBase = 'http://localhost:3001'): Record<s
       tokenExchange: 'json',
       tokenPath: 'access_token',
       extraAuthorizeParams: { owner: 'user' },
+      // Notion RECHAZA (400) cualquier petición sin esta cabecera de versión de API. La fija el nodo en cada llamada.
+      extraHeaders: { 'Notion-Version': '2022-06-28' },
     },
     figma: {
       provider: 'figma',

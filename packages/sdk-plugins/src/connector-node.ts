@@ -136,7 +136,9 @@ export class ConnectorNodeExecutor implements INodeExecutor {
     // fija. Si el conector la guardó en el blob, se usa como base; si no, cae a la base del proveedor.
     const base = connector.provider === 'salesforce' && blob.instance_url ? blob.instance_url : provider.baseUrl;
     const url = base.replace(/\/$/, '') + (resolvedPath.startsWith('/') ? resolvedPath : `/${resolvedPath}`);
-    const headers: Record<string, string> = { authorization: `Bearer ${token}` };
+    // Cabeceras estáticas del proveedor (p. ej. `Notion-Version`) + Bearer. El orden importa: `authorization`
+    // va después para que `extraHeaders` nunca pueda sobrescribir el token de autenticación.
+    const headers: Record<string, string> = { ...(provider.extraHeaders ?? {}), authorization: `Bearer ${token}` };
     let body: string | undefined;
     if (method !== 'GET' && method !== 'HEAD' && rawBody != null) {
       headers['content-type'] = 'application/json';

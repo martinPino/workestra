@@ -24,6 +24,7 @@ export * from './trigger-events';
 export * from './drive-poll';
 export * from './slack-api';
 export * from './sentry-api';
+export * from './github-api';
 export * from './interpolate';
 export * from './handoff';
 export * from './runtime-registry';

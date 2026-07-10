@@ -12,7 +12,7 @@ export interface ActionField {
    * Fuente de un DESPLEGABLE con datos reales del proveedor (M57), en vez de un campo de texto/insertor de
    * variables. `slack-channel` → canales del Slack conectado; `sentry-project` → proyectos del Sentry conectado.
    */
-  source?: 'slack-channel' | 'sentry-project';
+  source?: 'slack-channel' | 'sentry-project' | 'github-repo';
   /**
    * Muestra el insertor «+ Insertar dato de un paso» (M58): SOLO en campos de CONTENIDO/referencia (mensaje,
    * comentario, título…), no en identificadores (canal, ID de hoja, emoji…) donde no tiene sentido.
@@ -98,12 +98,12 @@ export const CONNECTOR_ACTIONS: Record<string, ConnectorAction[]> = {
       id: 'create-issue',
       label: 'Crear un issue',
       fields: [
-        { key: 'owner', label: 'Propietario', placeholder: 'mi-org' },
-        { key: 'repo', label: 'Repositorio', placeholder: 'mi-repo' },
+        // Desplegable de repos REALES del GitHub conectado (owner/repo); antes eran dos campos de texto a mano.
+        { key: 'repo', label: 'Repositorio', placeholder: 'mi-org/mi-repo', source: 'github-repo' },
         { key: 'title', label: 'Título', placeholder: 'Título del issue', insert: true },
         { key: 'body', label: 'Descripción', placeholder: 'Descripción…', multiline: true, insert: true },
       ],
-      build: (p) => ({ method: 'POST', path: `/repos/${p.owner}/${p.repo}/issues`, body: JSON.stringify({ title: p.title, body: p.body }) }),
+      build: (p) => ({ method: 'POST', path: `/repos/${p.repo}/issues`, body: JSON.stringify({ title: p.title, body: p.body }) }),
     },
   ],
   'google-sheets': [
@@ -247,6 +247,126 @@ export const CONNECTOR_ACTIONS: Record<string, ConnectorAction[]> = {
       fields: [{ key: 'issueId', label: 'ID del issue', placeholder: '{{issue.id}}', default: '{{issue.id}}', insert: true }],
       // El último evento trae la excepción + stacktrace + breadcrumbs (los «logs completos» del error).
       build: (p) => ({ method: 'GET', path: `/issues/${p.issueId}/events/latest/` }),
+    },
+  ],
+  hubspot: [
+    {
+      id: 'create-contact',
+      label: 'Crear un contacto',
+      fields: [
+        { key: 'email', label: 'Email', placeholder: 'persona@empresa.com', insert: true },
+        { key: 'firstname', label: 'Nombre', placeholder: 'Ana', insert: true },
+        { key: 'lastname', label: 'Apellidos', placeholder: 'García', insert: true },
+      ],
+      build: (p) => ({
+        method: 'POST',
+        path: '/crm/v3/objects/contacts',
+        body: JSON.stringify({ properties: { email: p.email, firstname: p.firstname, lastname: p.lastname } }),
+      }),
+    },
+    {
+      id: 'find-contact',
+      label: 'Buscar un contacto por email',
+      fields: [{ key: 'email', label: 'Email', placeholder: 'persona@empresa.com', insert: true }],
+      // El JSON queda en {{connector:nodo.json.results}} para leer el contacto en pasos siguientes.
+      build: (p) => ({
+        method: 'POST',
+        path: '/crm/v3/objects/contacts/search',
+        body: JSON.stringify({ filterGroups: [{ filters: [{ propertyName: 'email', operator: 'EQ', value: p.email }] }] }),
+      }),
+    },
+  ],
+  notion: [
+    {
+      id: 'search',
+      label: 'Buscar páginas',
+      fields: [{ key: 'query', label: 'Texto a buscar', placeholder: 'Notas de la reunión', insert: true }],
+      build: (p) => ({ method: 'POST', path: '/search', body: JSON.stringify({ query: p.query }) }),
+    },
+    {
+      id: 'create-page',
+      label: 'Crear una página',
+      fields: [
+        { key: 'parentPageId', label: 'ID de la página padre', placeholder: '(está en la URL de la página de Notion)' },
+        { key: 'title', label: 'Título', placeholder: 'Título de la nueva página', insert: true },
+      ],
+      build: (p) => ({
+        method: 'POST',
+        path: '/pages',
+        body: JSON.stringify({
+          parent: { page_id: p.parentPageId },
+          properties: { title: { title: [{ text: { content: p.title } }] } },
+        }),
+      }),
+    },
+    {
+      id: 'append-text',
+      label: 'Añadir texto a una página',
+      fields: [
+        { key: 'pageId', label: 'ID de la página', placeholder: '{{connector:buscar.json.results.0.id}}', insert: true },
+        { key: 'text', label: 'Texto', placeholder: 'Escribe el texto…', multiline: true, insert: true },
+      ],
+      build: (p) => ({
+        method: 'PATCH',
+        path: `/blocks/${p.pageId}/children`,
+        body: JSON.stringify({ children: [{ object: 'block', type: 'paragraph', paragraph: { rich_text: [{ text: { content: p.text } }] } }] }),
+      }),
+    },
+  ],
+  stripe: [
+    // Scope read_write, pero la API de Stripe exige cuerpos form-urlencoded para escribir; por ahora solo LECTURA
+    // (GET, sin cuerpo), que cubre los casos habituales de automatización (consultar clientes/pagos/saldo).
+    {
+      id: 'list-customers',
+      label: 'Listar clientes recientes',
+      fields: [{ key: 'count', label: 'Cuántos', placeholder: '10', default: '10' }],
+      build: (p) => ({ method: 'GET', path: `/v1/customers?limit=${p.count || '10'}` }),
+    },
+    {
+      id: 'find-customer',
+      label: 'Buscar un cliente por email',
+      fields: [{ key: 'email', label: 'Email', placeholder: 'cliente@empresa.com', insert: true }],
+      build: (p) => ({ method: 'GET', path: `/v1/customers?email=${encodeURIComponent(p.email ?? '')}` }),
+    },
+    {
+      id: 'list-payments',
+      label: 'Listar pagos recientes',
+      fields: [{ key: 'count', label: 'Cuántos', placeholder: '10', default: '10' }],
+      build: (p) => ({ method: 'GET', path: `/v1/charges?limit=${p.count || '10'}` }),
+    },
+    {
+      id: 'get-balance',
+      label: 'Ver el saldo de la cuenta',
+      fields: [],
+      build: () => ({ method: 'GET', path: '/v1/balance' }),
+    },
+  ],
+  figma: [
+    {
+      id: 'get-file',
+      label: 'Obtener un archivo',
+      fields: [{ key: 'fileKey', label: 'Clave del archivo', placeholder: '(está en la URL: figma.com/file/CLAVE/…)' }],
+      build: (p) => ({ method: 'GET', path: `/files/${p.fileKey}` }),
+    },
+    {
+      id: 'list-comments',
+      label: 'Listar comentarios de un archivo',
+      fields: [{ key: 'fileKey', label: 'Clave del archivo', placeholder: '(está en la URL: figma.com/file/CLAVE/…)' }],
+      build: (p) => ({ method: 'GET', path: `/files/${p.fileKey}/comments` }),
+    },
+  ],
+  canva: [
+    {
+      id: 'list-designs',
+      label: 'Listar mis diseños',
+      fields: [],
+      build: () => ({ method: 'GET', path: '/designs' }),
+    },
+    {
+      id: 'get-design',
+      label: 'Ver un diseño',
+      fields: [{ key: 'designId', label: 'ID del diseño', placeholder: '{{connector:listar.json.items.0.id}}', insert: true }],
+      build: (p) => ({ method: 'GET', path: `/designs/${p.designId}` }),
     },
   ],
   dev: [

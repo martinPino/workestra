@@ -325,6 +325,9 @@ export const api = {
   /** Proyectos del Sentry del conector (M79): pobla el desplegable «Proyecto» del trigger y de las acciones. */
   sentryProjects: (connectorId: string) =>
     fetch(`${API}/connectors/${connectorId}/sentry-projects`, { headers: authHeaders() }).then((r) => json<{ projects: Array<{ id: string; name: string }> }>(r)),
+  /** Repositorios del GitHub del conector: pobla el desplegable «Repositorio» de las acciones. */
+  githubRepos: (connectorId: string) =>
+    fetch(`${API}/connectors/${connectorId}/github-repos`, { headers: authHeaders() }).then((r) => json<{ repos: Array<{ id: string; name: string }> }>(r)),
 
   // --- Triggers sin código (recetas + auto-registro en el proveedor, M19) ---
   /** Proyectos de Jira accesibles con un conector (para el desplegable del picker). */

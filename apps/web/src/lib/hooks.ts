@@ -85,6 +85,16 @@ export const useSentryProjects = (connectorId: string | null) =>
     staleTime: 60_000,
   });
 
+/** Repositorios del GitHub de un conector conectado: pobla el desplegable «Repositorio» de las acciones. */
+export const useGithubRepos = (connectorId: string | null) =>
+  useQuery({
+    queryKey: ['githubRepos', connectorId],
+    queryFn: () => api.githubRepos(connectorId as string),
+    enabled: !!connectorId,
+    retry: false,
+    staleTime: 60_000,
+  });
+
 /** Catálogo de proveedores de conectores (M11). */
 export const useConnectorProviders = () =>
   useQuery({ queryKey: ['connector-providers'], queryFn: api.listConnectorProviders, retry: false });

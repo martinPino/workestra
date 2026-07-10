@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { CONNECTOR_ACTIONS, type ConnectorAction } from '../editor/connector-actions';
 import { ProviderLogo, hasProviderLogo } from '../lib/provider-logos';
-import { useConnectors, useSlackChannels, useSentryProjects } from '../lib/hooks';
+import { useConnectors, useSlackChannels, useSentryProjects, useGithubRepos } from '../lib/hooks';
 import { VarField, useAvailableVars } from './VarField';
 import { useT } from '../i18n';
 
@@ -74,6 +74,38 @@ function SentryProjectSelect({ connectorId, value, onChange }: { connectorId: st
       {projects.map((p) => (
         <option key={p.id} value={p.id}>
           {p.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/**
+ * Desplegable de repos REALES del GitHub conectado: igual que el picker de canales de Slack. El valor guardado
+ * es «owner/repo» (full_name), que la acción inserta en la ruta. Preserva un valor previo y cae a input de
+ * texto si el listado falla (sin scope/desconectado) para no bloquear.
+ */
+function GithubRepoSelect({ connectorId, value, onChange }: { connectorId: string; value: string; onChange: (v: string) => void }) {
+  const t = useT();
+  const { data, isLoading, isError } = useGithubRepos(connectorId || null);
+  const repos = data?.repos ?? [];
+
+  if (isError) {
+    return (
+      <>
+        <input type="text" value={value} placeholder="mi-org/mi-repo" onChange={(e) => onChange(e.target.value)} className={`${inputBase} font-mono`} />
+        <span className="text-[11px] text-txt-disabled">{t('No pudimos listar tus repos; escribe owner/repo.')}</span>
+      </>
+    );
+  }
+  const known = repos.some((r) => r.id === value);
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)} className={inputBase} disabled={isLoading}>
+      <option value="">{isLoading ? t('Cargando repos…') : t('— elige un repositorio —')}</option>
+      {!known && value && <option value={value}>{value}</option>}
+      {repos.map((r) => (
+        <option key={r.id} value={r.id}>
+          {r.name}
         </option>
       ))}
     </select>
@@ -169,6 +201,9 @@ export function ConnectorForm({ value, onChange }: { value: Record<string, unkno
             ) : f.source === 'sentry-project' ? (
               // Desplegable de proyectos reales de Sentry (M79).
               <SentryProjectSelect connectorId={connectorId} value={params[f.key] ?? ''} onChange={(v) => onField(f.key, v)} />
+            ) : f.source === 'github-repo' ? (
+              // Desplegable de repositorios reales de GitHub.
+              <GithubRepoSelect connectorId={connectorId} value={params[f.key] ?? ''} onChange={(v) => onField(f.key, v)} />
             ) : f.insert ? (
               // Solo los campos de CONTENIDO/referencia llevan el insertor «+ Insertar dato de un paso» (M58).
               <VarField value={params[f.key] ?? ''} onChange={(v) => onField(f.key, v)} vars={vars} multiline={f.multiline} placeholder={f.placeholder ? t(f.placeholder) : undefined} />
