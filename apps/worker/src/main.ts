@@ -26,7 +26,7 @@ import {
   McpToolResolver,
   RedisFileStore,
 } from '@core/infra';
-import { createRuntimeRegistry, resolveConnectorToken, pollDriveFiles, fetchDriveFileBytes, pollSentryIssues } from '@core/sdk-plugins';
+import { createRuntimeRegistry, resolveConnectorToken, pollDriveFiles, fetchDriveFileBytes } from '@core/sdk-plugins';
 import { createLlmRouter } from '@core/llm';
 
 /**
@@ -147,43 +147,9 @@ async function main(): Promise<void> {
   // M52: sondea la fuente (hoy Google Drive) y encola una ejecución por cada fichero NUEVO desde el último
   // sondeo (cursor en Redis). Descarga los bytes al file store y deja el `FileRef` en `{{file:trigger}}` para
   // que el flujo (extraer texto → LLM → CRM) lo consuma directo, como el trigger de Drive de n8n.
-  // M79: sondea Sentry y encola una ejecución por cada issue NUEVO desde el último sondeo (cursor por `firstSeen`
-  // en Redis). Deja el issue en `{{issue}}` para que el flujo lo consuma (resumir, avisar, crear ticket…).
-  async function firePollSentry(schedule: ScheduleRecord, wf: { id: string; workspaceId: string }): Promise<void> {
-    const poll = schedule.poll;
-    if (!poll?.projectId) {
-      console.warn(`[schedule] ${schedule.id}: sondeo Sentry sin projectId; salto.`);
-      return;
-    }
-    const cursorKey = `af:sentrypoll:${schedule.id}`;
-    const cursor = await redis.get(cursorKey);
-    const nowIso = new Date().toISOString();
-    if (!cursor) {
-      await redis.set(cursorKey, nowIso); // línea base «desde ahora»: no dispara por issues preexistentes
-      console.log(`[schedule] ${schedule.id}: sondeo Sentry inicializado en ${nowIso}.`);
-      return;
-    }
-    const resolved = await resolveConnectorToken(connectors, secrets, poll.connectorId, schedule.workspaceId);
-    if (!resolved) {
-      console.warn(`[schedule] ${schedule.id}: conector ${poll.connectorId} no conectado; salto el sondeo.`);
-      return;
-    }
-    const { issues, newSince } = await pollSentryIssues({ token: resolved.token, project: poll.projectId, sinceIso: cursor });
-    for (const issue of issues) {
-      const execId = await enqueueWorkflowRun(wf, {
-        trigger: 'sentry',
-        scheduleId: schedule.id,
-        issue: { id: issue.id, shortId: issue.shortId, title: issue.title, culprit: issue.culprit, level: issue.level, permalink: issue.permalink, count: issue.count, firstSeen: issue.firstSeen },
-      });
-      console.log(`[schedule] ${schedule.id}: Sentry «${issue.shortId || issue.id}» → ejecución ${execId}.`);
-    }
-    await redis.set(cursorKey, newSince); // avanza el cursor SOLO tras encolar el lote
-  }
-
   async function firePollTrigger(schedule: ScheduleRecord, wf: { id: string; workspaceId: string }): Promise<void> {
     const poll = schedule.poll;
     if (!poll) return;
-    if (poll.provider === 'sentry') return firePollSentry(schedule, wf);
     if (poll.provider !== 'google-drive') {
       console.warn(`[schedule] ${schedule.id}: proveedor de sondeo no soportado (${poll.provider}).`);
       return;

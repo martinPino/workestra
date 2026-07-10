@@ -706,24 +706,27 @@ function DriveSection({ wfId }: { wfId: string }) {
   );
 }
 
-/** Sentry: conectar + proyecto + frecuencia de sondeo → crea el schedule con `poll` (M79). Calco de DriveSection. */
+// URL de instalación de la Sentry App (Public Integration) de Workestra: el usuario la instala en su org para
+// que Sentry envíe los webhooks. Slug estable de la plataforma.
+const SENTRY_INSTALL_URL = 'https://sentry.io/sentry-apps/workestra/external-install/';
+
+/** Sentry (M80): conectar (para listar proyectos) + instalar la app + elegir proyecto → crea el binding de
+ *  webhook. El trigger `issue.created` llega en TIEMPO REAL a /hooks/sentry; se enruta por «org/proyecto». */
 function SentrySection({ wfId }: { wfId: string }) {
   const t = useT();
   const { role } = useAuth();
   const qc = useQueryClient();
   const { connected: sentry, busy: connBusy, connect } = useProviderConnection('sentry');
-  const { data: schedules } = useSchedules(wfId);
+  const { data: bindings } = useTriggerBindings(wfId);
   const { data: projectData, isLoading: projLoading, isError: projError } = useSentryProjects(sentry?.id ?? null);
   const [projectId, setProjectId] = useState('');
-  const [everyMin, setEveryMin] = useState(5);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const projects = projectData?.projects ?? [];
   const projectName = (id?: string) => (id ? projects.find((p) => p.id === id)?.name ?? id : id ?? '');
-  const polls = (schedules ?? []).filter((s) => s.poll?.provider === 'sentry');
+  const sentryBindings = (bindings ?? []).filter((b) => b.eventId === 'sentry.issue_created');
 
-  // Preselecciona el primer proyecto en cuanto carga la lista (si el usuario no eligió aún).
   useEffect(() => {
     if (!projectId && projects.length) setProjectId(projects[0].id);
   }, [projects]);
@@ -742,12 +745,9 @@ function SentrySection({ wfId }: { wfId: string }) {
     setBusy(true);
     setErr(null);
     try {
-      await flushGraph(wfId); // el sondeo es un schedule: el Trigger guardado debe ser «cron»
-      await api.createSchedule(wfId, {
-        everyMs: everyMin * 60_000,
-        poll: { provider: 'sentry', connectorId: sentry.id, projectId },
-      });
-      await qc.invalidateQueries({ queryKey: ['schedules', wfId] });
+      await flushGraph(wfId); // el backend valida que el Trigger guardado sea «webhook»
+      await api.createTriggerBinding(wfId, { eventId: 'sentry.issue_created', connectorId: sentry.id, params: { project: projectId } });
+      await qc.invalidateQueries({ queryKey: ['triggerBindings', wfId] });
     } catch (e) {
       setErr(e instanceof Error ? e.message : t('Error al activar'));
     } finally {
@@ -757,22 +757,31 @@ function SentrySection({ wfId }: { wfId: string }) {
   const remove = async (id: string) => {
     setErr(null);
     try {
-      await api.deleteSchedule(id);
+      await api.deleteTriggerBinding(id);
     } catch (e) {
       setErr(e instanceof Error ? e.message : t('Error al eliminar'));
     }
-    await qc.invalidateQueries({ queryKey: ['schedules', wfId] });
+    await qc.invalidateQueries({ queryKey: ['triggerBindings', wfId] });
   };
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-[11px] text-txt-disabled">{t('Workestra vigilará el proyecto y arrancará el flujo por cada issue nuevo, con el issue listo para usar.')}</p>
+      <p className="text-[11px] text-txt-disabled">{t('Workestra arrancará el flujo en cuanto Sentry reporte un issue nuevo del proyecto, con el issue listo para usar.')}</p>
       {!sentry ? (
         <Button size="sm" variant="primary" onClick={doConnect} disabled={!canApprove(role) || connBusy}>
           <Plug size={13} /> {connBusy ? t('Conectando…') : t('Conectar Sentry')}
         </Button>
       ) : (
         <>
+          {/* Para que Sentry emita webhooks hay que instalar la app de Workestra en la org (una vez). */}
+          <a
+            href={SENTRY_INSTALL_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center justify-center gap-1 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-[11px] font-medium text-txt-secondary transition-colors hover:border-border-strong hover:text-txt-primary"
+          >
+            <Plug size={12} /> {t('Instalar Workestra en Sentry (una vez por organización)')}
+          </a>
           <label className="flex flex-col gap-1.5">
             <span className="text-[11px] font-medium text-txt-secondary">{t('Proyecto de Sentry')}</span>
             {projError ? (
@@ -796,36 +805,24 @@ function SentrySection({ wfId }: { wfId: string }) {
               </select>
             )}
           </label>
-          <label className="flex items-center gap-2 text-xs text-txt-secondary">
-            {t('Comprobar cada')}
-            <select value={everyMin} onChange={(e) => setEveryMin(Number(e.target.value))} className={SEL_SM}>
-              {[1, 5, 15, 30].map((n) => (
-                <option key={n} value={n}>
-                  {n} min
-                </option>
-              ))}
-            </select>
-          </label>
           <Button size="sm" variant="primary" onClick={activate} disabled={busy || !projectId || !canApprove(role)}>
-            <Zap size={13} /> {busy ? t('Activando…') : t('Vigilar el proyecto')}
+            <Zap size={13} /> {busy ? t('Activando…') : t('Activar disparador')}
           </Button>
         </>
       )}
       {!canApprove(role) && <p className="text-[11px] text-warning">{t('El rol')} {role} {t('no puede crear disparadores (requiere workflow:write).')}</p>}
       {err && <p className="text-[11px] text-danger">{err}</p>}
       <div className="space-y-1.5">
-        {polls.length === 0 ? (
+        {sentryBindings.length === 0 ? (
           <p className="text-[11px] text-txt-disabled">{t('Este flujo aún no vigila ningún proyecto de Sentry.')}</p>
         ) : (
-          polls.map((s) => (
-            <div key={s.id} className={ROW}>
+          sentryBindings.map((b) => (
+            <div key={b.id} className={ROW}>
               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-white">
                 <ProviderLogo provider="sentry" size={13} />
               </span>
-              <span className="min-w-0 flex-1 truncate text-txt-secondary">
-                {projectName(s.poll?.projectId)} · {humanEvery(s.everyMs ?? 0)}
-              </span>
-              <button onClick={() => remove(s.id)} className={DEL} disabled={!canApprove(role)} aria-label={t('Eliminar')}>
+              <span className="min-w-0 flex-1 truncate text-txt-secondary">{projectName(String(b.params.project ?? ''))}</span>
+              <button onClick={() => remove(b.id)} className={DEL} disabled={!canApprove(role)} aria-label={t('Eliminar')}>
                 <Trash2 size={13} />
               </button>
             </div>
@@ -862,14 +859,15 @@ function Leftovers({ wfId, choice }: { wfId: string; choice: string }) {
   if (choice !== 'webhook') {
     for (const w of webhooks ?? []) items.push({ key: `w-${w.id}`, label: `Webhook ${w.url}`, remove: () => api.deleteWebhook(w.id) });
   }
-  if (!choice.startsWith('jira.')) {
-    for (const b of bindings ?? []) {
-      items.push({
-        key: `b-${b.id}`,
-        label: `${t(JIRA_LABELS[b.eventId] ?? b.eventId)}${b.params.projectKey ? ` · ${b.params.projectKey}` : ''}`,
-        remove: () => api.deleteTriggerBinding(b.id),
-      });
-    }
+  for (const b of bindings ?? []) {
+    const isSentry = b.eventId === 'sentry.issue_created';
+    // Un binding es «resto» solo si NO corresponde a la elección actual (Jira vs Sentry vs otra).
+    const belongsToChoice = isSentry ? choice === 'sentry.issue_created' : choice.startsWith('jira.');
+    if (belongsToChoice) continue;
+    const label = isSentry
+      ? `Sentry${b.params.project ? ` · ${b.params.project}` : ''}`
+      : `${t(JIRA_LABELS[b.eventId] ?? b.eventId)}${b.params.projectKey ? ` · ${b.params.projectKey}` : ''}`;
+    items.push({ key: `b-${b.id}`, label, remove: () => api.deleteTriggerBinding(b.id) });
   }
   if (items.length === 0) return null;
 

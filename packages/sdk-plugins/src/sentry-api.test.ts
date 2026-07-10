@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { listSentryProjects, pollSentryIssues, getSentryIssueLatestEvent } from './sentry-api';
+import { createHmac } from 'node:crypto';
+import { listSentryProjects, pollSentryIssues, getSentryIssueLatestEvent, verifySentryWebhookSignature, parseSentryIssueWebhook } from './sentry-api';
 
 const ok = (body: unknown) => async () => ({ ok: true, status: 200, json: async () => body });
 
@@ -54,6 +55,51 @@ describe('pollSentryIssues', () => {
   it('en error NO avanza el cursor (reintenta el mismo lote)', async () => {
     const res = await pollSentryIssues({ token: 't', project: 'o/p', sinceIso: 'C', fetchFn: async () => ({ ok: false, status: 500, json: async () => [] }) });
     expect(res).toEqual({ issues: [], newSince: 'C' });
+  });
+});
+
+describe('verifySentryWebhookSignature', () => {
+  const secret = 'shhh';
+  const body = JSON.stringify({ action: 'created' });
+  const sig = createHmac('sha256', secret).update(body).digest('hex');
+
+  it('acepta la firma correcta y rechaza la incorrecta / vacía', () => {
+    expect(verifySentryWebhookSignature(body, sig, secret)).toBe(true);
+    expect(verifySentryWebhookSignature(body, sig, 'otro')).toBe(false);
+    expect(verifySentryWebhookSignature(body, 'deadbeef', secret)).toBe(false);
+    expect(verifySentryWebhookSignature(body, undefined, secret)).toBe(false);
+    expect(verifySentryWebhookSignature(body, sig, '')).toBe(false);
+  });
+});
+
+describe('parseSentryIssueWebhook', () => {
+  it('extrae action, org/proyecto (de web_url) e issue', () => {
+    const payload = {
+      action: 'created',
+      installation: { uuid: 'inst-1' },
+      data: {
+        issue: {
+          id: '42',
+          shortId: 'BACK-1',
+          title: 'TypeError: x',
+          culprit: 'render',
+          level: 'error',
+          firstSeen: '2026-01-01T00:00:00Z',
+          web_url: 'https://sentry.io/organizations/acme/issues/42/',
+          project: { id: '9', name: 'Backend', slug: 'backend' },
+        },
+      },
+    };
+    const r = parseSentryIssueWebhook(payload);
+    expect(r.action).toBe('created');
+    expect(r.project).toBe('acme/backend');
+    expect(r.issue).toMatchObject({ id: '42', shortId: 'BACK-1', title: 'TypeError: x', level: 'error', projectSlug: 'backend' });
+  });
+
+  it('project = null si no puede derivar la org', () => {
+    const r = parseSentryIssueWebhook({ action: 'resolved', data: { issue: { id: '1', project: { slug: 'p' } } } });
+    expect(r.action).toBe('resolved');
+    expect(r.project).toBeNull();
   });
 });
 

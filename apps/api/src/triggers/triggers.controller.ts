@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ScopesGuard } from '../rbac/scopes.guard';
 import { RequireScopes } from '../rbac/scopes.decorator';
 import { Public } from '../auth/public.decorator';
@@ -80,5 +80,33 @@ export class JiraHooksController {
       payload = {};
     }
     return this.svc.ingestJiraEvent(connectorId, token, payload);
+  }
+}
+
+/**
+ * Ingreso PÚBLICO de webhooks de Sentry (M80): la Sentry App (Public Integration) POSTea a `/hooks/sentry` con
+ * la firma `Sentry-Hook-Signature` (HMAC del cuerpo con el Client Secret) y `Sentry-Hook-Resource: issue`. El
+ * servicio verifica la firma y enruta por «org/proyecto» al flujo(s). Devuelve 202.
+ */
+@Public()
+@Controller('hooks/sentry')
+export class SentryHooksController {
+  constructor(private readonly svc: TriggersService) {}
+
+  @Post()
+  @HttpCode(202)
+  async ingest(
+    @Req() req: { rawBody?: Buffer; body?: unknown },
+    @Headers('sentry-hook-signature') signature?: string,
+    @Headers('sentry-hook-resource') resource?: string,
+  ) {
+    const rawBody = req.rawBody ?? Buffer.from(JSON.stringify(req.body ?? {}));
+    let payload: unknown = {};
+    try {
+      payload = rawBody.length ? JSON.parse(rawBody.toString('utf8')) : {};
+    } catch {
+      payload = {};
+    }
+    return this.svc.ingestSentryEvent(rawBody, signature, resource, payload);
   }
 }

@@ -637,6 +637,9 @@ export const EN: Record<string, string> = {
   '— elige un proyecto —': '— choose a project —',
   'Vigilar el proyecto': 'Watch the project',
   'Este flujo aún no vigila ningún proyecto de Sentry.': "This flow isn't watching any Sentry project yet.",
+  'Workestra arrancará el flujo en cuanto Sentry reporte un issue nuevo del proyecto, con el issue listo para usar.':
+    'Workestra will start the flow as soon as Sentry reports a new issue in the project, with the issue ready to use.',
+  'Instalar Workestra en Sentry (una vez por organización)': 'Install Workestra in Sentry (once per organization)',
   'Listar issues de un proyecto': "List a project's issues",
   'Filtro (opcional · sintaxis Sentry)': 'Filter (optional · Sentry syntax)',
   'Ver un issue (detalle)': 'View an issue (details)',

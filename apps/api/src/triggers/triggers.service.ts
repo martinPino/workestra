@@ -12,6 +12,8 @@ import {
   serializeTokenBlob,
   needsRefresh,
   refreshAccessToken,
+  verifySentryWebhookSignature,
+  parseSentryIssueWebhook,
   type JiraFetch,
   type JiraProject,
 } from '@core/sdk-plugins';
@@ -197,10 +199,30 @@ export class TriggersService {
     assertInWorkspace(wf?.workspaceId, workspaceId, 'Workflow');
 
     const def = getTriggerEvent(input.eventId);
-    if (!def || def.kind !== 'external' || def.provider !== 'jira') {
+    if (!def || def.kind !== 'external') {
       throw new BadRequestException(`Receta no soportada para auto-registro: ${input.eventId}`);
     }
     const params = input.params ?? {};
+
+    // Sentry (M80): la Sentry App tiene una URL de webhook GLOBAL, así que no hay nada que registrar por conector;
+    // solo persistimos el binding con el proyecto. El ingreso enruta por «org/proyecto» del payload.
+    if (def.provider === 'sentry') {
+      const project = typeof params.project === 'string' ? params.project.trim() : '';
+      if (!project) throw new BadRequestException('Elige un proyecto de Sentry.');
+      return this.p.triggerBindings.create({
+        workspaceId,
+        workflowId,
+        eventId: input.eventId,
+        connectorId: input.connectorId,
+        webhookId: `sentry:${input.connectorId}`,
+        remoteId: null,
+        params: { project },
+      });
+    }
+
+    if (def.provider !== 'jira') {
+      throw new BadRequestException(`Receta no soportada para auto-registro: ${input.eventId}`);
+    }
     const projectKey = typeof params.projectKey === 'string' ? params.projectKey.trim() : '';
     if (!projectKey) throw new BadRequestException('Elige un proyecto de Jira.');
 
@@ -292,6 +314,41 @@ export class TriggersService {
         b.workflowId,
         b.workspaceId,
         { ticket, variables: { trigger: 'webhook', connectorId, issueKey: ticket.key, payload } },
+        'webhook',
+      );
+      started.push(r.executionId);
+    }
+    return { started };
+  }
+
+  /**
+   * Ingreso PÚBLICO de webhooks de Sentry (URL global de la Sentry App, M80). Verifica la firma
+   * `Sentry-Hook-Signature` (HMAC con el Client Secret de la integración), y para `issue.created` enruta por
+   * «org/proyecto» del payload contra los trigger bindings activos. Arranca una ejecución por flujo coincidente.
+   */
+  async ingestSentryEvent(rawBody: Buffer, signature: string | undefined, resource: string | undefined, payload: unknown): Promise<{ started: string[] }> {
+    const secret = process.env.SENTRY_APP_CLIENT_SECRET ?? '';
+    if (!verifySentryWebhookSignature(rawBody, signature, secret)) throw new UnauthorizedException('Firma inválida.');
+    if (resource !== 'issue') return { started: [] }; // solo nos interesan los webhooks de issue
+
+    const parsed = parseSentryIssueWebhook(payload);
+    if (parsed.action !== 'created' || !parsed.project) return { started: [] };
+
+    const bindings = (await this.p.triggerBindings.listActive()).filter(
+      (b) => b.eventId === 'sentry.issue_created' && String(b.params.project ?? '') === parsed.project,
+    );
+    // Contexto amigable: `{{issue.title}}`, `{{issue.permalink}}`… + el payload crudo.
+    const issue = { ...parsed.issue, webhook: payload };
+    const started: string[] = [];
+    const seen = new Set<string>();
+    for (const b of bindings) {
+      if (seen.has(b.workflowId)) continue;
+      seen.add(b.workflowId);
+      setCurrentWorkspace(b.workspaceId);
+      const r = await this.executions.start(
+        b.workflowId,
+        b.workspaceId,
+        { issue, variables: { trigger: 'sentry', issueId: issue.id, payload } },
         'webhook',
       );
       started.push(r.executionId);

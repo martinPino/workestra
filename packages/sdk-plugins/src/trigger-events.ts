@@ -71,14 +71,15 @@ export const TRIGGER_EVENTS: TriggerEventDef[] = [
     triggerEvent: 'cron', // se materializa como un sondeo programado
   },
   {
-    // M79: la OAuth App pública de Sentry (PKCE) NO puede registrar webhooks → se SONDEA (schedule con `poll`),
-    // como Google Drive. El worker lista los issues nuevos del proyecto y dispara una ejecución por cada uno.
+    // M80: la Public Integration (Sentry App) de Sentry SÍ emite webhooks. El usuario instala la app de Workestra
+    // en su org (URL de instalación) y Sentry envía `issue.created` a /hooks/sentry en TIEMPO REAL.
     id: 'sentry.issue_created',
     label: 'Cuando aparece un nuevo issue en Sentry',
     icon: '🔺',
     kind: 'external',
     provider: 'sentry',
-    triggerEvent: 'cron', // sondeo programado
+    providerEvents: ['issue.created'],
+    triggerEvent: 'webhook',
   },
 ];
 

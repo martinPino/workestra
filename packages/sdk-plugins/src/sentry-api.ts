@@ -9,7 +9,77 @@
  * La base de la API es `https://sentry.io/api/0`. El `project` es el par «orgSlug/projectSlug» (identifica
  * inequívocamente un proyecto entre organizaciones).
  */
+import { createHmac, timingSafeEqual } from 'node:crypto';
+
 const SENTRY_API = 'https://sentry.io/api/0';
+
+/** URL de instalación de la Sentry App (Public Integration) para que una org instale Workestra. */
+export function sentryAppInstallUrl(slug: string): string {
+  return `https://sentry.io/sentry-apps/${encodeURIComponent(slug)}/external-install/`;
+}
+
+/**
+ * Verifica la firma de un webhook de Sentry (`Sentry-Hook-Signature`): HMAC-SHA256 del cuerpo CRUDO con el
+ * Client Secret de la integración, en hex. Comparación en tiempo constante. `false` ante cualquier duda.
+ */
+export function verifySentryWebhookSignature(rawBody: string | Buffer, signature: string | undefined, secret: string): boolean {
+  if (!signature || !secret) return false;
+  const expected = createHmac('sha256', secret).update(rawBody).digest('hex');
+  const a = Buffer.from(expected);
+  const b = Buffer.from(signature);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+export interface SentryWebhookIssue {
+  action: string; // created | resolved | assigned | archived | unresolved
+  /** «orgSlug/projectSlug» derivado del payload (para enrutar contra los trigger bindings). */
+  project: string | null;
+  issue: {
+    id: string;
+    shortId: string;
+    title: string;
+    culprit: string;
+    level: string;
+    permalink: string;
+    projectSlug: string;
+    firstSeen: string;
+  };
+}
+
+/** Extrae orgSlug de las URLs del issue (`/organizations/{org}/…` o `{org}.sentry.io`). `null` si no se puede. */
+function orgFromUrls(...urls: unknown[]): string | null {
+  for (const u of urls) {
+    const s = String(u ?? '');
+    const m1 = s.match(/\/organizations\/([^/]+)/);
+    if (m1) return m1[1];
+    const m2 = s.match(/https?:\/\/([^./]+)\.sentry\.io/);
+    if (m2 && m2[1] !== 'www') return m2[1];
+  }
+  return null;
+}
+
+/** Parsea el webhook de recurso `issue` de Sentry a un shape estable + el `org/proyecto` para enrutar. */
+export function parseSentryIssueWebhook(payload: unknown): SentryWebhookIssue {
+  const p = asRecord(payload);
+  const issue = asRecord(asRecord(p.data).issue);
+  const project = asRecord(issue.project);
+  const projectSlug = String(project.slug ?? '');
+  const org = orgFromUrls(issue.web_url, issue.permalink, project.slug && issue.project_url);
+  return {
+    action: String(p.action ?? ''),
+    project: org && projectSlug ? `${org}/${projectSlug}` : null,
+    issue: {
+      id: String(issue.id ?? ''),
+      shortId: String(issue.shortId ?? ''),
+      title: String(issue.title ?? '').slice(0, 300),
+      culprit: String(issue.culprit ?? '').slice(0, 300),
+      level: String(issue.level ?? ''),
+      permalink: String(issue.web_url ?? issue.permalink ?? ''),
+      projectSlug,
+      firstSeen: String(issue.firstSeen ?? ''),
+    },
+  };
+}
 
 type Fetchish = (url: string, init?: { headers?: Record<string, string> }) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>;
 
