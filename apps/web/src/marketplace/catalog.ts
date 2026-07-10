@@ -641,7 +641,7 @@ export const MARKETPLACE: MarketItem[] = [
   {
     id: 'auto-sentry-triage',
     kind: 'automation',
-    name: 'Sentry → Ticket de Jira',
+    name: 'Sentry → Jira Ticket',
     tagline: 'Cuando Sentry reporta un error, la IA lo triaja y crea el ticket en Jira.',
     description:
       'Arranca en tiempo real en cuanto aparece un nuevo issue en Sentry. La IA resume el error y su gravedad, y automáticamente crea una incidencia en tu board de Jira con el triaje y el enlace al issue. Perfecto para no perder ningún error y probar el disparador de Sentry de punta a punta.',
@@ -663,7 +663,7 @@ export const MARKETPLACE: MarketItem[] = [
     collections: ['new'],
     install: {
       workflow: {
-        name: 'Sentry → Ticket de Jira',
+        name: 'Sentry → Jira Ticket',
         doc: {
           nodes: [
             node('trigger', 'trigger', 40, 160, { event: 'webhook', eventId: 'sentry.issue_created' }),
