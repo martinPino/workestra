@@ -567,6 +567,48 @@ export const MARKETPLACE: MarketItem[] = [
     },
   },
   {
+    id: 'auto-sentry-triage',
+    kind: 'automation',
+    name: 'Triaje de issues de Sentry',
+    tagline: 'Cuando Sentry reporta un error nuevo, la IA lo triaja al instante.',
+    description:
+      'Arranca en tiempo real en cuanto aparece un nuevo issue en Sentry. La IA resume el error, indica su gravedad y sugiere un primer paso para investigarlo, y lo deja anotado. Perfecto para PROBAR el disparador de Sentry de punta a punta: instálalo, elige tu proyecto y provoca un error.',
+    icon: '🔺',
+    gradient: 'from-violet-500 to-purple-700',
+    category: 'Engineering',
+    difficulty: 'Fácil',
+    setupMinutes: 4,
+    connectors: ['sentry'],
+    mcps: [],
+    tools: [],
+    useCases: ['Triaje de errores', 'Guardia on-call', 'Probar el disparador de Sentry'],
+    requirements: ['Sentry conectado + la app de Workestra instalada en tu organización'],
+    rating: 4.9,
+    installs: 640,
+    author: 'workestra',
+    badges: ['New', 'AI Powered'],
+    collections: ['new'],
+    install: {
+      workflow: {
+        name: 'Triaje de issues de Sentry',
+        doc: {
+          nodes: [
+            node('trigger', 'trigger', 40, 160, { event: 'webhook', eventId: 'sentry.issue_created' }),
+            node('triage', 'llm', 320, 160, {
+              model: M,
+              prompt: 'Eres un ingeniero de guardia. En 2-3 frases: resume el error, di su gravedad (alta/media/baja) y un primer paso concreto para investigarlo.',
+              input: 'Issue: {{issue.title}}\nNivel: {{issue.level}}\nCausa probable: {{issue.culprit}}\nEnlace: {{issue.permalink}}',
+            }),
+            node('note', 'tool', 600, 160, { message: '🔺 Sentry {{issue.shortId}} — {{issue.title}}\nTriaje: {{agent:triage.output}}\n{{issue.permalink}}' }),
+            node('end', 'end', 860, 160, {}),
+          ],
+          edges: [edge('trigger', 'triage'), edge('triage', 'note'), edge('note', 'end')],
+          comments: [],
+        },
+      },
+    },
+  },
+  {
     id: 'auto-daily-report',
     kind: 'automation',
     name: 'Daily Report',
