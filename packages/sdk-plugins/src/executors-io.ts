@@ -6,10 +6,19 @@ import { interpolate, getPath } from './interpolate';
  * Se registran en el NodeExecutorRegistry sin tocar el runner (Open/Closed).
  */
 
+/** Tope para exponer la respuesta parseada: por encima, no se guarda (inflaría el contexto persistido). */
+export const JSON_MAX_BYTES = 64_000;
+
+/** ¿Parece un cuerpo JSON? Sirve para distinguir «era JSON pero pesaba demasiado» de «no era JSON». */
+function looksLikeJson(text: string): boolean {
+  const c = text.trimStart()[0];
+  return c === '{' || c === '[';
+}
+
 /** Parsea la respuesta a JSON para exponerla a nodos posteriores (`{{http:nodo.json.…}}`), solo si es
  *  pequeña (≤64 KB, no infla el contexto persistido) y es JSON válido. `undefined` en caso contrario. */
 export function safeHttpJson(text: string): unknown {
-  if (text.length > 64_000) return undefined;
+  if (text.length > JSON_MAX_BYTES) return undefined;
   try {
     return JSON.parse(text);
   } catch {
@@ -133,7 +142,14 @@ export class HttpNodeExecutor implements INodeExecutor {
       const text = await res.text();
       const bodyPreview = text.slice(0, 4000);
       const json = safeHttpJson(text); // respuesta parseada para {{http:nodo.json.…}}
-      return store({ status: res.status, ok: res.ok, bodyPreview, json });
+      // Si la respuesta se pasó del límite, `json` desaparece y `{{http:<paso>.json.…}}` resuelve a vacío: el
+      // paso «tiene éxito», el siguiente recibe nada y la IA redacta sobre un vacío sin que nada falle. Es la
+      // peor clase de fallo —silencioso— así que se dice, y se dice con el arreglo (pedir menos resultados).
+      const jsonOmitido =
+        json === undefined && text.length > JSON_MAX_BYTES && looksLikeJson(text)
+          ? `La respuesta ocupa ${Math.round(text.length / 1024)} KB y el límite para leerla desde otros pasos son ${Math.round(JSON_MAX_BYTES / 1024)} KB, así que {{http:${ctx.nodeKey}.json.…}} quedará vacío. Pide menos resultados (p. ej. baja «pageSize» o «limit» en la URL).`
+          : undefined;
+      return store({ status: res.status, ok: res.ok, bodyPreview, json, jsonOmitido });
     } catch (e) {
       return store({ error: e instanceof Error ? e.message : String(e) });
     }

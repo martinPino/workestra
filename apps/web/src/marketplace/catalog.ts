@@ -636,7 +636,12 @@ export const MARKETPLACE: MarketItem[] = [
               // artículos al día, así que pedir las 30 más recientes devuelve los 24 minutos anteriores a la
               // ejecución —notas de prensa sueltas—. El plan gratuito de NewsAPI sirve con ~24 h de retraso,
               // de ahí que la ventana sea de -2d a -1d y no «las últimas 24 h» (que saldría vacía).
-              url: 'https://newsapi.org/v2/everything?q=%22artificial%20intelligence%22%20OR%20%22generative%20AI%22%20OR%20OpenAI%20OR%20Anthropic&language=en&from={{fecha:-2d}}&to={{fecha:-1d}}&sortBy=popularity&pageSize=100',
+              //
+              // `pageSize=50` NO es arbitrario y subirlo rompe el flujo EN SILENCIO: el nodo HTTP solo expone
+              // `.json` a los pasos siguientes si la respuesta baja de 64 KB (`safeHttpJson`), y esta consulta
+              // pesa ~780 B por artículo → 50 ≈ 39 KB, pero 100 ≈ 83 KB. Pasado el límite, `{{http:news.json
+              // .articles}}` resuelve a vacío y la IA redacta un boletín sin noticias sin que nada falle.
+              url: 'https://newsapi.org/v2/everything?q=%22artificial%20intelligence%22%20OR%20%22generative%20AI%22%20OR%20OpenAI%20OR%20Anthropic&language=en&from={{fecha:-2d}}&to={{fecha:-1d}}&sortBy=popularity&pageSize=50',
               headers: '{"X-Api-Key":"YOUR_NEWSAPI_KEY"}',
             }),
             node('digest', 'llm', 560, 200, {

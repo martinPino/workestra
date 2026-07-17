@@ -126,3 +126,44 @@ describe('HTTP executor (método + cabeceras + cuerpo + interpolación · M31)',
     vi.unstubAllGlobals();
   });
 });
+
+// Una respuesta JSON que se pasa del tope deja de exponerse a los pasos siguientes. Que eso ocurra en
+// SILENCIO es lo que convierte «subir pageSize» en un boletín vacío que nadie sabe explicar.
+describe('HTTP — respuesta JSON demasiado grande (M82)', () => {
+  const httpRun = async (bodyText: string) => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(bodyText, { status: 200 })));
+    const res = await new HttpNodeExecutor().execute({
+      executionId: 'e',
+      workspaceId: 'ws',
+      nodeKey: 'news',
+      config: { url: 'https://api.example/x' },
+      context: emptyContext(),
+      signal: new AbortController().signal,
+      emit: () => {},
+    } as never);
+    vi.unstubAllGlobals();
+    return (res.context.variables as Record<string, Record<string, unknown>>)['http:news'];
+  };
+
+  const bigJson = JSON.stringify({ articles: Array.from({ length: 400 }, (_, i) => ({ i, pad: 'x'.repeat(200) })) });
+
+  it('avisa de que la respuesta no se puede leer desde otros pasos, y de cómo arreglarlo', async () => {
+    expect(bigJson.length).toBeGreaterThan(64_000); // premisa del test
+    const out = await httpRun(bigJson);
+    expect(out.json).toBeUndefined();
+    expect(String(out.jsonOmitido)).toContain('{{http:news.json.…}}');
+    expect(String(out.jsonOmitido)).toContain('pageSize'); // dice cómo arreglarlo, no solo que falló
+  });
+
+  it('una respuesta pequeña se expone y NO avisa', async () => {
+    const out = await httpRun('{"articles":[{"i":1}]}');
+    expect(out.json).toEqual({ articles: [{ i: 1 }] });
+    expect(out.jsonOmitido).toBeUndefined();
+  });
+
+  it('un cuerpo grande que NO es JSON (p. ej. HTML) no le echa la culpa al tope', async () => {
+    const out = await httpRun('<html>' + 'x'.repeat(70_000));
+    expect(out.json).toBeUndefined();
+    expect(out.jsonOmitido).toBeUndefined();
+  });
+});
