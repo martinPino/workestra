@@ -32,6 +32,8 @@ import {
 } from './commands';
 import { wouldCreateCycle } from './cycle';
 import { defaultConfig } from './node-types';
+import { useUI } from '../app/ui-store';
+import { translate } from '../i18n';
 
 let counter = 0;
 const uid = () => `${(++counter).toString(36)}${Math.floor(Math.random() * 1e4).toString(36)}`;
@@ -224,7 +226,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   addCommentAt: (position) =>
     // Plantilla tipo sticky (M60): 1ª línea = título, líneas con «- » = viñetas. El usuario la edita al vuelo.
-    get().dispatchCmd(addComment({ id: `c-${uid()}`, text: 'Nueva nota\n- Escribe aquí un punto', position, color: 'amber' })),
+    // El texto es contenido persistido, no UI: se traduce al crearlo, en el idioma activo.
+    get().dispatchCmd(
+      addComment({
+        id: `c-${uid()}`,
+        text: translate('Nueva nota\n- Escribe aquí un punto', useUI.getState().lang),
+        position,
+        color: 'amber',
+      }),
+    ),
   updateCommentText: (id, text) => get().dispatchCmd(updateComment(get().history.doc, id, text)),
   setCommentColorById: (id, color) => get().dispatchCmd(setCommentColor(get().history.doc, id, color)),
   setCommentSizeById: (id, from, to) => get().dispatchCmd(setCommentSize(id, from, to)),
