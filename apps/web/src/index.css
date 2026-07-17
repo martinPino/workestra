@@ -163,6 +163,13 @@ body {
   width: 8px;
   height: 8px;
 }
+/* El panel de herramientas/memoria cuelga DENTRO de su nodo, así que el z-index de los nodos vecinos lo
+   tapaba: React Flow escribe un z-index inline en cada .react-flow__node (y sube a 1000 el seleccionado),
+   y ningún z-index interno del panel puede escapar de ese contexto de apilamiento. Mientras está abierto,
+   elevamos el nodo entero por encima del resto; de ahí el !important (gana al estilo inline de React Flow). */
+.react-flow__node:has([data-tools-open]) {
+  z-index: 1001 !important;
+}
 .react-flow__controls {
   border-radius: 10px;
   overflow: hidden;

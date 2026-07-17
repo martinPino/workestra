@@ -253,7 +253,11 @@ export function AgentToolsPort({
   const cx = (i: number) => i * (CIRCLE + GAP) + CIRCLE / 2;
 
   return (
-    <div ref={ref} className="nodrag absolute left-1/2 top-full z-10 flex -translate-x-1/2 flex-col items-center">
+    <div
+      ref={ref}
+      data-tools-open={open || undefined}
+      className="nodrag absolute left-1/2 top-full z-10 flex -translate-x-1/2 flex-col items-center"
+    >
       {/* stub + puerto «Tools» */}
       <span className="h-2.5 w-px bg-border" />
       <div className="flex items-center gap-1.5">
