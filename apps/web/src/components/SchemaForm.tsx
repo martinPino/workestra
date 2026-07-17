@@ -167,7 +167,7 @@ function Field({ field, value, onChange }: { field: FieldSchema; value: unknown;
       <input
         type="number"
         value={value === undefined ? '' : Number(value)}
-        placeholder={field.placeholder}
+        placeholder={field.placeholder ? t(field.placeholder) : undefined}
         onChange={(e) => onChange(e.target.value === '' ? undefined : Number(e.target.value))}
         className={base}
       />
@@ -189,7 +189,7 @@ function Field({ field, value, onChange }: { field: FieldSchema; value: unknown;
     const jsonError = field.format === 'json' ? validateJsonTemplate(text) : null;
     return (
       <>
-        <VarField value={text} onChange={(v) => onChange(v)} vars={vars} multiline mono={field.format === 'json'} placeholder={field.placeholder} invalid={!!jsonError} />
+        <VarField value={text} onChange={(v) => onChange(v)} vars={vars} multiline mono={field.format === 'json'} placeholder={field.placeholder ? t(field.placeholder) : undefined} invalid={!!jsonError} />
         {field.format === 'json' && jsonError && (
           <span className="text-[11px] text-danger">{t('JSON inválido:')} {jsonError}</span>
         )}
@@ -199,5 +199,5 @@ function Field({ field, value, onChange }: { field: FieldSchema; value: unknown;
       </>
     );
   }
-  return <VarField value={String(value ?? '')} onChange={(v) => onChange(v)} vars={vars} placeholder={field.placeholder} />;
+  return <VarField value={String(value ?? '')} onChange={(v) => onChange(v)} vars={vars} placeholder={field.placeholder ? t(field.placeholder) : undefined} />;
 }
