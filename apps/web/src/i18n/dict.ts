@@ -1242,4 +1242,11 @@ export const EN: Record<string, string> = {
   "No repetir lo que ya escribió": "Don't repeat what it already wrote",
   "Recuerda lo que este paso escribió otros días y le pide que no lo repita. Necesita una «Tarea / entrada».":
     "Remembers what this step wrote on previous days and asks it not to repeat itself. Needs a “Task / input”.",
+
+  // Fechas que provee el motor, ofrecidas en «Insertar dato de un paso» (M82)
+  "Fecha: ahora mismo": "Date: right now",
+  "Fecha: ayer a esta hora": "Date: yesterday, same time",
+  "Fecha: hace 2 días": "Date: 2 days ago",
+  "Fecha: hace 1 hora": "Date: 1 hour ago",
+  "Fecha: ayer (solo el día)": "Date: yesterday (day only)",
 };
