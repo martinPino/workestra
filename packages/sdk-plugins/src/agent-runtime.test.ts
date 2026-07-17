@@ -469,3 +469,54 @@ describe('AgentRuntime — nunca entrega vacío por gastar los turnos en herrami
     expect(calls).toBe(1); // una y solo una
   });
 });
+
+// Tras el ida y vuelta de una herramienta, el último mensaje que ve el modelo es el resultado de la tool. Al
+// pedirle la respuesta forzada se quedaba mirando ahí: «no veo el JSON en tu último mensaje». Le recordamos
+// cuál era la tarea. Pasó de verdad con el digest: el agente pidió los artículos que ya tenía arriba.
+describe('AgentRuntime — la respuesta forzada recuerda la tarea', () => {
+  it('reenvía la tarea al pedir la respuesta final sin herramientas', async () => {
+    const { memory } = valueSpy();
+    let ultimo = '';
+    let conTools = true;
+    let turn = 0;
+    const router = {
+      async chat({ messages, tools }: { messages: Array<{ content: string }>; tools?: unknown[] }) {
+        turn += 1;
+        const usage = { inputTokens: 1, outputTokens: 1 };
+        if (tools && turn <= 99) {
+          return { content: '', toolCalls: [{ id: 'c', name: 'remember', arguments: { fact: 'x' } }], usage, model: 'mock-1', providerId: 'mock' };
+        }
+        conTools = !!tools;
+        ultimo = messages[messages.length - 1].content;
+        return { content: 'ok', toolCalls: [], usage, model: 'mock-1', providerId: 'mock' };
+      },
+    } as unknown as AgentRuntimeDeps['router'];
+
+    await new AgentRuntime({ ...deps(memory), router }).invoke(
+      agent({ memoryScope: 'persistent' }),
+      { ...emptyContext(), variables: { task: 'ELIGE 5 NOTICIAS DE ESTE JSON' } },
+      'ws1',
+    );
+    expect(conTools).toBe(false); // sin herramientas: no puede volver a pedir otra
+    expect(ultimo).toContain('ELIGE 5 NOTICIAS DE ESTE JSON'); // y sabe a qué responde
+  });
+
+  it('el bloque de memoria le dice que su respuesta se guarda sola (o gasta turnos apuntándola)', async () => {
+    const memory: AgentRuntimeDeps['memory'] = {
+      async get(_ws, _s, _o, key) {
+        return key === 'notes' ? ['lo de ayer'] : undefined;
+      },
+      async set() {},
+      async append() {},
+    };
+    let visto = '';
+    const router = {
+      async chat({ messages }: { messages: Array<{ content: string }> }) {
+        visto = messages.map((m) => m.content).join('\n');
+        return { content: 'ok', toolCalls: [], usage: { inputTokens: 1, outputTokens: 1 }, model: 'mock-1', providerId: 'mock' };
+      },
+    } as unknown as AgentRuntimeDeps['router'];
+    await new AgentRuntime({ ...deps(memory), router }).invoke(agent({ memoryScope: 'persistent' }), { ...emptyContext(), variables: { task: 'x' } }, 'ws1');
+    expect(visto).toContain('se guardará sola');
+  });
+});
