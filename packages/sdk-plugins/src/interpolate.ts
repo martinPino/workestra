@@ -1,4 +1,4 @@
-import type { ExecutionContext } from '@core/contracts';
+import { DATE_REF_RE, type ExecutionContext } from '@core/contracts';
 
 /**
  * Lee `path` (dot-notation) de un objeto. Las claves de variable pueden contener `:` e incluso `.`
@@ -43,11 +43,10 @@ export function getPath(root: unknown, path: string): unknown {
  * Formato ISO-8601 en UTC sin milisegundos (`2026-07-16T11:30:00`), que es lo que aceptan las APIs
  * habituales. `.date` da solo `2026-07-16` para las que quieren día suelto.
  */
-const FECHA_RE = /^fecha(?::([+-]\d+)([smhd]))?(?:\.(date|iso))?$/;
 const UNIT_MS: Record<string, number> = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 };
 
 function resolveFecha(path: string, now: number): string | undefined {
-  const m = FECHA_RE.exec(path.trim());
+  const m = DATE_REF_RE.exec(path.trim());
   if (!m) return undefined;
   const [, amount, unit, fmt] = m;
   const at = new Date(now + (amount ? Number(amount) * UNIT_MS[unit] : 0));

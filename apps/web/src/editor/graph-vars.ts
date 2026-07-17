@@ -1,4 +1,4 @@
-import type { NodeType } from '@core/contracts';
+import { isDateRef, type NodeType } from '@core/contracts';
 import type { GraphDoc, EditorNode } from './model';
 
 /**
@@ -76,6 +76,18 @@ export const TRIGGER_VARS: VarSuggestion[] = [
   { ref: 'issue.id', label: 'ID del issue (Sentry)', nodeId: 'trigger', kind: 'trigger' },
 ];
 
+/**
+ * Fechas que provee el MOTOR (M82), no un paso previo. Se ofrecen en todos los campos porque casi cualquier
+ * API con filtro temporal las pide, y sin verlas en la lista nadie adivina la sintaxis.
+ */
+export const DATE_VARS: VarSuggestion[] = [
+  { ref: 'fecha:-1d', label: 'Fecha: ayer a esta hora', nodeId: 'motor', kind: 'trigger' },
+  { ref: 'fecha', label: 'Fecha: ahora mismo', nodeId: 'motor', kind: 'trigger' },
+  { ref: 'fecha:-2d', label: 'Fecha: hace 2 días', nodeId: 'motor', kind: 'trigger' },
+  { ref: 'fecha:-1h', label: 'Fecha: hace 1 hora', nodeId: 'motor', kind: 'trigger' },
+  { ref: 'fecha:-1d.date', label: 'Fecha: ayer (solo el día)', nodeId: 'motor', kind: 'trigger' },
+];
+
 /** Sugerencias para el nodo `nodeId`: salidas de sus ancestros (cercanos primero) + del disparador. */
 export function availableVars(doc: GraphDoc, nodeId: string): VarSuggestion[] {
   const byId = new Map(doc.nodes.map((n) => [n.id, n]));
@@ -85,6 +97,7 @@ export function availableVars(doc: GraphDoc, nodeId: string): VarSuggestion[] {
     if (n) out.push(...outputsForNode(n));
   }
   out.push(...TRIGGER_VARS);
+  out.push(...DATE_VARS);
   return out;
 }
 
@@ -108,6 +121,9 @@ export function unknownRefs(text: string, vars: VarSuggestion[]): string[] {
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
     const tok = m[1].trim();
+    // Las fechas las provee el motor: no son referencias a pasos y marcarlas en rojo era un falso positivo
+    // que hacía desconfiar de los avisos de verdad. La regla es compartida con el runtime (@core/contracts).
+    if (isDateRef(tok)) continue;
     const ok = rootList.some((r) => tok === r || tok.startsWith(r + '.'));
     if (!ok && !bad.includes(tok)) bad.push(tok);
   }
