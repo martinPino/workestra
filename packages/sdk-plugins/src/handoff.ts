@@ -10,6 +10,8 @@ export interface HandoffRequest {
   includeVariableKeys?: string[];
   /** Claves de memoria COMPARTIDA a adjuntar (por ownerId destino), en orden determinista. */
   includeMemoryKeys?: string[];
+  /** Tenant del handoff (M81). Sin él NO se adjunta memoria: el almacén es multi-tenant y no podríamos aislarla. */
+  workspaceId?: string;
 }
 
 export interface Handoff {
@@ -43,11 +45,14 @@ export class HandoffService {
       if (key in req.context.variables) variables[key] = req.context.variables[key];
     }
 
+    // Memoria de EQUIPO (M81): su owner es el WORKSPACE, no el agente destino —es la memoria que todos los
+    // agentes del espacio comparten—. Leerla por `toAgentId` apuntaba a un namespace que nadie escribe: el
+    // handoff adjuntaba siempre vacío.
     const memory: Array<{ key: string; value: unknown }> = [];
-    if (this.memory && req.includeMemoryKeys?.length) {
+    if (this.memory && req.workspaceId && req.includeMemoryKeys?.length) {
       const scope: MemoryScope = 'shared';
       for (const key of [...req.includeMemoryKeys].sort()) {
-        const value = await this.memory.get(scope, req.toAgentId, key);
+        const value = await this.memory.get(req.workspaceId, scope, req.workspaceId, key);
         if (value !== undefined) memory.push({ key, value });
       }
     }

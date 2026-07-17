@@ -62,7 +62,9 @@ export const AgentSchema = z.object({
   tools: z.array(z.string()).default([]),
   // M40: servidores MCP enganchados a este agente; sus herramientas quedan disponibles al ejecutar.
   mcpServers: z.array(McpServerRefSchema).nullish(),
-  memoryScope: z.string().nullish(),
+  /** M81: memoria del agente. Ausente/`null` = apagada. Enum cerrado: un valor inventado apagaría la memoria
+      en silencio mientras la UI la muestra encendida, así que se rechaza en el borde. */
+  memoryScope: z.enum(['temporal', 'persistent', 'shared']).nullish(),
   variables: z.record(z.unknown()).nullish(),
   limits: z.record(z.unknown()).nullish(),
   permissions: z.record(z.unknown()).nullish(),

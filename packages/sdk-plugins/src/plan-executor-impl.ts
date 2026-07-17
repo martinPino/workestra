@@ -42,6 +42,7 @@ export class DefaultPlanExecutor implements PlanExecutor {
     initialContext: ExecutionContext,
     agents: Map<string, Agent>,
     emit: (event: unknown) => void,
+    workspaceId?: string,
   ): Promise<PlanExecutionResult> {
     const scheduler = createScheduler({
       nodes: plan.subtasks.map((s) => ({ key: s.id, type: 'agent', config: {}, position: { x: 0, y: 0 } })),
@@ -61,7 +62,7 @@ export class DefaultPlanExecutor implements PlanExecutor {
         if (ready.length === 0) break;
 
         const baseCtx = ctx;
-        const run = (id: string) => this.runSubtask(plan, id, baseCtx, agents, emit, defaultPolicy);
+        const run = (id: string) => this.runSubtask(plan, id, baseCtx, agents, emit, defaultPolicy, workspaceId);
         const outcomes = this.config.mode === 'sequential' ? await this.serial(ready, run) : await Promise.all(ready.map(run));
 
         const contributions: ContextContribution[] = outcomes.map((o) => ({ nodeKey: o.subtaskId, context: o.context }));
@@ -117,6 +118,7 @@ export class DefaultPlanExecutor implements PlanExecutor {
     agents: Map<string, Agent>,
     emit: (event: unknown) => void,
     defaultPolicy: SubtaskPolicy,
+    workspaceId?: string,
   ): Promise<SubtaskOutcome> {
     const st = plan.subtasks.find((s) => s.id === subtaskId)!;
     emit({ type: 'subtask.started', subtaskId: st.id, agentId: st.agentId });
@@ -136,6 +138,7 @@ export class DefaultPlanExecutor implements PlanExecutor {
           task: st.task,
           context: baseCtx,
           includeVariableKeys: st.handoff.variableKeys,
+          workspaceId,
         })
       : { ...baseCtx, variables: { ...baseCtx.variables, task: st.task } };
 
@@ -143,7 +146,9 @@ export class DefaultPlanExecutor implements PlanExecutor {
     let lastError: unknown;
     for (let attempt = 1; attempt <= policy.maxAttempts; attempt++) {
       try {
-        const r = await this.runtime.invoke(agent, subCtx);
+        // El tenant viaja hasta el subagente: sin él, un agente con memoria configurada correría SIN ella
+        // (falla cerrado) solo por ejecutarse a través del coordinador.
+        const r = await this.runtime.invoke(agent, subCtx, workspaceId);
         const output = String(r.output ?? '');
         emit({ type: 'subtask.succeeded', subtaskId: st.id, output: output.slice(0, 120) });
         return { subtaskId: st.id, output, context: r.context, tokens: r.tokens, cost: r.cost };

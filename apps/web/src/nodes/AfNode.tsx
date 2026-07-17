@@ -7,6 +7,7 @@ import { nodeSetupIssues } from '../editor/node-issues';
 import { ProviderLogo, hasProviderLogo } from '../lib/provider-logos';
 import { useAgents, useConnectors } from '../lib/hooks';
 import { agentGradient, agentInitial } from '../lib/agent-avatar';
+import { hasMemory } from '../lib/memory';
 import { useEditorStore } from '../editor/store';
 import { cn } from '../lib/cn';
 import { AgentToolsPort } from './AgentToolsPort';
@@ -258,9 +259,16 @@ export function AfNode({ id, data, selected }: NodeProps<AfNodeData>) {
       <Handle type="source" position={Position.Right} className={HANDLE_CLASS} />
 
       {/* Puerto «Herramientas» (M39): en un nodo Agente con agente resuelto, cuelga bajo la tarjeta los tools
-          del agente + un «+» para añadir/quitar (edita el agente; su runtime las usa). Oculto si está apagado. */}
-      {agent && !disabled && (data.editable || (agent.tools?.length ?? 0) > 0 || (agent.mcpServers?.length ?? 0) > 0) && (
-        <AgentToolsPort agentId={agent.id} tools={agent.tools ?? []} mcpServers={agent.mcpServers ?? []} editable={!!data.editable} />
+          del agente + su memoria (M81) + un «+» para añadir/quitar (edita el agente; su runtime los usa).
+          Oculto si está apagado. */}
+      {agent && !disabled && (data.editable || (agent.tools?.length ?? 0) > 0 || (agent.mcpServers?.length ?? 0) > 0 || hasMemory(agent.memoryScope)) && (
+        <AgentToolsPort
+          agentId={agent.id}
+          tools={agent.tools ?? []}
+          mcpServers={agent.mcpServers ?? []}
+          memoryScope={agent.memoryScope}
+          editable={!!data.editable}
+        />
       )}
     </div>
   );

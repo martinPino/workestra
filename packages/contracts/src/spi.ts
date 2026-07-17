@@ -98,7 +98,12 @@ export interface AgentResult {
 }
 
 export interface IAgentRuntime {
-  invoke(agent: Agent, ctx: ExecutionContext): Promise<AgentResult>;
+  /**
+   * `workspaceId` es el TENANT de la ejecución: sin él el runtime corre sin memoria ni herramientas de
+   * integración (falla cerrado, porque no podría aislarlas por tenant). Opcional para no romper a los
+   * llamantes que no lo tienen (p. ej. un test con contexto vacío).
+   */
+  invoke(agent: Agent, ctx: ExecutionContext, workspaceId?: string): Promise<AgentResult>;
 }
 
 /** Ej.: 'secrets:read:connector', 'net:egress:github.com', 'workflow:execute'. */

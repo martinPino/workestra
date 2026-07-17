@@ -44,5 +44,7 @@ export interface PlanExecutor {
     initialContext: ExecutionContext,
     agents: Map<string, Agent>,
     emit: (event: unknown) => void,
+    /** Tenant de la ejecución (M81). Sin él, los subagentes corren SIN memoria: no se puede aislar por tenant. */
+    workspaceId?: string,
   ): Promise<PlanExecutionResult>;
 }

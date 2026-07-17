@@ -85,7 +85,7 @@ export class Orchestrator {
         budget: this.deps.budget ?? budgetFromLimits(agent.limits),
       });
     const agentMap = new Map(available.map((a) => [a.id, a]));
-    const planResult = await executor.execute(plan, ctx, agentMap, emit);
+    const planResult = await executor.execute(plan, ctx, agentMap, emit, workspaceId);
     tokens += planResult.totalTokens;
     cost += planResult.totalCost;
 

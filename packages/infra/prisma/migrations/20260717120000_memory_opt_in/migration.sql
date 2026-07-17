@@ -1,0 +1,13 @@
+-- M81: la memoria del agente pasa a ser OPT-IN y `memoryScope` empieza a SIGNIFICAR algo.
+--
+-- Hasta ahora el campo se sembraba a 'shared' por defecto (create + seeds) y el runtime lo IGNORABA:
+-- daba a todos los agentes un bloc de notas privado y volátil. A partir de M81:
+--   NULL/''      → memoria apagada
+--   'temporal'   → solo dentro de una ejecución
+--   'persistent' → este agente recuerda entre ejecuciones
+--   'shared'     → memoria de EQUIPO (todos los agentes del workspace comparten)
+--
+-- Como NUNCA hubo UI para elegirlo, todo 'shared' guardado es el DEFAULT antiguo, no una decisión del
+-- usuario. Dejarlo tal cual convertiría a cada agente existente en memoria de equipo de golpe (y mezclaría
+-- el contexto entre agentes que no tienen nada que ver). Lo apagamos: la memoria se enciende desde la UI.
+UPDATE "Agent" SET "memoryScope" = NULL WHERE "memoryScope" = 'shared';

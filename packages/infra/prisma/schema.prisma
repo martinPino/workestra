@@ -389,13 +389,16 @@ model Memory {
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   scope       String
-  ownerId     String?
+  ownerId     String
   key         String
   value       Json
   kind        String
+  /// Caducidad (M81): la memoria «solo esta ejecución» se marca al escribirla y no se lee pasada la fecha.
   expiresAt   DateTime?
 
+  @@unique([workspaceId, scope, ownerId, key])
   @@index([workspaceId, scope, ownerId])
+  @@index([expiresAt])
 }
 
 model Prompt {

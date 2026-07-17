@@ -127,6 +127,8 @@ export interface AgentDto {
   model: string;
   tools: string[];
   mcpServers?: McpServerRef[] | null;
+  /** M81: memoria del agente. `null` = apagada; ver `MEMORY_MODES` en lib/memory. */
+  memoryScope?: string | null;
   isOrchestrator: boolean;
   permissions?: { role?: string } | null;
 }
@@ -139,6 +141,8 @@ export interface AgentInput {
   model?: string;
   tools?: string[];
   mcpServers?: Array<{ id?: string; name: string; url: string }>;
+  /** M81: `null`/omitido = memoria apagada; 'temporal' | 'persistent' | 'shared'. */
+  memoryScope?: string | null;
   isOrchestrator?: boolean;
 }
 

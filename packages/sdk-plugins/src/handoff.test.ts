@@ -10,20 +10,22 @@ const ctx = (): ExecutionContext => ({
   variables: { public: 'ok', 'agent:secreto': 'no-compartir', otra: 42 },
 });
 
+const WS = 'ws_1';
+
 class FakeMemory implements IMemoryStore {
   private readonly store = new Map<string, unknown>();
-  private k(s: MemoryScope, o: string, key: string) {
-    return `${s}/${o}/${key}`;
+  private k(ws: string, s: MemoryScope, o: string, key: string) {
+    return `${ws}/${s}/${o}/${key}`;
   }
-  async get(s: MemoryScope, o: string, key: string) {
-    return this.store.get(this.k(s, o, key));
+  async get(ws: string, s: MemoryScope, o: string, key: string) {
+    return this.store.get(this.k(ws, s, o, key));
   }
-  async set(s: MemoryScope, o: string, key: string, v: unknown) {
-    this.store.set(this.k(s, o, key), v);
+  async set(ws: string, s: MemoryScope, o: string, key: string, v: unknown) {
+    this.store.set(this.k(ws, s, o, key), v);
   }
-  async append(s: MemoryScope, o: string, key: string, v: unknown) {
-    const prev = (this.store.get(this.k(s, o, key)) as unknown[]) ?? [];
-    this.store.set(this.k(s, o, key), [...prev, v]);
+  async append(ws: string, s: MemoryScope, o: string, key: string, v: unknown) {
+    const prev = (this.store.get(this.k(ws, s, o, key)) as unknown[]) ?? [];
+    this.store.set(this.k(ws, s, o, key), [...prev, v]);
   }
 }
 
@@ -42,11 +44,14 @@ describe('HandoffService (context-slicing, mínimo privilegio)', () => {
     expect(h.repository).toEqual({ name: 'app' });
   });
 
-  it('adjunta memoria compartida del agente destino en orden determinista', async () => {
+  // La memoria de EQUIPO la escribe el runtime con el WORKSPACE como owner (M81); leerla por el id del agente
+  // destino apuntaba a un namespace que nadie escribe y el handoff adjuntaba siempre vacío.
+  it('adjunta la memoria de equipo (owner = workspace) en orden determinista', async () => {
     const mem = new FakeMemory();
-    await mem.set('shared', 'qa', 'b', 2);
-    await mem.set('shared', 'qa', 'a', 1);
-    await mem.set('shared', 'otro', 'a', 999); // de otro owner: NO se incluye
+    await mem.set(WS, 'shared', WS, 'b', 2);
+    await mem.set(WS, 'shared', WS, 'a', 1);
+    await mem.set(WS, 'shared', 'qa', 'a', 999); // otro owner (no es la memoria de equipo): NO se incluye
+    await mem.set('ws_2', 'shared', 'ws_2', 'a', 999); // otro tenant: NO se incluye
     const svc = new HandoffService(mem);
     const h = await svc.slice({
       fromAgentId: 'orch',
@@ -54,6 +59,7 @@ describe('HandoffService (context-slicing, mínimo privilegio)', () => {
       task: 't',
       context: ctx(),
       includeMemoryKeys: ['b', 'a', 'ausente'],
+      workspaceId: WS,
     });
     expect(h.memory).toEqual([
       { key: 'a', value: 1 },

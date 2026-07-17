@@ -15,7 +15,7 @@ import {
   PrismaTriggerBindingRepository,
   PrismaSecretStore,
   EventStorePublisher,
-  InMemoryMemoryStore,
+  PrismaMemoryStore,
   RedisContextStore,
   RedisWorkspaceUsageRepository,
   RedisEventPublisher,
@@ -58,7 +58,9 @@ async function main(): Promise<void> {
   const fileStore = new RedisFileStore(redis); // M48: mismo almacén de ficheros que la API (Redis compartido)
   const registry = createRuntimeRegistry({
     agents: new PrismaAgentRepository(prisma),
-    memory: new InMemoryMemoryStore(),
+    // M81: memoria DURABLE (Postgres), la MISMA que usa la API: sin esto, lo que un agente «recuerda» al
+    // ejecutarse en el worker moría con el proceso y la API nunca lo veía.
+    memory: new PrismaMemoryStore(prisma),
     // Registra el nodo Humano en el worker con el MISMO repo durable que la API (Prisma), de modo
     // que al reanudar en este proceso lea el veredicto persistido y continúe.
     pendingReviews: new PrismaPendingReviewRepository(prisma),

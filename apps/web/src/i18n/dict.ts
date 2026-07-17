@@ -1224,4 +1224,17 @@ export const EN: Record<string, string> = {
   "Radar de lanzamientos y regulación": "Radar for launches and regulation",
   "Una clave gratuita de NewsAPI (newsapi.org)": "A free NewsAPI key (newsapi.org)",
   "Slack conectado": "Slack connected",
+
+  // Memoria del agente (M81)
+  "Memoria": "Memory",
+  "Sin memoria": "No memory",
+  "Empieza de cero en cada ejecución.": "Starts from scratch on every run.",
+  "Solo esta ejecución": "Only this run",
+  "Recuerda mientras dura el flujo; al terminar, lo olvida.": "Remembers for as long as the flow runs, then forgets.",
+  "Recuerda siempre": "Remembers everything",
+  "Este trabajador recuerda lo suyo entre ejecuciones.": "This worker remembers its own work between runs.",
+  "Memoria de equipo": "Team memory",
+  "Todos los trabajadores del espacio comparten lo que recuerdan.": "Every worker in the workspace shares what they remember.",
+  "Qué recuerda este trabajador entre ejecuciones. Con memoria, guarda sus conclusiones y puede anotar lo que le pidas que recuerde.":
+    "What this worker remembers between runs. With memory on, it saves its conclusions and can note down anything you ask it to remember.",
 };

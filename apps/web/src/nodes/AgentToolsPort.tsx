@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { Plus, Check, X, Boxes, Wrench, TriangleAlert, Plug } from 'lucide-react';
+import { Plus, Check, X, Boxes, Wrench, TriangleAlert, Plug, Brain } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type McpServerRef } from '../lib/api';
 import { TOOL_CATALOG, MCP_PRESETS, INTEGRATION_PRESETS, isIntegrationUrl, integrationPresetForUrl } from '../lib/tools';
+import { MEMORY_MODES, memoryModeOf, hasMemory } from '../lib/memory';
 import { useConnectors } from '../lib/hooks';
 import { McpLogo } from '../lib/mcp-logos';
 import { useT } from '../i18n';
@@ -15,7 +16,8 @@ const LINK = 30; // alto del abanico de líneas punteadas del puerto a los círc
 
 type Item =
   | { kind: 'builtin'; key: string; label: string; icon: typeof Wrench }
-  | { kind: 'mcp'; id: string; label: string; url: string };
+  | { kind: 'mcp'; id: string; label: string; url: string }
+  | { kind: 'memory'; label: string };
 
 /**
  * Aviso + «Conectar» de un servidor MCP (M43/M45). Verifica la conexión (con la credencial guardada si está
@@ -178,11 +180,13 @@ export function AgentToolsPort({
   agentId,
   tools,
   mcpServers,
+  memoryScope,
   editable,
 }: {
   agentId: string;
   tools: string[];
   mcpServers: McpServerRef[];
+  memoryScope?: string | null;
   editable: boolean;
 }) {
   const t = useT();
@@ -192,7 +196,7 @@ export function AgentToolsPort({
   const ref = useRef<HTMLDivElement>(null);
 
   const save = useMutation({
-    mutationFn: (patch: { tools?: string[]; mcpServers?: McpServerRef[] }) => api.updateAgent(agentId, patch),
+    mutationFn: (patch: { tools?: string[]; mcpServers?: McpServerRef[]; memoryScope?: string | null }) => api.updateAgent(agentId, patch),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['agents'] }),
   });
 
@@ -227,7 +231,15 @@ export function AgentToolsPort({
     setOpen(false);
   };
 
+  // M81: la memoria cuelga del mismo puerto que las herramientas —es otra capacidad que le añades al agente—,
+  // primera de la fila para que se lea «este agente recuerda, y además usa estas tools».
+  const setMemory = (scope: string | null) => {
+    save.mutate({ memoryScope: scope });
+    setOpen(false);
+  };
+
   const items: Item[] = [
+    ...(hasMemory(memoryScope) ? [{ kind: 'memory', label: t(memoryModeOf(memoryScope).label) } as Item] : []),
     ...tools.map((key): Item => {
       const c = TOOL_CATALOG.find((x) => x.key === key);
       return { kind: 'builtin', key, label: c ? t(c.label) : key, icon: c?.icon ?? Wrench };
@@ -280,9 +292,24 @@ export function AgentToolsPort({
           </svg>
           <div className="flex justify-center" style={{ gap: GAP, paddingTop: LINK }}>
             {items.map((it) => (
-              <div key={it.kind === 'mcp' ? it.id : it.key} className="group/tool flex flex-col items-center" style={{ width: CIRCLE }}>
-                <div className="relative flex items-center justify-center rounded-full border border-border bg-elevated" style={{ width: CIRCLE, height: CIRCLE }}>
-                  {it.kind === 'mcp' ? <McpLogo server={{ url: it.url, name: it.label }} box={30} /> : <it.icon size={19} className="text-txt-secondary" />}
+              <div
+                key={it.kind === 'mcp' ? it.id : it.kind === 'memory' ? 'memory' : it.key}
+                className="group/tool flex flex-col items-center"
+                style={{ width: CIRCLE }}
+              >
+                <div
+                  className={`relative flex items-center justify-center rounded-full border bg-elevated ${
+                    it.kind === 'memory' ? 'border-primary/50' : 'border-border'
+                  }`}
+                  style={{ width: CIRCLE, height: CIRCLE }}
+                >
+                  {it.kind === 'mcp' ? (
+                    <McpLogo server={{ url: it.url, name: it.label }} box={30} />
+                  ) : it.kind === 'memory' ? (
+                    <Brain size={19} className="text-primary" />
+                  ) : (
+                    <it.icon size={19} className="text-txt-secondary" />
+                  )}
                   {it.kind === 'mcp' &&
                     (isIntegrationUrl(it.url) ? (
                       <IntegrationWarn server={{ name: it.label, url: it.url }} />
@@ -296,6 +323,7 @@ export function AgentToolsPort({
                       onClick={(e) => {
                         e.stopPropagation();
                         if (it.kind === 'mcp') removeMcp(it.id);
+                        else if (it.kind === 'memory') setMemory(null);
                         else toggleBuiltin(it.key);
                       }}
                       className="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full border border-border bg-card text-txt-secondary hover:text-danger group-hover/tool:flex"
@@ -304,7 +332,7 @@ export function AgentToolsPort({
                     </button>
                   )}
                 </div>
-                <span className="mt-1 max-w-[72px] truncate text-center text-[10px] text-txt-secondary">{it.label}</span>
+                <span className={`mt-1 max-w-[72px] truncate text-center text-[10px] ${it.kind === 'memory' ? 'text-primary' : 'text-txt-secondary'}`}>{it.label}</span>
               </div>
             ))}
           </div>
@@ -313,9 +341,12 @@ export function AgentToolsPort({
 
       {/* menú de añadir: tools internas + servidor MCP */}
       {open && (
-        <div className="absolute top-8 z-30 w-64 rounded-lg border border-border bg-elevated p-2 shadow-pop">
+        <div className="absolute top-8 z-30 max-h-[70vh] w-64 overflow-y-auto rounded-lg border border-border bg-elevated p-2 shadow-pop">
+          {/* Memoria (M81): una sola elección —qué recuerda el agente— antes de las herramientas que puede usar. */}
           <div className="flex items-center justify-between px-1 pb-1">
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-txt-disabled">{t('Herramientas')}</span>
+            <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-txt-disabled">
+              <Brain size={11} /> {t('Memoria')}
+            </span>
             <button
               type="button"
               aria-label={t('Cerrar')}
@@ -328,6 +359,33 @@ export function AgentToolsPort({
               <X size={12} />
             </button>
           </div>
+          {MEMORY_MODES.map((m) => {
+            const on = (memoryScope ?? null) === m.value;
+            return (
+              <button
+                key={m.value ?? 'off'}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMemory(m.value);
+                }}
+                className="flex w-full items-start gap-2 rounded-md px-1.5 py-1.5 text-left hover:bg-card"
+              >
+                <span className={`mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border ${on ? 'border-primary' : 'border-border'}`}>
+                  {on && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                </span>
+                <span className="min-w-0">
+                  <span className={`block text-xs ${on ? 'text-txt-primary' : 'text-txt-secondary'}`}>{t(m.label)}</span>
+                  <span className="block text-[10px] leading-snug text-txt-disabled">{t(m.desc)}</span>
+                </span>
+              </button>
+            );
+          })}
+
+          <div className="my-1.5 border-t border-border" />
+          <p className="flex items-center gap-1.5 px-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-txt-disabled">
+            <Wrench size={11} /> {t('Herramientas')}
+          </p>
           {TOOL_CATALOG.map((c) => {
             const on = tools.includes(c.key);
             return (

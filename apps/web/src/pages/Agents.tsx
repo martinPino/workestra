@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Bot, Crown, Wrench, Cpu, Plus, Pencil, Trash2, X, Check, Sparkles, Boxes } from 'lucide-react';
+import { Bot, Crown, Wrench, Cpu, Plus, Pencil, Trash2, X, Check, Sparkles, Boxes, Brain } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Page } from '../app/AppShell';
 import { Card, Badge, PageHeader, Button, EmptyState, Skeleton, Input, Textarea, Switch, IconButton } from '../ui';
 import { useAgents } from '../lib/hooks';
 import { useMediaQuery } from '../lib/useMediaQuery';
 import { TOOL_CATALOG, MCP_PRESETS, toolLabel, type McpPreset } from '../lib/tools';
+import { MEMORY_MODES, memoryModeOf, hasMemory } from '../lib/memory';
 import { McpLogo } from '../lib/mcp-logos';
 import { api, type AgentDto, type AgentInput, type AgentDraft, type McpServerRef } from '../lib/api';
 import { AgentChatPanel } from '../components/AgentChatPanel';
@@ -152,6 +153,8 @@ export function AgentForm({ initial, seed, onDone, onCancel }: { initial: AgentD
   // Servidores MCP / conectores del agente (M69): antes solo se podían asignar desde el nodo del editor.
   const [mcpServers, setMcpServers] = useState<McpServerRef[]>(initial?.mcpServers ?? []);
   const [mcpForm, setMcpForm] = useState({ name: '', url: '' });
+  // Memoria del agente (M81): opt-in; `null` = arranca de cero en cada ejecución.
+  const [memoryScope, setMemoryScope] = useState<string | null>(initial?.memoryScope ?? null);
   const [isOrchestrator, setIsOrchestrator] = useState(initial?.isOrchestrator ?? seed?.isOrchestrator ?? false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
@@ -195,6 +198,7 @@ export function AgentForm({ initial, seed, onDone, onCancel }: { initial: AgentD
       model,
       tools,
       mcpServers,
+      memoryScope,
       isOrchestrator,
     };
     try {
@@ -355,6 +359,38 @@ export function AgentForm({ initial, seed, onDone, onCancel }: { initial: AgentD
             </div>
           </div>
         </Field>
+
+        {/* Memoria (M81): qué se lleva el agente de una ejecución a la siguiente. Con memoria, arranca
+            recordando sus conclusiones anteriores y puede guardar hechos a propósito. */}
+        <Field
+          label={t('Memoria')}
+          hint={t('Qué recuerda este trabajador entre ejecuciones. Con memoria, guarda sus conclusiones y puede anotar lo que le pidas que recuerde.')}
+          className="md:col-span-2"
+        >
+          <div className="grid gap-1.5 sm:grid-cols-2">
+            {MEMORY_MODES.map((m) => {
+              const on = memoryScope === m.value;
+              return (
+                <button
+                  key={m.value ?? 'off'}
+                  type="button"
+                  onClick={() => setMemoryScope(m.value)}
+                  className={`flex items-start gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors ${
+                    on ? 'border-primary/60 bg-primary/10' : 'border-border bg-surface hover:border-border-strong'
+                  }`}
+                >
+                  <span className={`mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border ${on ? 'border-primary' : 'border-border'}`}>
+                    {on && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                  </span>
+                  <span className="min-w-0">
+                    <span className={`block text-xs font-medium ${on ? 'text-txt-primary' : 'text-txt-secondary'}`}>{t(m.label)}</span>
+                    <span className="block text-[11px] leading-snug text-txt-disabled">{t(m.desc)}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </Field>
       </div>
 
       <label className="mt-4 flex items-center gap-2.5">
@@ -461,6 +497,11 @@ function AgentCard({ agent, index, onEdit }: { agent: AgentDto; index: number; o
                 <McpLogo server={{ url: s.url, name: s.name }} box={13} /> {s.name}
               </span>
             ))}
+            {hasMemory(agent.memoryScope) && (
+              <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-[11px] text-primary" title={t(memoryModeOf(agent.memoryScope).desc)}>
+                <Brain size={11} /> {t(memoryModeOf(agent.memoryScope).label)}
+              </span>
+            )}
             {agent.tools.length === 0 && (agent.mcpServers ?? []).length === 0 && (
               <span className="inline-flex items-center gap-1 rounded-md bg-elevated px-2 py-0.5 text-[11px] text-txt-disabled">{t('sin tools')}</span>
             )}

@@ -1,5 +1,5 @@
 import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
-import { type Role, type McpServerRef, McpServerRefSchema, AgentDraftSchema, type AgentDraft } from '@core/contracts';
+import { type Role, type McpServerRef, McpServerRefSchema, AgentDraftSchema, type AgentDraft, type MemoryScope } from '@core/contracts';
 import { createLlmRouter } from '@core/llm';
 import { McpHttpClient } from '@core/infra';
 import { z } from 'zod';
@@ -29,10 +29,26 @@ interface CreateAgentBody {
   model?: string;
   tools?: string[];
   mcpServers?: McpServerRef[];
-  memoryScope?: string;
+  memoryScope?: MemoryScope | string | null;
   limits?: Record<string, unknown>;
   permissions?: { role?: Role };
   isOrchestrator?: boolean;
+}
+
+const MEMORY_SCOPES = ['temporal', 'persistent', 'shared'] as const;
+
+/**
+ * Valida la memoria del agente (M81): enum cerrado, o `null` para apagarla. Se RECHAZA un valor inventado en
+ * vez de normalizarlo a null: el runtime falla cerrado ante lo desconocido, así que un typo dejaría al agente
+ * sin memoria mientras la UI la sigue pintando encendida. Mejor un 400 que una mentira silenciosa.
+ */
+function normalizeMemoryScope(raw: unknown): MemoryScope | null {
+  if (raw === undefined || raw === null || raw === '') return null;
+  const parsed = z.enum(MEMORY_SCOPES).safeParse(raw);
+  if (!parsed.success) {
+    throw new BadRequestException(`memoryScope inválido: ${String(raw)}. Usa ${MEMORY_SCOPES.join(' | ')}, o null para apagarla.`);
+  }
+  return parsed.data;
 }
 
 /** Valida y normaliza los servidores MCP (M40): URL válida obligatoria; asegura un id estable por servidor. */
@@ -68,7 +84,9 @@ export class AgentsService {
       model: body.model ?? 'mock-1',
       tools: body.tools ?? [],
       mcpServers: body.mcpServers ? normalizeMcpServers(body.mcpServers) : null,
-      memoryScope: body.memoryScope ?? 'shared',
+      // M81: la memoria es OPT-IN. Antes se sembraba 'shared' por defecto (y el runtime lo ignoraba); ahora
+      // 'shared' significa memoria de EQUIPO, así que por defecto va apagada y se enciende desde la UI.
+      memoryScope: normalizeMemoryScope(body.memoryScope),
       variables: null,
       limits: body.limits ?? null,
       permissions: body.permissions ?? { role: 'EDITOR' },
@@ -85,7 +103,7 @@ export class AgentsService {
     if (body.model !== undefined) patch.model = body.model;
     if (body.tools !== undefined) patch.tools = body.tools;
     if (body.mcpServers !== undefined) patch.mcpServers = normalizeMcpServers(body.mcpServers);
-    if (body.memoryScope !== undefined) patch.memoryScope = body.memoryScope;
+    if (body.memoryScope !== undefined) patch.memoryScope = normalizeMemoryScope(body.memoryScope);
     if (body.limits !== undefined) patch.limits = body.limits;
     if (body.permissions !== undefined) patch.permissions = body.permissions;
     if (body.isOrchestrator !== undefined) patch.isOrchestrator = body.isOrchestrator;

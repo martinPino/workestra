@@ -533,10 +533,16 @@ export interface ISecretStore {
 
 // --------- Puerto de memoria (temporal/persistente/compartida) ---------
 
+/**
+ * Memoria del agente (M81). Deny-by-default por tenant: TODA operación se acota a un `workspaceId`, igual
+ * que el resto de puertos (secretos, conectores…) — sin él, una memoria de equipo (`shared`) se mezclaría
+ * entre workspaces. `ownerId` define QUIÉN recuerda según el scope: `temporal`→la ejecución,
+ * `persistent`→el agente, `shared`→el workspace (memoria de equipo).
+ */
 export interface IMemoryStore {
-  get(scope: MemoryScope, ownerId: string, key: string): Promise<unknown | undefined>;
-  set(scope: MemoryScope, ownerId: string, key: string, value: unknown): Promise<void>;
-  append(scope: MemoryScope, ownerId: string, key: string, value: unknown): Promise<void>;
+  get(workspaceId: string, scope: MemoryScope, ownerId: string, key: string): Promise<unknown | undefined>;
+  set(workspaceId: string, scope: MemoryScope, ownerId: string, key: string, value: unknown): Promise<void>;
+  append(workspaceId: string, scope: MemoryScope, ownerId: string, key: string, value: unknown): Promise<void>;
 }
 
 // --------- Puerto de claves de API (credencial duradera para MCP / apps externas, M32) ---------
