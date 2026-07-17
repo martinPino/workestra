@@ -288,3 +288,132 @@ describe('AgentRuntime', () => {
     expect(writes).toContainEqual({ ws: 'ws1', scope: 'persistent', ownerId: 'agent_1', key: 'facts' });
   });
 });
+
+// --- M83: la memoria tiene que dar para CONSTRUIR ------------------------------------------------
+// Los topes de M81 (200/280 al guardar, 1.500 para todo el recuerdo) la hacían inservible: un agente que
+// redacta un boletín guardaba la cabecera y tiraba el contenido. «Recordar solo el título de lo que hiciste»
+// no permite construir «no repitas lo que ya enviaste» escribiéndolo en las instrucciones.
+
+/** Espía que captura los VALORES escritos, no solo que se escribió. */
+const valueSpy = () => {
+  const store = new Map<string, unknown[]>();
+  const memory: AgentRuntimeDeps['memory'] = {
+    async get(_ws, _s, _o, key) {
+      return store.get(key);
+    },
+    async set() {},
+    async append(_ws, _s, _o, key, value) {
+      store.set(key, [...(store.get(key) ?? []), value]);
+    },
+  };
+  return { store, memory };
+};
+
+const DIGEST = `*🤖 AI News Digest — July 16*\n\n${Array.from({ length: 5 }, (_, i) => `*${i + 1}. Titular número ${i + 1} sobre modelos y regulación*\n> Por qué importa, en un par de frases que ocupan lo suyo.\nhttps://ejemplo.com/noticia-${i + 1}`).join('\n\n')}`;
+
+describe('AgentRuntime — memoria utilizable (M83)', () => {
+  it('un boletín entero cabe en la conclusión: no se guarda solo la cabecera', async () => {
+    const { store, memory } = valueSpy();
+    const router = {
+      async chat() {
+        return { content: DIGEST, toolCalls: [], usage: { inputTokens: 1, outputTokens: 1 }, model: 'mock-1', providerId: 'mock' };
+      },
+    } as unknown as AgentRuntimeDeps['router'];
+
+    await new AgentRuntime({ ...deps(memory), router }).invoke(agent({ memoryScope: 'persistent' }), { ...emptyContext(), variables: { task: 'redacta' } }, 'ws1');
+    const guardado = String((store.get('notes') as string[])[0]);
+    expect(DIGEST.length).toBeGreaterThan(200); // premisa: con el tope viejo se habría perdido
+    expect(guardado).toBe(DIGEST); // entero, con sus 5 titulares y sus 5 enlaces
+    expect(guardado).toContain('https://ejemplo.com/noticia-5');
+  });
+
+  it('«remember» acepta un párrafo, no solo una frase', async () => {
+    const { store, memory } = valueSpy();
+    const parrafo =
+      'Hoy envié estos 5 titulares y no debo repetirlos: ' +
+      Array.from({ length: 5 }, (_, i) => `(${i + 1}) un titular de los de verdad, con su medio y su enlace, número ${i + 1} de la tanda`).join('; ');
+    let turn = 0;
+    const router = {
+      async chat() {
+        turn += 1;
+        const usage = { inputTokens: 1, outputTokens: 1 };
+        return turn === 1
+          ? { content: '', toolCalls: [{ id: 'c1', name: 'remember', arguments: { fact: parrafo } }], usage, model: 'mock-1', providerId: 'mock' }
+          : { content: 'ok', toolCalls: [], usage, model: 'mock-1', providerId: 'mock' };
+      },
+    } as unknown as AgentRuntimeDeps['router'];
+
+    await new AgentRuntime({ ...deps(memory), router }).invoke(agent({ memoryScope: 'persistent' }), { ...emptyContext(), variables: { task: 'x' } }, 'ws1');
+    expect(parrafo.length).toBeGreaterThan(280); // premisa: con el tope viejo se habría cortado
+    expect((store.get('facts') as string[])[0]).toBe(parrafo);
+  });
+
+  it('lo recordado vuelve ENTERO al prompt de la siguiente ejecución (el caso «no repitas»)', async () => {
+    const memory: AgentRuntimeDeps['memory'] = {
+      async get(_ws, _s, _o, key) {
+        return key === 'notes' ? [DIGEST] : undefined;
+      },
+      async set() {},
+      async append() {},
+    };
+    let seen = '';
+    const router = {
+      async chat({ messages }: { messages: Array<{ content: string }> }) {
+        seen = messages.map((m) => m.content).join('\n');
+        return { content: 'ok', toolCalls: [], usage: { inputTokens: 1, outputTokens: 1 }, model: 'mock-1', providerId: 'mock' };
+      },
+    } as unknown as AgentRuntimeDeps['router'];
+
+    await new AgentRuntime({ ...deps(memory), router }).invoke(agent({ memoryScope: 'persistent' }), { ...emptyContext(), variables: { task: 'redacta otro' } }, 'ws1');
+    // El modelo ve los titulares Y los enlaces que mandó: puede no repetirlos sin que nadie parsee nada.
+    expect(seen).toContain('Titular número 1');
+    expect(seen).toContain('https://ejemplo.com/noticia-5');
+  });
+
+  it('el presupuesto acota el prompt: sobran las viejas, no las nuevas', async () => {
+    const vieja = 'V'.repeat(3000);
+    const media = 'M'.repeat(3000);
+    const nueva = 'NUEVA-DE-HOY';
+    const memory: AgentRuntimeDeps['memory'] = {
+      async get(_ws, _s, _o, key) {
+        return key === 'notes' ? [vieja, media, nueva] : undefined;
+      },
+      async set() {},
+      async append() {},
+    };
+    let seen = '';
+    const router = {
+      async chat({ messages }: { messages: Array<{ content: string }> }) {
+        seen = messages.map((m) => m.content).join('\n');
+        return { content: 'ok', toolCalls: [], usage: { inputTokens: 1, outputTokens: 1 }, model: 'mock-1', providerId: 'mock' };
+      },
+    } as unknown as AgentRuntimeDeps['router'];
+
+    await new AgentRuntime({ ...deps(memory), router }).invoke(agent({ memoryScope: 'persistent' }), { ...emptyContext(), variables: { task: 'x' } }, 'ws1');
+    expect(seen).toContain(nueva); // la de hoy siempre
+    expect(seen).toContain(media); // cabe (3000 + 12 < 6000)
+    expect(seen).not.toContain(vieja); // la más vieja se cae por presupuesto
+  });
+
+  it('una sola entrada gigante se recorta, pero NO desaparece', async () => {
+    const enorme = 'X'.repeat(20_000) + 'FINAL';
+    const memory: AgentRuntimeDeps['memory'] = {
+      async get(_ws, _s, _o, key) {
+        return key === 'notes' ? [enorme] : undefined;
+      },
+      async set() {},
+      async append() {},
+    };
+    let seen = '';
+    const router = {
+      async chat({ messages }: { messages: Array<{ content: string }> }) {
+        seen = messages.map((m) => m.content).join('\n');
+        return { content: 'ok', toolCalls: [], usage: { inputTokens: 1, outputTokens: 1 }, model: 'mock-1', providerId: 'mock' };
+      },
+    } as unknown as AgentRuntimeDeps['router'];
+
+    await new AgentRuntime({ ...deps(memory), router }).invoke(agent({ memoryScope: 'persistent' }), { ...emptyContext(), variables: { task: 'x' } }, 'ws1');
+    expect(seen).toContain('Conclusiones previas: XXXX'); // llegó algo…
+    expect(seen).not.toContain('FINAL'); // …recortado, pero el recuerdo no se calló entero
+  });
+});

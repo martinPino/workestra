@@ -42,16 +42,47 @@ function roleOf(agent: Agent): Role {
 /** Claves de memoria (M81): `notes` = lo que el agente concluyó al terminar; `facts` = lo que decidió recordar. */
 const MEM_NOTES = 'notes';
 const MEM_FACTS = 'facts';
-/** Cuántas entradas de cada clave se le recuerdan al modelo. Las más RECIENTES: la memoria envejece. */
-const MEM_RECALL = 8;
 
 /**
- * Rinde una clave de memoria para el prompt. Recorta por ENTRADAS (las últimas), no por caracteres del JSON:
- * truncar la cadena dejaría fijas las entradas más antiguas y los recuerdos nuevos no llegarían nunca al modelo.
+ * Cuánto se GUARDA por entrada (M83). Los topes de M81 (200 y 280) hacían la memoria inútil para construir
+ * nada: la conclusión de un agente que redacta —un boletín, un resumen, un informe— ronda los 1.000-2.000
+ * caracteres, así que guardar 200 dejaba la cabecera y tiraba el contenido. Recordar solo el título de lo que
+ * hiciste no es recordar.
+ */
+const MEM_NOTE_CHARS = 2000;
+const MEM_FACT_CHARS = 1000;
+
+/**
+ * Cuánto se RECUERDA en el prompt: un PRESUPUESTO de caracteres por clave, no un número fijo de entradas.
+ * Con entradas de tamaño libre, «las últimas 8» puede ser una línea o veinte mil caracteres; lo que hay que
+ * acotar es lo que ocupa en el prompt. Se cogen las más RECIENTES que quepan.
+ */
+const MEM_RECALL_CHARS = 6000;
+/** Techo de entradas, para que mil recuerdos diminutos no conviertan el prompt en una lista infinita. */
+const MEM_RECALL_MAX = 12;
+
+/**
+ * Rinde una clave de memoria para el prompt: las entradas más RECIENTES que entren en el presupuesto, en
+ * orden cronológico y separadas, no como JSON escapado (el modelo lee texto, no `["...\\n..."]`).
+ *
+ * Nunca devuelve vacío por presupuesto: si la última entrada sola ya no cabe, se recorta. Callar el recuerdo
+ * más reciente por pasarse de largo sería el peor de los recortes posibles.
  */
 function renderMemory(value: unknown): string {
-  const recent = Array.isArray(value) ? value.slice(-MEM_RECALL) : value;
-  return JSON.stringify(recent).slice(0, 1500);
+  const items = Array.isArray(value) ? value : [value];
+  const asText = (x: unknown): string => (typeof x === 'string' ? x : JSON.stringify(x) ?? '');
+  const out: string[] = [];
+  let left = MEM_RECALL_CHARS;
+  for (let i = items.length - 1; i >= 0 && out.length < MEM_RECALL_MAX; i--) {
+    const s = asText(items[i]);
+    if (s.length > left) {
+      if (out.length === 0 && left > 0) out.push(s.slice(0, left)); // la más reciente entra siempre, recortada
+      break;
+    }
+    left -= s.length;
+    out.push(s);
+  }
+  return out.reverse().join('\n---\n');
 }
 
 /**
@@ -122,10 +153,10 @@ export class AgentRuntime implements IAgentRuntime {
             {
               name: 'remember',
               description:
-                'Guarda un hecho en tu memoria para futuras ejecuciones. Úsalo solo para datos DURADEROS y útiles (una preferencia, una decisión, contexto del cliente), no para el detalle de esta tarea.',
+                'Guarda algo en tu memoria para futuras ejecuciones: lo que quieras tener delante la próxima vez que te toque esta tarea (una preferencia, una decisión, contexto del cliente, o lo que acabas de entregar para no repetirlo). Cabe un párrafo, no solo una frase.',
               parameters: {
                 type: 'object',
-                properties: { fact: { type: 'string', description: 'El hecho a recordar, en una frase.' } },
+                properties: { fact: { type: 'string', description: 'Lo que hay que recordar. Puede ser una lista o un párrafo.' } },
                 required: ['fact'],
               },
               // Escribir memoria es una ESCRITURA sobre el agente y, en «memoria de equipo», sobre lo que leerán
@@ -135,7 +166,7 @@ export class AgentRuntime implements IAgentRuntime {
               invoke: async (args: Record<string, unknown>) => {
                 const fact = String(args.fact ?? '').trim();
                 if (!fact) return { error: 'invalid_args', detail: 'fact es obligatorio.' };
-                await store.append(workspaceId, mem.scope, mem.ownerId, MEM_FACTS, fact.slice(0, 280));
+                await store.append(workspaceId, mem.scope, mem.ownerId, MEM_FACTS, fact.slice(0, MEM_FACT_CHARS));
                 return { remembered: true };
               },
             },
@@ -248,7 +279,7 @@ export class AgentRuntime implements IAgentRuntime {
 
     // M81: al terminar, guarda su conclusión en la memoria configurada (best-effort: no rompe la ejecución).
     if (store && mem && workspaceId && finalText) {
-      await store.append(workspaceId, mem.scope, mem.ownerId, MEM_NOTES, finalText.slice(0, 200)).catch(() => undefined);
+      await store.append(workspaceId, mem.scope, mem.ownerId, MEM_NOTES, finalText.slice(0, MEM_NOTE_CHARS)).catch(() => undefined);
     }
 
     const context: ExecutionContext = {
