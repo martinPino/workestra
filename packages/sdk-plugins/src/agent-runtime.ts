@@ -225,6 +225,8 @@ export class AgentRuntime implements IAgentRuntime {
     let finalText = '';
     const toolLog: Array<{ tool: string; allowed: boolean; result: unknown }> = [];
 
+    let usedTools = false;
+
     for (let i = 0; i < this.maxIterations; i++) {
       const res = await this.deps.router.chat({
         model: agent.model,
@@ -238,6 +240,7 @@ export class AgentRuntime implements IAgentRuntime {
         finalText = res.content;
         break;
       }
+      usedTools = true;
 
       for (const call of res.toolCalls) {
         let result: unknown;
@@ -275,6 +278,17 @@ export class AgentRuntime implements IAgentRuntime {
         messages.push({ role: 'assistant', content: `tool_call:${call.name}` });
         messages.push({ role: 'tool', name: call.name, content: JSON.stringify(result).slice(0, 500), toolCallId: call.id });
       }
+    }
+
+    // Se acabaron los turnos sin respuesta: se le pide UNA vez más, ya SIN herramientas, así no puede volver
+    // a pedir otra y tiene que redactar. Pasa con un agente aplicado —guarda en memoria, consulta, guarda— que
+    // gasta el presupuesto en herramientas; sin esto entrega VACÍO, el nodo «tiene éxito» igual y lo que se
+    // publica es un mensaje en blanco. Silencioso, que es la peor forma de fallar.
+    if (!finalText && usedTools) {
+      const res = await this.deps.router.chat({ model: agent.model, messages });
+      tokens += res.usage.inputTokens + res.usage.outputTokens;
+      cost += this.cost.cost(agent.model, res.usage).total;
+      finalText = res.content;
     }
 
     // M81: al terminar, guarda su conclusión en la memoria configurada (best-effort: no rompe la ejecución).

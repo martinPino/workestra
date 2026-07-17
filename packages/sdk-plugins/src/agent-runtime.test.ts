@@ -417,3 +417,55 @@ describe('AgentRuntime — memoria utilizable (M83)', () => {
     expect(seen).not.toContain('FINAL'); // …recortado, pero el recuerdo no se calló entero
   });
 });
+
+// El bucle da un presupuesto de turnos. Un agente aplicado puede gastárselo entero usando herramientas
+// —guardar en memoria, consultar, guardar— y quedarse sin turno para responder. Pasó de verdad: el Asistente
+// del digest hizo 4 llamadas a `remember` y entregó un boletín VACÍO, con el nodo dándose por bueno.
+describe('AgentRuntime — nunca entrega vacío por gastar los turnos en herramientas', () => {
+  const rounds = (n: number) => {
+    let turn = 0;
+    return {
+      async chat({ tools }: { tools?: unknown[] }) {
+        turn += 1;
+        const usage = { inputTokens: 1, outputTokens: 1 };
+        // Pide una herramienta en cada ronda mientras se las ofrezcan; si no hay, responde.
+        return tools && turn <= n
+          ? { content: '', toolCalls: [{ id: `c${turn}`, name: 'remember', arguments: { fact: `hecho ${turn}` } }], usage, model: 'mock-1', providerId: 'mock' }
+          : { content: 'EL BOLETÍN', toolCalls: [], usage, model: 'mock-1', providerId: 'mock' };
+      },
+    } as unknown as AgentRuntimeDeps['router'];
+  };
+
+  it('si agota los turnos pidiendo herramientas, se le pide la respuesta SIN ellas', async () => {
+    const { memory } = valueSpy();
+    const res = await new AgentRuntime({ ...deps(memory), router: rounds(99) }).invoke(
+      agent({ memoryScope: 'persistent' }),
+      { ...emptyContext(), variables: { task: 'redacta' } },
+      'ws1',
+    );
+    expect(res.output).toBe('EL BOLETÍN'); // antes: '' y el flujo publicaba un mensaje en blanco
+  });
+
+  it('la conclusión forzada TAMBIÉN se guarda en memoria (si no, mañana no recordaría nada)', async () => {
+    const { store, memory } = valueSpy();
+    await new AgentRuntime({ ...deps(memory), router: rounds(99) }).invoke(
+      agent({ memoryScope: 'persistent' }),
+      { ...emptyContext(), variables: { task: 'redacta' } },
+      'ws1',
+    );
+    expect(store.get('notes')).toEqual(['EL BOLETÍN']);
+  });
+
+  it('no gasta una llamada de más cuando el agente responde por las buenas', async () => {
+    let calls = 0;
+    const router = {
+      async chat() {
+        calls += 1;
+        return { content: 'directo', toolCalls: [], usage: { inputTokens: 1, outputTokens: 1 }, model: 'mock-1', providerId: 'mock' };
+      },
+    } as unknown as AgentRuntimeDeps['router'];
+    const res = await new AgentRuntime({ ...deps(), router }).invoke(agent(), { ...emptyContext(), variables: { task: 'x' } }, 'ws1');
+    expect(res.output).toBe('directo');
+    expect(calls).toBe(1); // una y solo una
+  });
+});
