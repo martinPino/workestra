@@ -603,6 +603,77 @@ export const MARKETPLACE: MarketItem[] = [
 
   // ---------------------------------- AUTOMATIONS ----------------------------------
   {
+    id: 'ai-news-digest',
+    kind: 'automation',
+    name: 'AI News Digest',
+    tagline: 'Cada día, la IA elige las 5 noticias de IA más relevantes y las publica en Slack.',
+    description:
+      'Un boletín diario automático. Trae las noticias más recientes de IA desde NewsAPI, la IA las lee todas y selecciona las 5 más relevantes (lanzamientos de modelos, investigación con impacto, movimientos de las grandes, regulación y financiación), descarta clickbait y coberturas duplicadas, y publica un resumen limpio en tu canal de Slack, sin previews de enlaces. Solo tienes que pegar tu clave gratuita de NewsAPI y elegir el canal.',
+    icon: '🗞️',
+    gradient: 'from-sky-500 to-indigo-500',
+    category: 'Operations',
+    difficulty: 'Fácil',
+    setupMinutes: 4,
+    connectors: ['slack'],
+    mcps: [],
+    tools: [],
+    useCases: ['Boletín diario de IA para tu equipo', 'Vigilancia del sector y la competencia', 'Radar de lanzamientos y regulación'],
+    requirements: ['Una clave gratuita de NewsAPI (newsapi.org)', 'Slack conectado'],
+    rating: 4.9,
+    installs: 0,
+    author: 'workestra',
+    badges: ['New', 'AI Powered'],
+    collections: ['new', 'popular', 'beginner'],
+    install: {
+      workflow: {
+        name: 'AI News Digest',
+        doc: {
+          nodes: [
+            node('trigger', 'trigger', 40, 200, { event: 'cron', eventId: 'schedule' }),
+            node('news', 'api', 300, 200, {
+              method: 'GET',
+              url: 'https://newsapi.org/v2/everything?q=%22artificial%20intelligence%22%20OR%20%22generative%20AI%22%20OR%20OpenAI%20OR%20Anthropic&language=en&sortBy=publishedAt&pageSize=30',
+              headers: '{"X-Api-Key":"YOUR_NEWSAPI_KEY"}',
+            }),
+            node('digest', 'llm', 560, 200, {
+              model: M,
+              prompt:
+                'You are the editor of a daily AI news briefing. You receive a list of articles as JSON (from NewsAPI). Analyse them and PICK THE 5 MOST RELEVANT for someone who follows the AI industry closely: prioritise model launches, research with real impact, moves by the leading labs and companies, regulation, and meaningful funding. Drop clickbait, listicles, promotional content, thin opinion pieces and duplicates (if several outlets cover the same story, keep the best one).\n\nReturn ONLY the final Slack message, with no preamble or explanation, in exactly this format:\n\n*🤖 AI News Digest — <today\'s date>*\n\n*1. <clear, concise headline>*\n> <why it matters, 1-2 sentences>\n<article url>\n\n(and so on, up to 5)\n\n_Source: NewsAPI · curated by AI_\n\nRules: Slack mrkdwn — bold with a SINGLE asterisk (*like this*), NEVER double. Do not invent headlines or URLs: use exactly the ones from the JSON. Write in English, natural and to the point.',
+              input: "Today's articles (NewsAPI JSON):\n{{http:news.json.articles}}",
+            }),
+            node('slack', 'connector', 820, 200, {
+              provider: 'slack',
+              connectorId: null,
+              action: 'post-message',
+              actionParams: { channel: '', text: '{{agent:digest.output}}' },
+              method: 'POST',
+              path: '/chat.postMessage',
+              body: '{"channel":"","text":"{{agent:digest.output}}","unfurl_links":false,"unfurl_media":false}',
+            }),
+            node('end', 'end', 1080, 200, {}),
+          ],
+          edges: [edge('trigger', 'news'), edge('news', 'digest'), edge('digest', 'slack'), edge('slack', 'end')],
+          comments: [
+            {
+              id: 'c-readme',
+              text:
+                '🗞️ AI News Digest — a daily AI briefing in Slack\n' +
+                '- 1. NewsAPI (HTTP): fetches the 30 freshest AI articles in English. Paste your free newsapi.org key in this node\'s Headers (replace YOUR_NEWSAPI_KEY).\n' +
+                '- 2. AI (digest): reads them all and picks the 5 most relevant — model launches, real research, moves by the big labs, regulation, funding. Drops clickbait and duplicates.\n' +
+                '- 3. Slack: posts the digest. Open this node and pick your channel. Link previews are off so the 5 URLs stay compact.\n' +
+                '- Schedule: open the Trigger node to choose what time it runs each day.\n' +
+                '- Tune it: the prompt and model live in the "digest" node; the topic filter is the q= in the news node\'s URL.',
+              position: { x: 40, y: -260 },
+              color: 'amber',
+              width: 640,
+              height: 210,
+            },
+          ],
+        },
+      },
+    },
+  },
+  {
     id: 'auto-gmail-slack',
     kind: 'automation',
     name: 'Gmail → Slack',

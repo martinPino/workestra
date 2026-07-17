@@ -1217,4 +1217,11 @@ export const EN: Record<string, string> = {
   "Tarea a repartir (opcional · admite {{variables}})": "Task to distribute (optional · supports {{variables}})",
   "Investiga X y redacta un resumen": "Research X and write a summary",
   "Enviar a una app conectada": "Send to a connected app",
+  "Cada día, la IA elige las 5 noticias de IA más relevantes y las publica en Slack.": "Every day, AI picks the 5 most relevant AI news stories and posts them to Slack.",
+  "Un boletín diario automático. Trae las noticias más recientes de IA desde NewsAPI, la IA las lee todas y selecciona las 5 más relevantes (lanzamientos de modelos, investigación con impacto, movimientos de las grandes, regulación y financiación), descarta clickbait y coberturas duplicadas, y publica un resumen limpio en tu canal de Slack, sin previews de enlaces. Solo tienes que pegar tu clave gratuita de NewsAPI y elegir el canal.": "An automatic daily briefing. It pulls the latest AI news from NewsAPI, the AI reads them all and picks the 5 most relevant (model launches, impactful research, moves by the big players, regulation and funding), drops clickbait and duplicate coverage, and posts a clean summary to your Slack channel with link previews turned off. All you do is paste your free NewsAPI key and pick the channel.",
+  "Boletín diario de IA para tu equipo": "A daily AI briefing for your team",
+  "Vigilancia del sector y la competencia": "Industry and competitor watch",
+  "Radar de lanzamientos y regulación": "Radar for launches and regulation",
+  "Una clave gratuita de NewsAPI (newsapi.org)": "A free NewsAPI key (newsapi.org)",
+  "Slack conectado": "Slack connected",
 };

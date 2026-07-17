@@ -45,7 +45,14 @@ export const CONNECTOR_ACTIONS: Record<string, ConnectorAction[]> = {
         { key: 'channel', label: 'Canal', placeholder: '#general', source: 'slack-channel' },
         { key: 'text', label: 'Mensaje', placeholder: 'Escribe el mensaje…', multiline: true, insert: true },
       ],
-      build: (p) => ({ method: 'POST', path: '/chat.postMessage', body: JSON.stringify({ channel: p.channel, text: p.text }) }),
+      // `unfurl_links/media: false`: un mensaje de automatización (digest, alerta, informe) NO debe expandir
+      // cada URL en una tarjeta de preview — el mensaje se vuelve enorme e ilegible. Slack los expande por
+      // defecto, así que lo apagamos aquí para que sobreviva a re-editar el canal/mensaje en el formulario.
+      build: (p) => ({
+        method: 'POST',
+        path: '/chat.postMessage',
+        body: JSON.stringify({ channel: p.channel, text: p.text, unfurl_links: false, unfurl_media: false }),
+      }),
     },
     // «Añadir una reacción» retirada (M58): exige el channel ID y el timestamp del mensaje, datos que un
     // usuario no-dev no tiene de dónde sacar. Se reintroducirá cuando haya un disparador de Slack que
