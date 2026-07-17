@@ -133,6 +133,7 @@ async function main(): Promise<void> {
     const input: RunInput = {
       executionId: execution.id,
       workflowVersionId: runVersion.id,
+      workflowId: wf.id, // M82: sin esto los nodos con memoria (p. ej. «no repetir») no se identifican entre ejecuciones
       workspaceId: wf.workspaceId,
       graph: runVersion.graph,
       triggerType: 'cron',

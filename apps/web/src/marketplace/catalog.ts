@@ -632,14 +632,21 @@ export const MARKETPLACE: MarketItem[] = [
             node('trigger', 'trigger', 40, 200, { event: 'cron', eventId: 'schedule' }),
             node('news', 'api', 300, 200, {
               method: 'GET',
-              url: 'https://newsapi.org/v2/everything?q=%22artificial%20intelligence%22%20OR%20%22generative%20AI%22%20OR%20OpenAI%20OR%20Anthropic&language=en&sortBy=publishedAt&pageSize=30',
+              // Ventana de UN DÍA ordenada por popularidad, no «lo más reciente»: esta consulta tiene ~1.600
+              // artículos al día, así que pedir las 30 más recientes devuelve los 24 minutos anteriores a la
+              // ejecución —notas de prensa sueltas—. El plan gratuito de NewsAPI sirve con ~24 h de retraso,
+              // de ahí que la ventana sea de -2d a -1d y no «las últimas 24 h» (que saldría vacía).
+              url: 'https://newsapi.org/v2/everything?q=%22artificial%20intelligence%22%20OR%20%22generative%20AI%22%20OR%20OpenAI%20OR%20Anthropic&language=en&from={{fecha:-2d}}&to={{fecha:-1d}}&sortBy=popularity&pageSize=100',
               headers: '{"X-Api-Key":"YOUR_NEWSAPI_KEY"}',
             }),
             node('digest', 'llm', 560, 200, {
               model: M,
               prompt:
-                'You are the editor of a daily AI news briefing. You receive a list of articles as JSON (from NewsAPI). Analyse them and PICK THE 5 MOST RELEVANT for someone who follows the AI industry closely: prioritise model launches, research with real impact, moves by the leading labs and companies, regulation, and meaningful funding. Drop clickbait, listicles, promotional content, thin opinion pieces and duplicates (if several outlets cover the same story, keep the best one).\n\nReturn ONLY the final Slack message, with no preamble or explanation, in exactly this format:\n\n*🤖 AI News Digest — <today\'s date>*\n\n*1. <clear, concise headline>*\n> <why it matters, 1-2 sentences>\n<article url>\n\n(and so on, up to 5)\n\n_Source: NewsAPI · curated by AI_\n\nRules: Slack mrkdwn — bold with a SINGLE asterisk (*like this*), NEVER double. Do not invent headlines or URLs: use exactly the ones from the JSON. Write in English, natural and to the point.',
-              input: "Today's articles (NewsAPI JSON):\n{{http:news.json.articles}}",
+                'You are the editor of a daily AI news briefing. You receive a list of articles as JSON (from NewsAPI). Analyse them and PICK THE 5 MOST RELEVANT for someone who follows the AI industry closely: prioritise model launches, research with real impact, moves by the leading labs and companies, regulation, and meaningful funding. Drop clickbait, listicles, promotional content, thin opinion pieces and duplicates (if several outlets cover the same story, keep the best one). If a story already appears in the <ya-escrito> block (previous digests), skip it and pick the next best one — even if the headline, the outlet or the link is different; only bring a story back if there is genuinely new, material development.\n\nReturn ONLY the final Slack message, with no preamble or explanation, in exactly this format:\n\n*🤖 AI News Digest — <today\'s date>*\n\n*1. <clear, concise headline>*\n> <why it matters, 1-2 sentences>\n<article url>\n\n(and so on, up to 5)\n\n_Source: NewsAPI · curated by AI_\n\nRules: Slack mrkdwn — bold with a SINGLE asterisk (*like this*), NEVER double. Do not invent headlines or URLs: use exactly the ones from the JSON. Write in English, natural and to the point.',
+              input: "Yesterday's articles (NewsAPI JSON):\n{{http:news.json.articles}}",
+              // Sin esto, cada ejecución arranca en blanco y vuelve a elegir las mismas historias: el paso
+              // recuerda los boletines de días anteriores y se le pide que no los repita.
+              noRepetir: true,
             }),
             node('slack', 'connector', 820, 200, {
               provider: 'slack',
@@ -658,11 +665,13 @@ export const MARKETPLACE: MarketItem[] = [
               id: 'c-readme',
               text:
                 '🗞️ AI News Digest — a daily AI briefing in Slack\n' +
-                '- 1. NewsAPI (HTTP): fetches the 30 freshest AI articles in English. Paste your free newsapi.org key in this node\'s Headers (replace YOUR_NEWSAPI_KEY).\n' +
+                '- 1. NewsAPI (HTTP): fetches a full day of AI articles in English, ranked by popularity. Paste your free newsapi.org key in this node\'s Headers (replace YOUR_NEWSAPI_KEY).\n' +
                 '- 2. AI (digest): reads them all and picks the 5 most relevant — model launches, real research, moves by the big labs, regulation, funding. Drops clickbait and duplicates.\n' +
+                '     "Don\'t repeat what it already wrote" is ON: it remembers the last week of digests and skips stories it already covered, even from another outlet. Day 1 sends a normal digest — there is nothing to remember yet.\n' +
                 '- 3. Slack: posts the digest. Open this node and pick your channel. Link previews are off so the 5 URLs stay compact.\n' +
                 '- Schedule: open the Trigger node to choose what time it runs each day.\n' +
-                '- Tune it: the prompt and model live in the "digest" node; the topic filter is the q= in the news node\'s URL.',
+                '- Tune it: the prompt and model live in the "digest" node; the topic filter is the q= in the news node\'s URL.\n' +
+                '- Why a day-old window: the free NewsAPI plan serves articles with a ~24h delay, so the news node asks for the -2d..-1d window. On a paid key you can move it to {{fecha:-1d}}..{{fecha}}.',
               position: { x: 40, y: -260 },
               color: 'amber',
               width: 640,

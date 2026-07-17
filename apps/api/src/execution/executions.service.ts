@@ -74,6 +74,9 @@ export class ExecutionsService {
     const input: RunInput = {
       executionId: execution.id,
       workflowVersionId: runVersion.id,
+      // M82: identidad ESTABLE del flujo (la versión cambia al publicar). La usan los nodos con estado
+      // durable —p. ej. el paso de IA que recuerda lo que ya envió— para no perder memoria al editar.
+      workflowId: runVersion.workflowId,
       workspaceId,
       graph: runVersion.graph,
       triggerType,
@@ -143,6 +146,7 @@ export class ExecutionsService {
     const input: RunInput = {
       executionId,
       workflowVersionId: execution.workflowVersionId,
+      workflowId: version.workflowId, // M82: igual que en el arranque, para que el estado durable sea el mismo
       workspaceId: execution.workspaceId,
       graph: version.graph,
       triggerType: execution.triggerType,

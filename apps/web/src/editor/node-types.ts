@@ -7,6 +7,8 @@ export interface FieldSchema {
   // `duration`: número + unidad (seg/min/horas/días) para gente que no piensa en milisegundos; guarda ms.
   type: 'string' | 'number' | 'boolean' | 'enum' | 'connector' | 'agent' | 'duration';
   label: string;
+  /** Aclaración bajo el campo, para lo que la etiqueta no alcanza a explicar. */
+  help?: string;
   default?: unknown;
   placeholder?: string;
   options?: string[]; // para type: 'enum'
@@ -264,6 +266,13 @@ registerNodeType({
         label: 'Tarea / entrada',
         placeholder: 'Responde a este mensaje: {{connector:leer.bodyPreview}}',
         multiline: true,
+      },
+      // M82: sin esto, un paso que corre cada día arranca en blanco y vuelve a elegir lo mismo.
+      noRepetir: {
+        type: 'boolean',
+        label: 'No repetir lo que ya escribió',
+        help: 'Recuerda lo que este paso escribió otros días y le pide que no lo repita. Necesita una «Tarea / entrada».',
+        default: false,
       },
     },
   },

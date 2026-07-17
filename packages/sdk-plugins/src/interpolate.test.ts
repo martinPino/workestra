@@ -58,3 +58,53 @@ describe('interpolate (M12 · flujo de datos entre nodos)', () => {
     expect(interpolate('{{connector:read.msg.bodyPreview}}', c)).toBe('hola');
   });
 });
+
+// --- M82: fechas relativas -----------------------------------------------------------------------
+// Un flujo diario necesita «ayer», no una fecha fija que se queda vieja al segundo día.
+describe('interpolate — {{fecha}} relativa a la ejecución', () => {
+  const NOW = Date.parse('2026-07-16T11:30:45.123Z');
+  const base = ctx({});
+
+  it('{{fecha}} da el instante de la ejecución en ISO UTC, sin milisegundos', () => {
+    expect(interpolate('{{fecha}}', base, false, NOW)).toBe('2026-07-16T11:30:45');
+  });
+
+  it('acepta desplazamientos en s/m/h/d, hacia atrás y hacia delante', () => {
+    expect(interpolate('{{fecha:-1d}}', base, false, NOW)).toBe('2026-07-15T11:30:45');
+    expect(interpolate('{{fecha:-36h}}', base, false, NOW)).toBe('2026-07-14T23:30:45');
+    expect(interpolate('{{fecha:+7d}}', base, false, NOW)).toBe('2026-07-23T11:30:45');
+    expect(interpolate('{{fecha:-30m}}', base, false, NOW)).toBe('2026-07-16T11:00:45');
+  });
+
+  it('`.date` da solo el día, para las APIs que no quieren hora', () => {
+    expect(interpolate('{{fecha:-1d.date}}', base, false, NOW)).toBe('2026-07-15');
+  });
+
+  it('una variable llamada «fecha» NO puede sombrear la palabra reservada', () => {
+    const conVar = ctx({ fecha: 'DE-OTRO-SITIO' });
+    expect(interpolate('{{fecha}}', conVar, false, NOW)).toBe('2026-07-16T11:30:45');
+  });
+
+  it('lo que no es una fecha válida sigue el camino normal (no se traga otras refs)', () => {
+    const v = ctx({ fechado: 'X', 'fecha:mal': 'Y' });
+    expect(interpolate('{{fechado}}', v, false, NOW)).toBe('X'); // no empieza por «fecha» + separador
+    expect(interpolate('{{fecha:mal}}', v, false, NOW)).toBe('Y'); // desplazamiento inválido → variable
+  });
+
+  it('sirve para una ventana de 24 h en una URL (el caso que lo motivó)', () => {
+    const url = interpolate('https://api/x?from={{fecha:-2d}}&to={{fecha:-1d}}', base, false, NOW);
+    expect(url).toBe('https://api/x?from=2026-07-14T11:30:45&to=2026-07-15T11:30:45');
+  });
+
+  it('un desplazamiento fuera de rango degrada a vacío, NO lanza (está en el camino de cada nodo)', () => {
+    // `{{fecha:+99999999d}}` (un cero de más al escribir «días») ya roza el límite de Date: si esto lanzara,
+    // un typo en un campo tumbaría el flujo entero en vez de resolver a ''.
+    expect(() => interpolate('{{fecha:+99999999999999d}}', base, false, NOW)).not.toThrow();
+    expect(interpolate('{{fecha:+99999999999999d}}', base, false, NOW)).toBe('');
+    expect(interpolate('{{fecha:-99999999999999d}}', base, false, NOW)).toBe('');
+  });
+
+  it('en modo jsonSafe se incrusta escapada como cualquier otro valor', () => {
+    expect(interpolate('{"from":"{{fecha:-1d}}"}', base, true, NOW)).toBe('{"from":"2026-07-15T11:30:45"}');
+  });
+});

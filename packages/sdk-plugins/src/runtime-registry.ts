@@ -74,8 +74,10 @@ export function createRuntimeRegistry(deps: RuntimeRegistryDeps): NodeExecutorRe
     agents: deps.agents,
     runtime,
   });
-  registry.register(new AgentNodeExecutor(runtime, deps.agents, 'agent', orchestrator));
-  registry.register(new AgentNodeExecutor(runtime, deps.agents, 'llm'));
+  registry.register(new AgentNodeExecutor(runtime, deps.agents, 'agent', orchestrator, deps.memory));
+  // M82: `deps.memory` habilita «no repetir lo que ya envió» en el paso de IA (un boletín diario que, si no,
+  // volvería a elegir lo mismo cada día porque cada ejecución arranca en blanco).
+  registry.register(new AgentNodeExecutor(runtime, deps.agents, 'llm', undefined, deps.memory));
   // Router (M14): el coordinador enruta a los nodos de agente conectados (usa el LLM para elegir).
   registry.register(new RouterNodeExecutor(deps.agents, deps.llmRouter));
   if (deps.pendingReviews) registry.register(new HumanNodeExecutor(deps.pendingReviews));

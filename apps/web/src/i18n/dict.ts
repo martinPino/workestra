@@ -1237,4 +1237,9 @@ export const EN: Record<string, string> = {
   "Todos los trabajadores del espacio comparten lo que recuerdan.": "Every worker in the workspace shares what they remember.",
   "Qué recuerda este trabajador entre ejecuciones. Con memoria, guarda sus conclusiones y puede anotar lo que le pidas que recuerde.":
     "What this worker remembers between runs. With memory on, it saves its conclusions and can note down anything you ask it to remember.",
+
+  // «No repetir lo que ya escribió» en el paso de IA (M82)
+  "No repetir lo que ya escribió": "Don't repeat what it already wrote",
+  "Recuerda lo que este paso escribió otros días y le pide que no lo repita. Necesita una «Tarea / entrada».":
+    "Remembers what this step wrote on previous days and asks it not to repeat itself. Needs a “Task / input”.",
 };

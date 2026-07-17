@@ -134,11 +134,20 @@ export function SchemaForm({ schema, value, onChange }: Props) {
   return (
     <div className="flex flex-col gap-3">
       {entries.map(([key, field]) => (
-        <div key={key} className="flex flex-col gap-3">
-          <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-medium text-txt-secondary">{t(field.label)}</span>
-            <Field field={field} value={value[key]} onChange={(v) => set(key, v)} />
-          </label>
+        <div key={key} className="flex flex-col gap-1">
+          {/* Una casilla se lee «casilla → qué activa», así que va en línea; el resto, etiqueta encima. */}
+          {field.type === 'boolean' ? (
+            <label className="flex items-center gap-2">
+              <Field field={field} value={value[key]} onChange={(v) => set(key, v)} />
+              <span className="text-[11px] font-medium text-txt-secondary">{t(field.label)}</span>
+            </label>
+          ) : (
+            <label className="flex flex-col gap-1">
+              <span className="text-[11px] font-medium text-txt-secondary">{t(field.label)}</span>
+              <Field field={field} value={value[key]} onChange={(v) => set(key, v)} />
+            </label>
+          )}
+          {field.help && <span className="text-[11px] leading-snug text-txt-disabled">{t(field.help)}</span>}
         </div>
       ))}
     </div>

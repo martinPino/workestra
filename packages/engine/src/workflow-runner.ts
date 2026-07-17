@@ -45,6 +45,15 @@ export interface RunnerDeps {
 export interface RunInput {
   executionId?: string;
   workflowVersionId: string;
+  /**
+   * Flujo (M82). Distinto de `workflowVersionId`: la versión cambia en CADA publicación, así que anclar a ella
+   * el estado durable de un nodo lo borraría al editar el flujo.
+   *
+   * OBLIGATORIO a propósito, aunque el nodo sepa vivir sin él: los tres llamantes lo tienen a mano, y siendo
+   * opcional la ruta del cron se lo dejó sin querer —lo que dejaba la memoria de nodo muerta justo en los
+   * flujos programados, que son los que la necesitan—. Que lo cace el compilador y no producción.
+   */
+  workflowId: string;
   workspaceId: string;
   graph: WorkflowGraph;
   triggerType: string;
@@ -96,6 +105,7 @@ interface NodeOutcome {
 export class WorkflowRunner {
   private seq = 0;
   private workspaceId = ''; // tenant de la ejecución en curso (se pasa a cada nodo, M8)
+  private workflowId: string | undefined; // flujo en curso (M82): identidad ESTABLE para el estado durable de un nodo
 
   constructor(private readonly deps: RunnerDeps) {}
 
@@ -169,7 +179,17 @@ export class WorkflowRunner {
 
       try {
         const result = await this.withTimeout(
-          executor.execute({ executionId, workspaceId: this.workspaceId, nodeKey: key, config: node.config, context: baseCtx, signal: controller.signal, outgoing, emit }),
+          executor.execute({
+            executionId,
+            workspaceId: this.workspaceId,
+            workflowId: this.workflowId,
+            nodeKey: key,
+            config: node.config,
+            context: baseCtx,
+            signal: controller.signal,
+            outgoing,
+            emit,
+          }),
           policy.timeoutMs,
         );
         await emitChain;
@@ -212,6 +232,7 @@ export class WorkflowRunner {
 
   async run(input: RunInput): Promise<string> {
     this.workspaceId = input.workspaceId;
+    this.workflowId = input.workflowId;
     // M38: los pasos DESACTIVADOS se podan (puenteando sus aristas) antes de ejecutar. El resto del flujo
     // corre como si no estuvieran. Todo lo que sigue (scheduler, nodeByKey, aristas) usa el grafo ya podado.
     const graph = stripDisabledNodes(input.graph);

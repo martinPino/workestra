@@ -21,6 +21,13 @@ export interface NodeExecutionContext {
   readonly executionId: string;
   /** Workspace (tenant) DE LA EJECUCIÓN. Los nodos lo usan para acotar recursos por tenant (M8). */
   readonly workspaceId: string;
+  /**
+   * Workflow al que pertenece el nodo (M82). Es la identidad ESTABLE del flujo: a diferencia de la versión
+   * (que cambia en cada publicación) sobrevive a las ediciones, así que un nodo con estado durable —p. ej.
+   * un paso de IA que recuerda lo que ya envió— puede anclarse a `(workflowId, nodeKey)` sin perder memoria
+   * al publicar ni chocar con un nodo homónimo de otro flujo. Opcional: los tests no lo necesitan.
+   */
+  readonly workflowId?: string;
   readonly nodeKey: string;
   readonly config: Record<string, unknown>;
   readonly context: ExecutionContext;

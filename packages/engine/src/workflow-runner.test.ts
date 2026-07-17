@@ -119,7 +119,7 @@ function harness() {
     ids: { next: () => 'id' },
   });
   const run = (graph: WorkflowGraph, extra: Partial<RunInput> = {}) =>
-    runner.run({ workflowVersionId: 'v', workspaceId: 'ws', graph, triggerType: 'manual', initialContext: emptyContext(), ...extra });
+    runner.run({ workflowVersionId: 'v', workflowId: 'wf', workspaceId: 'ws', graph, triggerType: 'manual', initialContext: emptyContext(), ...extra });
   return { run, events, store };
 }
 

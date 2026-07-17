@@ -34,6 +34,7 @@ async function main(): Promise<void> {
 
   const id = await runner.run({
     workflowVersionId: 'v_demo',
+    workflowId: 'wf_demo',
     workspaceId: 'ws_demo',
     graph,
     triggerType: 'manual',

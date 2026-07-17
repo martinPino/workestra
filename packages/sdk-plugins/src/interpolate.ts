@@ -31,6 +31,34 @@ export function getPath(root: unknown, path: string): unknown {
   return node;
 }
 
+/**
+ * Fechas relativas al momento de la ejecución (M82): `{{fecha}}`, `{{fecha:-1d}}`, `{{fecha:-36h}}`,
+ * `{{fecha:+7d}}`. Se resuelve ANTES que el contexto, así que `fecha` es una palabra reservada.
+ *
+ * Existe porque medio mundo filtra por tiempo (`?from=`, `?since=`, `updated >= ...`) y un flujo que corre
+ * cada día necesita «ayer», no una fecha fija que se queda vieja el segundo día. Sin esto, la única
+ * alternativa es una ventana sin fecha —«lo más reciente»— que en una fuente con volumen es un ojo de
+ * cerradura de minutos.
+ *
+ * Formato ISO-8601 en UTC sin milisegundos (`2026-07-16T11:30:00`), que es lo que aceptan las APIs
+ * habituales. `.date` da solo `2026-07-16` para las que quieren día suelto.
+ */
+const FECHA_RE = /^fecha(?::([+-]\d+)([smhd]))?(?:\.(date|iso))?$/;
+const UNIT_MS: Record<string, number> = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 };
+
+function resolveFecha(path: string, now: number): string | undefined {
+  const m = FECHA_RE.exec(path.trim());
+  if (!m) return undefined;
+  const [, amount, unit, fmt] = m;
+  const at = new Date(now + (amount ? Number(amount) * UNIT_MS[unit] : 0));
+  // Un desplazamiento fuera del rango de Date (`{{fecha:+99999999d}}` ya roza el límite) haría que
+  // `toISOString()` lanzara. Toda ref inválida degrada a '' en el resto de la interpolación; esta —que está
+  // en el camino de CADA nodo— no va a ser la única que tumbe un flujo por un cero de más.
+  if (!Number.isFinite(at.getTime())) return '';
+  const iso = at.toISOString();
+  return fmt === 'date' ? iso.slice(0, 10) : iso.slice(0, 19);
+}
+
 /** Escapa `value` como FRAGMENTO de string JSON (sin las comillas envolventes). Un valor no-string se
  *  serializa primero a su forma JSON y esa cadena se escapa: así incrustar `{{x}}` dentro de una
  *  cadena JSON (`"...{{x}}..."`) SIEMPRE produce JSON válido, aunque el valor sea objeto/array. */
@@ -50,14 +78,18 @@ function jsonStringFragment(value: unknown): string {
  * escapado: el placeholder debe ir DENTRO de una cadena (`"...{{x}}..."`) y nunca puede romper la
  * estructura del JSON ni inyectar claves/valores, sea cual sea el tipo del valor resuelto.
  */
-export function interpolate(template: string, ctx: ExecutionContext, jsonSafe = false): string {
+export function interpolate(template: string, ctx: ExecutionContext, jsonSafe = false, now: number = Date.now()): string {
   const lookup: Record<string, unknown> = {
     ...(ctx.variables as Record<string, unknown>),
     ticket: ctx.ticket,
     repository: ctx.repository,
     variables: ctx.variables,
   };
+  // Un `fecha` en las variables NO puede sombrear la palabra reservada: el mismo texto debe dar la misma
+  // fecha en cualquier flujo, venga de donde venga el contexto.
   return template.replace(/\{\{([^}]+)\}\}/g, (_match, path: string) => {
+    const fecha = resolveFecha(path, now);
+    if (fecha !== undefined) return jsonSafe ? jsonStringFragment(fecha) : fecha;
     const v = getPath(lookup, path);
     if (v === undefined || v === null) return '';
     if (jsonSafe) return jsonStringFragment(v);
