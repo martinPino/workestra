@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AnalyticsProvider } from './analytics/provider';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppShell } from './app/AppShell';
 import { initTheme } from './app/ui-store';
@@ -15,6 +16,7 @@ import { MarketplaceDetail } from './pages/MarketplaceDetail';
 import { Integrations } from './pages/Integrations';
 import { SettingsPage } from './pages/Settings';
 import { Team } from './pages/Team';
+import { Analytics } from './pages/Analytics';
 import { Login, Register } from './pages/Auth';
 import { AcceptInvite } from './pages/AcceptInvite';
 import { ensureDevSession, useAuth, isExpired } from './lib/auth';
@@ -42,6 +44,8 @@ void ensureDevSession(api.base).finally(() => {
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
+          {/* Dentro del router a propósito: la captura automática necesita saber en qué ruta está. */}
+          <AnalyticsProvider>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
@@ -63,9 +67,13 @@ void ensureDevSession(api.base).finally(() => {
               <Route path="/marketplace/:id" element={<MarketplaceDetail />} />
               <Route path="/integrations" element={<Integrations />} />
               <Route path="/team" element={<Team />} />
+              {/* M84. Sin guard de cliente a propósito: el permiso lo decide la API (403), y una guarda
+                  aquí solo repetiría —peor y más tarde— una decisión que ya es del servidor. */}
+              <Route path="/analytics" element={<Analytics />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Route>
           </Routes>
+          </AnalyticsProvider>
         </BrowserRouter>
       </QueryClientProvider>
     </React.StrictMode>,

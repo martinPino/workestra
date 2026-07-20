@@ -446,3 +446,153 @@ model Plugin {
 
   @@unique([workspaceId, key, version])
 }
+
+// ===================================================================================================
+// Product analytics (M84). Cómo se usa el producto, no cuánta gente pasa.
+//
+// Ninguna de estas tablas tiene relación (FK) con Workspace/User a propósito: es telemetría append-only
+// con su propia retención, y una FK en la tabla caliente cobra una comprobación por cada inserción y
+// convierte «borrar un workspace» en borrar millones de filas dentro de una transacción. El borrado se
+// hace explícito (ver el endpoint de olvido) en vez de por cascada.
+// ===================================================================================================
+
+/// Eventos en crudo. Se escribe mucho y se lee poco: el dashboard vive de los rollups, y esto solo se
+/// consulta para embudos dentro de la ventana y para rehacer un rollup tras un fallo.
+model AnalyticsEvent {
+  /// Hora del cliente, ya acotada por el servidor a ±24 h de la recepción (un reloj torcido falsea el DAU).
+  at          DateTime @db.Timestamptz
+  /// Generado por el cliente al ENCOLAR. Con `at` forma la clave: reintentar el mismo evento no duplica.
+  id          String   @db.Uuid
+  receivedAt  DateTime @default(now()) @db.Timestamptz
+  workspaceId String
+  userId      String
+  sessionId   String   @db.Uuid
+  /// Orden dentro de la sesión: lo que permite montar embudos después sin rehacer nada.
+  seq         Int
+  name        String
+  surface     String
+  tab         String   @default("")
+  entityType  String   @default("")
+  entityId    String   @default("")
+  durationMs  Int?
+  props       Json     @default("{}")
+
+  /// Clave compuesta por tiempo: si algún día hace falta particionar por mes, la parte cara (cambiar la
+  /// PK) ya está hecha. Hoy NO se particiona: Prisma 5 no emite `PARTITION BY`, así que habría que editar
+  /// la migración a mano y `prisma migrate dev` reportaría drift para siempre, en cada cambio futuro.
+  @@id([at, id])
+  @@index([workspaceId, at(sort: Desc)])
+  @@index([workspaceId, name, at(sort: Desc)])
+  /// Vista de plataforma (todos los tenants) y barrido de retención.
+  @@index([at])
+}
+
+/// Rollup por hora de pantallas y pestañas. Aditivo: el día es la suma de sus 24 horas selladas.
+model AnalyticsHourlyView {
+  workspaceId  String
+  hour         DateTime @db.Timestamptz
+  surface      String
+  tab          String   @default("")
+  views        Int      @default(0)
+  sessions     Int      @default(0)
+  dwellMs      BigInt   @default(0)
+  /// Denominador PROPIO: la media es dwellMs/dwellSamples. Dividir por `views` mete ceros en el
+  /// denominador y hunde la media sin que nadie lo note.
+  dwellSamples Int      @default(0)
+
+  @@id([workspaceId, hour, surface, tab])
+  @@index([hour])
+}
+
+/// Rollup por hora de eventos, con su ENTIDAD. Sin esta dimensión, «qué automatización se edita más»,
+/// «qué conector se usa más» y «qué plantilla se instala más» acaban escaneando eventos crudos.
+model AnalyticsHourlyEvent {
+  workspaceId String
+  hour        DateTime @db.Timestamptz
+  name        String
+  entityType  String   @default("")
+  entityId    String   @default("")
+  count       Int      @default(0)
+  users       Int      @default(0)
+
+  @@id([workspaceId, hour, name, entityType, entityId])
+  @@index([hour])
+}
+
+/// Conjunto persona×día. Los únicos no se pueden sumar entre horas, así que DAU/WAU/MAU y la retención
+/// salen de aquí y no de sumar rollups. Se conserva SIEMPRE (personas × días ocupa nada).
+model AnalyticsUserDay {
+  workspaceId String
+  day         DateTime @db.Date
+  userId      String
+  /// Escrito al ingerir, no deducido después: si se dedujera escaneando el histórico, la purga de los
+  /// 90 días convertiría a un usuario de hace un año en «nuevo» y la retención saldría mal —y hacia
+  /// arriba, que es la peor dirección para equivocarse—.
+  firstSeenDay DateTime @db.Date
+  sessions    Int      @default(0)
+  activeMs    BigInt   @default(0)
+
+  @@id([workspaceId, day, userId])
+  @@index([day])
+  @@index([workspaceId, firstSeenDay])
+}
+
+/// Una fila por sesión. La cierra el rollup a partir de min/max de los eventos: las sesiones que más
+/// importan (cierre de golpe, caída, móvil en segundo plano) nunca mandan un «he terminado».
+model AnalyticsSession {
+  id           String   @id @db.Uuid
+  workspaceId  String
+  userId       String
+  startedAt    DateTime @db.Timestamptz
+  lastSeenAt   DateTime @db.Timestamptz
+  activeMs     BigInt   @default(0)
+  eventCount   Int      @default(0)
+  device       String?
+  browser      String?
+  os           String?
+  timezone     String?
+  /// Requiere una CDN delante que inyecte el país; sin ella queda NULL, y así se dice en el dashboard.
+  country      String?
+  entrySurface String?
+  exitSurface  String?
+
+  @@index([workspaceId, startedAt(sort: Desc)])
+  @@index([startedAt])
+}
+
+/// INVENTARIO de funciones. Responde «¿qué no usa casi nadie?»: una función que no se dispara nunca no
+/// deja filas, así que sin algo enfrente contra lo que cruzar es invisible.
+model AnalyticsFeature {
+  kind  String
+  key   String
+  label String
+  /// Desde cuándo está medida. Distingue «no la usa nadie» de «no la hemos instrumentado todavía».
+  instrumentedSince DateTime @db.Date
+  retiredAt         DateTime? @db.Date
+
+  @@id([kind, key])
+}
+
+/// Marca de agua del rollup: hasta qué hora está sellado, y las métricas que disparan la mudanza de
+/// motor (filas, bytes, eventos/24 h). Un umbral que nadie mide es un comentario.
+model AnalyticsRollupWatermark {
+  bucket        String   @id
+  sealedThrough DateTime @db.Timestamptz
+  lastRunAt     DateTime @db.Timestamptz
+  metrics       Json     @default("{}")
+}
+
+/// Búsquedas en claro SOLO cuando las han tecleado 5+ personas distintas del mismo workspace. Lo que
+/// escribe mucha gente es una señal de producto; lo que escribió una sola persona es de esa persona.
+model AnalyticsSearchTerm {
+  workspaceId String
+  day         DateTime @db.Date
+  queryHash   String
+  scope       String
+  text        String
+  users       Int      @default(0)
+  searches    Int      @default(0)
+
+  @@id([workspaceId, day, queryHash])
+  @@index([workspaceId, day])
+}

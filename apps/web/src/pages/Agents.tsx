@@ -16,6 +16,7 @@ import { GENERATION_MODELS, DEFAULT_GENERATION_MODEL } from '../lib/models';
 import { agentGradient } from '../lib/agent-avatar';
 import { useCan } from '../lib/auth';
 import { useT } from '../i18n';
+import { useAnalytics } from '../analytics/useAnalytics';
 
 let mcpCounter = 0;
 const newMcpId = () => `mcp_${(++mcpCounter).toString(36)}${Math.floor(Math.random() * 1e4).toString(36)}`;
@@ -33,6 +34,15 @@ export function Agents() {
   const [draftNonce, setDraftNonce] = useState(0); // fuerza el remontaje del formulario para re-sembrarlo
   const formWrapRef = useRef<HTMLDivElement>(null);
   const isDesktop = useMediaQuery('(min-width: 768px)');
+  const { trackEvent } = useAnalytics();
+
+  // M84: apertura de Trabajadores. Ref para que el doble montaje de StrictMode no cuente dos visitas.
+  const openedRef = useRef(false);
+  useEffect(() => {
+    if (openedRef.current) return;
+    openedRef.current = true;
+    trackEvent('agent.opened');
+  }, [trackEvent]);
 
   // Abre el formulario «Nuevo agente», opcionalmente sembrado con un borrador de la IA (M68).
   const openNew = (seed: AgentDraft | null) => {
@@ -145,6 +155,7 @@ export function Agents() {
 export function AgentForm({ initial, seed, onDone, onCancel }: { initial: AgentDto | null; seed?: AgentDraft; onDone: () => void; onCancel: () => void }) {
   const t = useT();
   const qc = useQueryClient();
+  const { trackEvent } = useAnalytics();
   const [role, setRole] = useState(initial?.name ?? seed?.name ?? '');
   const [goal, setGoal] = useState(initial?.description ?? seed?.description ?? '');
   const [model, setModel] = useState(initial?.model ?? seed?.model ?? DEFAULT_GENERATION_MODEL);
@@ -203,7 +214,10 @@ export function AgentForm({ initial, seed, onDone, onCancel }: { initial: AgentD
     };
     try {
       if (initial) await api.updateAgent(initial.id, body);
-      else await api.createAgent(body);
+      else {
+        const created = await api.createAgent(body);
+        trackEvent('agent.created', { entityType: 'agent', entityId: created.id });
+      }
       await qc.invalidateQueries({ queryKey: ['agents'] });
       onDone();
     } catch (e) {
@@ -474,7 +488,7 @@ function AgentCard({ agent, index, onEdit }: { agent: AgentDto; index: number; o
           <div className="flex items-center justify-between gap-2 border-t border-border bg-danger/5 px-5 py-3">
             <span className="text-xs text-txt-secondary">{t('¿Borrar «')}{agent.name}{t('»?')}</span>
             <div className="flex items-center gap-2">
-              <Button variant="danger" size="sm" onClick={del} disabled={deleting}>
+              <Button variant="danger" size="sm" onClick={del} disabled={deleting} data-track="agent-delete">
                 {deleting ? t('Borrando…') : t('Borrar')}
               </Button>
               <Button variant="ghost" size="sm" onClick={() => setConfirming(false)} disabled={deleting}>

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { api } from './api';
+import type { EntityType, EventName } from '@core/contracts';
+import { api, type InsightsQuery } from './api';
 
 export const useAgents = () => useQuery({ queryKey: ['agents'], queryFn: api.listAgents });
 export const useWorkflows = () => useQuery({ queryKey: ['workflows'], queryFn: api.listWorkflows });
@@ -102,3 +103,56 @@ export const useConnectorProviders = () =>
 /** Conectores del workspace. `poll` acelera el refresco mientras un OAuth está en curso. */
 export const useConnectors = (poll = false) =>
   useQuery({ queryKey: ['connectors'], queryFn: api.listConnectors, retry: false, refetchInterval: poll ? 1500 : false });
+
+/* --- Analítica de producto (M84) -----------------------------------------------------------------
+ *
+ * Todo el panel lee de rollups, no de la tabla en crudo: refrescarlo cada pocos segundos solo repetiría
+ * la misma respuesta, así que `staleTime` es alto a propósito.
+ *
+ * La clave lleva `days` y `scope`: dos ventanas distintas son dos consultas distintas, y así el mismo
+ * `days` pedido dos veces en la página (p. ej. la cabecera de 30 días y el rango seleccionado de 30 días)
+ * comparte una sola petición en vez de duplicarla.
+ */
+
+const INSIGHTS_OPTS = { retry: false, staleTime: 60_000 } as const;
+const key = (q: InsightsQuery) => [q.days, q.scope ?? 'workspace'] as const;
+
+/**
+ * Qué puede ver quien pregunta. Lo consume el nav para ocultar «Analítica» a quien no es administrador
+ * de plataforma; la API lo exige igual, así que esto solo evita enseñar una puerta que no abre.
+ *
+ * Sin permiso `analytics:read` la llamada da 403 y `data` se queda en `undefined` → el ítem no aparece.
+ * Falla en cerrado, que es la dirección correcta para equivocarse.
+ */
+export const useInsightsMe = () =>
+  useQuery({ queryKey: ['insights', 'me'], queryFn: api.insightsMe, retry: false, staleTime: 300_000 });
+
+export const useInsightsOverview = (q: InsightsQuery) =>
+  useQuery({ queryKey: ['insights', 'overview', ...key(q)], queryFn: () => api.insightsOverview(q), ...INSIGHTS_OPTS });
+
+export const useInsightsEntities = (q: InsightsQuery & { name: EventName; entityType: EntityType }) =>
+  useQuery({
+    queryKey: ['insights', 'entities', q.name, q.entityType, ...key(q)],
+    queryFn: () => api.insightsEntities(q),
+    ...INSIGHTS_OPTS,
+  });
+
+export const useInsightsFeatures = (q: InsightsQuery) =>
+  useQuery({ queryKey: ['insights', 'features', ...key(q)], queryFn: () => api.insightsFeatures(q), ...INSIGHTS_OPTS });
+
+export const useInsightsRetention = (q: InsightsQuery & { cohortDays: number }) =>
+  useQuery({
+    queryKey: ['insights', 'retention', q.cohortDays, ...key(q)],
+    queryFn: () => api.insightsRetention(q),
+    ...INSIGHTS_OPTS,
+  });
+
+export const useInsightsSearch = (q: InsightsQuery) =>
+  useQuery({ queryKey: ['insights', 'search', ...key(q)], queryFn: () => api.insightsSearch(q), ...INSIGHTS_OPTS });
+
+export const useInsightsFunnel = (q: InsightsQuery & { steps: EventName[]; windowMinutes: number }) =>
+  useQuery({
+    queryKey: ['insights', 'funnel', q.steps.join(','), q.windowMinutes, ...key(q)],
+    queryFn: () => api.insightsFunnel(q),
+    ...INSIGHTS_OPTS,
+  });

@@ -18,6 +18,7 @@ import { ApiKeysModule } from './api-keys/api-keys.module';
 import { McpModule } from './mcp/mcp.module';
 import { LlmKeysModule } from './llm-keys/llm-keys.module';
 import { TeamModule } from './team/team.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { TeamModule } from './team/team.module';
     McpModule,
     LlmKeysModule,
     TeamModule,
+    AnalyticsModule,
   ],
   controllers: [HealthController],
   providers: [

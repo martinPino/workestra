@@ -32,6 +32,7 @@ import { ReviewActions } from './Executions';
 import { statusLabel } from '../lib/labels';
 import { cn } from '../lib/cn';
 import { useT } from '../i18n';
+import { useAnalytics } from '../analytics/useAnalytics';
 
 type Tone = 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'accent';
 
@@ -269,6 +270,16 @@ export function ExecutionDetail() {
   const [cursor, setCursor] = useState<number | null>(null); // null = en vivo (todos los eventos)
   const [playing, setPlaying] = useState(false);
   const [openEv, setOpenEv] = useState<Set<number>>(new Set()); // filas del timeline con su detalle desplegado (M77)
+  const { trackEvent } = useAnalytics();
+
+  // M84: apertura de la ejecución. El ref evita el doble montaje de StrictMode y deja pasar una apertura
+  // por ejecución si se salta de una a otra sin desmontar la pantalla.
+  const viewedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!id || viewedRef.current === id) return;
+    viewedRef.current = id;
+    trackEvent('execution.viewed', { entityType: 'execution', entityId: id });
+  }, [id, trackEvent]);
   const toggleEv = (i: number) =>
     setOpenEv((s) => {
       const n = new Set(s);
@@ -342,6 +353,15 @@ export function ExecutionDetail() {
     }, 350);
     return () => clearInterval(t);
   }, [playing, events.length]);
+
+  // M84: el replay no es una pestaña, es salir de EN VIVO (cursor != null). Se cuenta la primera vez que
+  // se entra en cada ejecución: rebobinar diez veces seguidas es una sola persona mirando un replay.
+  const replayRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (cursor == null || !id || replayRef.current === id) return;
+    replayRef.current = id;
+    trackEvent('replay.viewed', { entityType: 'execution', entityId: id });
+  }, [cursor, id, trackEvent]);
 
   // La timeline sigue al cursor.
   useEffect(() => {
@@ -443,7 +463,7 @@ export function ExecutionDetail() {
             <IconButton aria-label={t('Un evento atrás')} onClick={() => { setPlaying(false); setCursor(Math.max(0, position - 1)); }}>
               <ChevronLeft size={15} />
             </IconButton>
-            <IconButton aria-label={playing ? t('Pausar') : t('Reproducir')} onClick={() => setPlaying((p) => !p)}>
+            <IconButton aria-label={playing ? t('Pausar') : t('Reproducir')} onClick={() => setPlaying((p) => !p)} data-track="execution-replay">
               {playing ? <Pause size={15} /> : <Play size={15} />}
             </IconButton>
             <IconButton aria-label={t('Un evento adelante')} onClick={() => { setPlaying(false); const n = position + 1; setCursor(n >= events.length ? null : n); }}>

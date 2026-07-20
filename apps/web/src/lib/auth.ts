@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { can as canScope } from '@core/contracts';
+import { clearQueue } from '../analytics/transport';
 
 export type Role = 'OWNER' | 'ADMIN' | 'EDITOR' | 'VIEWER';
 
@@ -73,6 +74,10 @@ export const useAuth = create<AuthState>((set) => ({
     set(next);
   },
   clear: () => {
+    // M84: la analítica pendiente se va con la sesión. Si no, los eventos que dejó sin enviar quien sale
+    // los mandaría quien entre después en este mismo navegador, y el servidor los sellaría con SU
+    // workspace: el mecanismo que impide falsificar la atribución sería justo el que la falsifica.
+    clearQueue();
     persist({ token: null, user: null, role: null, sub: null });
     set({ token: null, user: null, role: null, sub: null });
   },

@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Search, CornerDownLeft, Sun, Moon, Plus } from 'lucide-react';
 import { visibleNav } from './nav';
 import { useAuth } from '../lib/auth';
+import { useInsightsMe } from '../lib/hooks';
 import { useUI } from './ui-store';
 import { cn } from '../lib/cn';
 import { useT } from '../i18n';
@@ -49,8 +50,11 @@ export function CommandPalette() {
   }, [open]);
 
   const role = useAuth((s) => s.role);
+  // M84: la paleta ofrece las mismas puertas que el nav, así que filtra igual (si no, ⌘K sería el atajo
+  // para llegar a «Analítica» justo a quien se le acaba de ocultar).
+  const platformAdmin = useInsightsMe().data?.platformAdmin ?? false;
   const actions: Action[] = useMemo(() => {
-    const nav: Action[] = visibleNav(role).map((n) => ({
+    const nav: Action[] = visibleNav(role, platformAdmin).map((n) => ({
       id: `nav-${n.to}`,
       label: `${t('Ir a')} ${t(n.label)}`,
       hint: t('Navegación'),
@@ -68,7 +72,7 @@ export function CommandPalette() {
       },
       ...nav,
     ];
-  }, [navigate, theme, toggleTheme, t, role]);
+  }, [navigate, theme, toggleTheme, t, role, platformAdmin]);
 
   const filtered = useMemo(
     () => actions.filter((a) => a.label.toLowerCase().includes(query.toLowerCase())),

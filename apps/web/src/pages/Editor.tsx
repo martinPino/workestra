@@ -38,6 +38,7 @@ import { Button, IconButton, Badge, Dot } from '../ui';
 import { TriangleAlert, Eye } from 'lucide-react';
 import { useT } from '../i18n';
 import { useCan } from '../lib/auth';
+import { useAnalytics } from '../analytics/useAnalytics';
 
 function SelectionSync() {
   useOnSelectionChange({
@@ -81,6 +82,7 @@ export function Editor() {
   const lastError = useEditorStore((s) => s.lastError);
   const s = useEditorStore.getState;
   const t = useT();
+  const { trackEvent, trackError } = useAnalytics();
   // RBAC de UX (M74): un VIEWER (sin 'workflow:write') solo puede LEER el editor. La seguridad real la
   // impone el servidor; esto solo oculta/desactiva la edición para no ofrecer acciones que fallarían.
   const canEdit = useCan('workflow:write');
@@ -158,6 +160,17 @@ export function Editor() {
       }
     })();
   }, [id, canEdit]);
+
+  // M84: apertura de la automatización. `useParams` puede venir sin id (ruta sin id: el editor abre la
+  // primera que haya), así que se cae al id ya resuelto en el store. El ref evita el doble montaje de
+  // StrictMode y, a la vez, deja pasar una apertura por automatización si se navega entre dos sin desmontar.
+  const openedRef = useRef<string | null>(null);
+  useEffect(() => {
+    const wid = id ?? (workflowId && workflowId !== 'local' ? workflowId : undefined);
+    if (!wid || openedRef.current === wid) return;
+    openedRef.current = wid;
+    trackEvent('workflow.opened', { entityType: 'workflow', entityId: wid });
+  }, [id, workflowId, trackEvent]);
 
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     const moves = changes
@@ -242,6 +255,9 @@ export function Editor() {
         await api.saveGraph(workflowId, docToWorkflowGraph(s().history.doc));
         dirtyRef.current = false;
         setSaveState('saved');
+        // M84: el autoguardado va con debounce (900 ms), así que esto cuenta SESIONES de edición, no
+        // pulsaciones: una ráfaga de cambios seguidos emite un solo `workflow.updated`.
+        trackEvent('workflow.updated', { entityType: 'workflow', entityId: workflowId });
       } catch {
         setSaveState('idle');
         s().setError(t('No se pudo guardar. Revisa que el flujo no tenga pasos en bucle.'));
@@ -277,6 +293,7 @@ export function Editor() {
     try {
       await api.saveGraph(workflowId, docToWorkflowGraph(s().history.doc));
       await api.publish(workflowId);
+      trackEvent('workflow.updated', { entityType: 'workflow', entityId: workflowId });
       setActivated(true);
       s().setError(t('Flujo activado. A partir de ahora funcionará con estos cambios.'));
     } catch {
@@ -302,6 +319,7 @@ export function Editor() {
       const { executionId } = await api.execute(workflowId, { variables: { task: 'Coordina el workflow y ejecuta las subtareas.' } });
       s().beginExec();
       const buffer: ExecutionEvent[] = [];
+      let outcomeSent = false; // el desenlace se emite UNA vez: siguen llegando eventos hasta el unsub
       const unsub = subscribeExecution(api.base, executionId, (e) => {
         buffer.push(e);
         const state = reduceExecution(buffer);
@@ -312,7 +330,31 @@ export function Editor() {
           if (v.error) errs[k] = v.error;
         }
         s().applyExec(state.status, map, errs, state.plan);
-        if (state.status === 'SUCCEEDED' || state.status === 'FAILED') setTimeout(unsub, 400);
+        if (state.status === 'SUCCEEDED' || state.status === 'FAILED') {
+          // M84: el desenlace se emite AQUÍ y no en `api.execute`, porque ese POST solo encola (devuelve
+          // QUEUED/RUNNING): darlo por bueno al aceptarlo dejaría la tasa de fallo clavada a cero.
+          if (outcomeSent) return;
+          outcomeSent = true;
+          if (state.status === 'SUCCEEDED') {
+            trackEvent('workflow.run.succeeded', {
+              entityType: 'workflow',
+              entityId: workflowId,
+              props: { nodeCount: Object.keys(state.nodes).length },
+            });
+          } else {
+            trackEvent('workflow.run.failed', { entityType: 'workflow', entityId: workflowId });
+            // Una ejecución fallida SE VE: el lienzo pinta el nodo en rojo y el panel muestra el fallo.
+            // Por eso cuenta también como error mostrado — si no, el panel de errores solo conocería los
+            // fallos de red y daría a entender que el producto solo falla al llamar a la API.
+            //
+            // El código es la constante 'run-failed' y no se deriva de `state` ni de `errs`: el mensaje de
+            // error de un nodo trae dentro el valor que lo hizo reventar (un prompt, una fila de datos del
+            // cliente), y en el momento en que eso se usa para construir un código, el código deja de ser
+            // un código y pasa a ser el dato. Para el detalle está la ejecución, que ya se guarda entera.
+            trackError({ kind: 'workflow', code: 'run-failed' });
+          }
+          setTimeout(unsub, 400);
+        }
       });
     } catch {
       s().setError(t('Error al ejecutar'));
@@ -378,13 +420,13 @@ export function Editor() {
                 <Sparkles size={14} /> {t('IA')}
               </Button>
               <div className="mx-1 h-4 w-px bg-border" />
-              <Button size="sm" variant={activated ? 'secondary' : 'primary'} onClick={handleActivate}>
+              <Button size="sm" variant={activated ? 'secondary' : 'primary'} onClick={handleActivate} data-track="workflow-publish">
                 {activated ? <Check size={14} /> : <UploadCloud size={14} />} {activated ? t('Activo') : t('Activar')}
               </Button>
             </>
           )}
           {canRun && (
-            <Button size="sm" variant="primary" onClick={handleRun}>
+            <Button size="sm" variant="primary" onClick={handleRun} data-track="workflow-run">
               <Play size={14} /> {t('Probar')}
             </Button>
           )}

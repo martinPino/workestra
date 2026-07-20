@@ -5,6 +5,7 @@ import { visibleNav } from './nav';
 import { Logo } from './Logo';
 import { useUI } from './ui-store';
 import { useAuth } from '../lib/auth';
+import { useInsightsMe } from '../lib/hooks';
 import { cn } from '../lib/cn';
 import { useMediaQuery } from '../lib/useMediaQuery';
 import { useT } from '../i18n';
@@ -12,6 +13,9 @@ import { useT } from '../i18n';
 export function Sidebar() {
   const t = useT();
   const role = useAuth((s) => s.role);
+  // M84: «Analítica» solo para administradores de plataforma. Sin permiso la consulta da 403 y esto se
+  // queda en `undefined` → el ítem no se pinta. La API lo exige igual; esto solo evita enseñar la puerta.
+  const platformAdmin = useInsightsMe().data?.platformAdmin ?? false;
   const collapsed = useUI((s) => s.collapsed);
   const toggleCollapsed = useUI((s) => s.toggleCollapsed);
   const mobileNav = useUI((s) => s.mobileNav);
@@ -69,7 +73,7 @@ export function Sidebar() {
 
         {/* Navegación */}
         <nav className="mt-3 flex-1 space-y-0.5 px-3">
-          {visibleNav(role).map((item) => (
+          {visibleNav(role, platformAdmin).map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

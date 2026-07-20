@@ -13,6 +13,7 @@ import { ModelKeysDialog } from '../components/ModelKeysDialog';
 import { GENERATION_MODELS, DEFAULT_GENERATION_MODEL } from '../lib/models';
 import { useCan } from '../lib/auth';
 import { useT } from '../i18n';
+import { useAnalytics } from '../analytics/useAnalytics';
 
 /** Estado del diálogo «ponle nombre antes de crear». `template` null = empezar en blanco. */
 type Namer = { open: boolean; name: string };
@@ -26,6 +27,7 @@ export function Workflows() {
   const { data, isLoading } = useWorkflows();
   const canWrite = useCan('workflow:write'); // crear/editar/publicar workflow
   const canManageKeys = useCan('apikey:manage'); // gestionar claves de IA del workspace (MCP/BYOK)
+  const { trackEvent } = useAnalytics();
 
   const [namer, setNamer] = useState<Namer>(CLOSED);
   const [busy, setBusy] = useState(false);
@@ -67,6 +69,7 @@ export function Workflows() {
       const name = namer.name.trim() || t('Mi automatización');
       const doc = STARTER_DOC;
       const wf = await api.createWorkflow(name, docToWorkflowGraph(doc));
+      trackEvent('workflow.created', { entityType: 'workflow', entityId: wf.id });
       await qc.invalidateQueries({ queryKey: ['workflows'] });
       navigate(`/workflows/${wf.id}`);
     } catch {
@@ -86,6 +89,7 @@ export function Workflows() {
     try {
       const { name, graph } = await api.generateWorkflow(aiPrompt.trim(), aiModel);
       const wf = await api.createWorkflow(name, graph);
+      trackEvent('workflow.created', { entityType: 'workflow', entityId: wf.id });
       await qc.invalidateQueries({ queryKey: ['workflows'] });
       navigate(`/workflows/${wf.id}?ai=1`); // abre el chat de IA para seguir puliendo (M30)
     } catch (e) {
@@ -555,6 +559,7 @@ function WorkflowCard({ wf, index, onOpen }: { wf: WorkflowDto; index: number; o
   const t = useT();
   const qc = useQueryClient();
   const canDelete = useCan('workflow:delete'); // borrar workflow
+  const { trackEvent } = useAnalytics();
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -564,6 +569,7 @@ function WorkflowCard({ wf, index, onOpen }: { wf: WorkflowDto; index: number; o
     setErr(null);
     try {
       await api.deleteWorkflow(wf.id);
+      trackEvent('workflow.deleted', { entityType: 'workflow', entityId: wf.id });
       await qc.invalidateQueries({ queryKey: ['workflows'] }); // la tarjeta desaparece al refrescar la lista
       setConfirming(false);
     } catch {
@@ -618,7 +624,7 @@ function WorkflowCard({ wf, index, onOpen }: { wf: WorkflowDto; index: number; o
             <div className="flex items-center justify-between gap-2">
               <span className="min-w-0 text-xs text-txt-secondary">{t('¿Borrar con todo su historial?')}</span>
               <div className="flex shrink-0 items-center gap-2">
-                <Button variant="danger" size="sm" onClick={del} disabled={deleting}>
+                <Button variant="danger" size="sm" onClick={del} disabled={deleting} data-track="workflow-delete">
                   {deleting ? t('Borrando…') : t('Borrar')}
                 </Button>
                 <Button variant="ghost" size="sm" onClick={cancel} disabled={deleting}>
@@ -706,7 +712,7 @@ function NameDialog({
           <Button variant="ghost" onClick={onClose} disabled={busy}>
             {t('Cancelar')}
           </Button>
-          <Button variant="primary" onClick={onSubmit} disabled={busy}>
+          <Button variant="primary" onClick={onSubmit} disabled={busy} data-track="workflow-create">
             {busy ? t('Creando…') : t('Crear')}
           </Button>
         </div>

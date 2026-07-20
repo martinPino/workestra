@@ -1249,4 +1249,131 @@ export const EN: Record<string, string> = {
   "Fecha: hace 2 días": "Date: 2 days ago",
   "Fecha: hace 1 hora": "Date: 1 hour ago",
   "Fecha: ayer (solo el día)": "Date: yesterday (day only)",
+
+  // --- M84 · panel de analítica de producto -------------------------------------------------------
+  // Cabecera y controles
+  "Analítica": "Analytics",
+  "Cómo se usa Workestra de verdad: qué se toca, qué se abandona y qué no usa nadie.":
+    "How Workestra actually gets used: what people touch, what they drop, and what nobody uses.",
+  "Toda la plataforma": "Whole platform",
+  "Mi espacio": "My workspace",
+  "No se pudo cargar la analítica": "Analytics could not be loaded",
+  "Hace falta el permiso de analítica (propietario o administrador) y que la API esté en marcha.":
+    "You need the analytics permission (owner or admin) and the API up and running.",
+  "Los datos vienen de rollups por hora y día, no de la tabla en crudo: lo de las últimas horas puede aparecer con retraso.":
+    "Data comes from hourly and daily rollups, not the raw table: the last few hours may show up late.",
+  "Aún no hay datos: las métricas aparecen tras el primer rollup.": "No data yet: metrics show up after the first rollup.",
+
+  // Cifras de cabecera
+  "Activos · 24 h": "Active · 24 h",
+  "Activos · 7 días": "Active · 7 days",
+  "Activos · 30 días": "Active · 30 days",
+  "Sesiones": "Sessions",
+  "eventos por sesión": "events per session",
+  "Duración mediana de sesión": "Median session length",
+  "«Activos» = personas distintas con al menos una sesión en esa ventana, contadas por ventana (no es la suma de los días). La duración es la mediana, no la media.":
+    "“Active” = distinct people with at least one session in that window, counted per window (not the sum of the days). The length is the median, not the mean.",
+
+  // Permanencia (y su sesgo)
+  "Páginas más usadas": "Most used pages",
+  "Vistas, sesiones que pasaron por ahí y cuánto se queda la gente.": "Views, sessions that went through, and how long people stay.",
+  "Pestañas por tiempo de permanencia": "Tabs by time spent",
+  "Media de permanencia por pestaña, con las muestras que la sostienen.": "Average time spent per tab, with the samples behind it.",
+  "La permanencia se mide con un aviso que el navegador manda al salir de la pantalla, y una parte pequeña se pierde siempre (cierres de golpe, pestañas en segundo plano, bloqueadores). La cifra queda algo POR DEBAJO de la real: sirve para comparar pantallas entre sí, no como medida exacta.":
+    "Time spent is measured with a signal the browser sends when leaving the screen, and a small share is always lost (abrupt closes, backgrounded tabs, ad blockers). The figure lands slightly BELOW the real one: use it to compare screens against each other, not as an exact measurement.",
+  "n=": "n=",
+  "sesiones": "sessions",
+  "Sin visitas registradas": "No visits recorded",
+  "Sin permanencia registrada": "No time spent recorded",
+
+  // Lo más tocado
+  "Automatizaciones más editadas": "Most edited automations",
+  "Ediciones guardadas en la ventana.": "Edits saved within the window.",
+  "Sin ediciones registradas": "No edits recorded",
+  "ediciones": "edits",
+  "Conexiones más usadas": "Most used connections",
+  "Conexiones completadas desde la interfaz.": "Connections completed from the interface.",
+  "Cuenta conexiones abiertas y conectadas DESDE LA INTERFAZ, no invocaciones en ejecución: los conectores se ejecutan en el servidor y eso no pasa nunca por el navegador.":
+    "Counts connections opened and completed FROM THE INTERFACE, not runtime invocations: connectors run on the server and that never passes through the browser.",
+  "Sin conexiones registradas": "No connections recorded",
+  "conexiones": "connections",
+  "Plantillas más instaladas": "Most installed templates",
+  "Instalaciones desde el marketplace.": "Installs from the marketplace.",
+  "Sin instalaciones registradas": "No installs recorded",
+
+  // Funciones frías
+  "Funciones que no usa casi nadie": "Features almost nobody uses",
+  "De menos a más uso, cruzando el inventario de funciones: las que salen a cero están medidas y sin usar.":
+    "From least to most used, cross-checked against the feature inventory: the ones at zero are measured and unused.",
+  "«Medida desde» separa «no la usa nadie» de «la acabamos de instrumentar»: sin esa fecha, las dos cosas son la misma cifra.":
+    "“Measured since” separates “nobody uses it” from “we just instrumented it”: without that date, both are the same number.",
+  "sin uso": "unused",
+  "medida desde": "measured since",
+  "personas": "people",
+  "Sin inventario de funciones": "No feature inventory",
+
+  // Errores
+  "Errores más frecuentes": "Most frequent errors",
+  "Por origen y código. El texto del error no se guarda nunca.": "By source and code. The error text is never stored.",
+  "Sin errores registrados": "No errors recorded",
+  "Interfaz": "Interface",
+  "API": "API",
+  "Automatización": "Automation",
+  "Conexión": "Connection",
+  "Navegador": "Browser",
+
+  // Búsqueda
+  "Búsqueda": "Search",
+  "Búsquedas, cuántas no dieron ningún resultado y qué se teclea. Lo que no encuentra nadie es lo que falta en el producto.":
+    "Searches, how many returned nothing, and what people type. What nobody finds is what the product is missing.",
+  "El tiempo hasta el clic sale «—» porque hoy no existe: una mediana no se puede reconstruir desde contadores por hora. Aparecerá cuando el rollup guarde el histograma.":
+    "Time to click shows “—” because today it does not exist: a median cannot be reconstructed from hourly counters. It will appear once the rollup stores the histogram.",
+  "búsquedas": "searches",
+  "sin resultados": "with no results",
+  "clics en un resultado": "clicks on a result",
+  "mediana hasta el clic:": "median time to click:",
+  "pers.": "ppl",
+  "Sin búsquedas registradas": "No searches recorded",
+  "Buscador ⌘K": "⌘K search",
+
+  // Embudo
+  "Embudo": "Funnel",
+  "Personas que completan cada paso dentro de la misma sesión y en orden, con una ventana de":
+    "People completing each step within the same session and in order, with a window of",
+  "Cuenta recorridos dentro de UNA sesión: quien crea algo hoy y lo ejecuta mañana no aparece como conversión.":
+    "Counts journeys within ONE session: someone who creates something today and runs it tomorrow does not show up as a conversion.",
+  "punto de partida": "starting point",
+  "del anterior": "of the previous step",
+  "Sin recorridos completos todavía": "No completed journeys yet",
+  "Crea una automatización": "Creates an automation",
+  "La pone en marcha": "Runs it",
+  "Termina sin errores": "Finishes without errors",
+
+  // Retención
+  "Retención por cohorte": "Retention by cohort",
+  "Cada fila es la gente que se dio de alta ese día; cada columna, si seguía apareciendo N días después.":
+    "Each row is the people who signed up that day; each column, whether they still showed up N days later.",
+  "El tamaño de la cohorte incluye a todos los que se dieron de alta ese día, aparecieran luego o no: por eso el día 0 no siempre es el 100 %.":
+    "The cohort size includes everyone who signed up that day, whether they came back or not: that is why day 0 is not always 100 %.",
+  "Alta": "Signed up",
+  "Personas": "People",
+  "D": "D",
+  "Sin cohortes todavía": "No cohorts yet",
+
+  // Nombres de pantalla y de pestaña del panel
+  "Editor de automatización": "Automation editor",
+  "Detalle de ejecución": "Run detail",
+  "Detalle de plantilla": "Template detail",
+  "Invitación": "Invitation",
+  "Pantalla desconocida": "Unknown screen",
+  "Resumen": "Overview",
+  "Lienzo": "Canvas",
+  "Registros": "Logs",
+  "Repetición": "Replay",
+  "Variables": "Variables",
+  "Conocimiento": "Knowledge",
+  "Historial · Todas": "History · All",
+  "Historial · Correctas": "History · Successful",
+  "Historial · Con incidencias": "History · Failed",
+  "Historial · Revisiones": "History · Reviews",
 };

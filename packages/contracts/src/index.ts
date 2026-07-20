@@ -8,3 +8,5 @@ export * from './llm';
 export * from './rbac';
 export * from './memory';
 export * from './refs';
+export * from './analytics';
+export * from './analytics-sink';

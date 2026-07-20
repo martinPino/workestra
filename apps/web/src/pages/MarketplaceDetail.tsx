@@ -10,6 +10,7 @@ import { useConnectors } from '../lib/hooks';
 import { useCan } from '../lib/auth';
 import { cn } from '../lib/cn';
 import { useT } from '../i18n';
+import { useAnalytics } from '../analytics/useAnalytics';
 import { getMarketItem, KINDS } from '../marketplace/catalog';
 import { installItem } from '../marketplace/install';
 
@@ -52,6 +53,7 @@ function ConnectorRow({
           type="button"
           onClick={onConnect}
           disabled={connecting}
+          data-track="connector-connect"
           className="inline-flex items-center gap-1 rounded-md bg-primary/15 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/25 disabled:opacity-50"
         >
           {connecting ? <Loader2 size={12} className="animate-spin" /> : <Plug size={12} />} {t('Conectar')}
@@ -71,6 +73,7 @@ export function MarketplaceDetail() {
   const canInstall = useCan('workflow:write');
   const canConnect = useCan('connector:write');
   const qc = useQueryClient();
+  const { trackEvent } = useAnalytics();
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [installing, setInstalling] = useState(false);
@@ -100,6 +103,10 @@ export function MarketplaceDetail() {
     setError('');
     try {
       const res = await installItem(item, connectorIdByProvider);
+      // M84: `kind` solo viaja si está en el catálogo de props; 'browser'/'mcp' no lo están y el evento
+      // ENTERO se descartaría en el servidor por `.strict()`, así que en ese caso se omite el campo.
+      const kindProp = item.kind === 'team' || item.kind === 'agent' || item.kind === 'automation' ? { kind: item.kind } : {};
+      trackEvent('template.installed', { entityType: 'template', entityId: item.id, props: kindProp });
       setWizardOpen(false);
       if (res.workflowId) navigate(`/workflows/${res.workflowId}`);
       else navigate('/agents');
@@ -160,7 +167,7 @@ export function MarketplaceDetail() {
           </div>
         </div>
         <div className="flex flex-col items-end gap-1.5">
-          <Button variant="primary" onClick={onInstallClick} disabled={!canInstall || installing}>
+          <Button variant="primary" onClick={onInstallClick} disabled={!canInstall || installing} data-track="template-install">
             {installing ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />} {t('Instalar')}
           </Button>
           {!canInstall && <span className="text-[10px] text-txt-disabled">{t('Requiere permiso de edición')}</span>}
@@ -314,7 +321,7 @@ export function MarketplaceDetail() {
               <Link to="/integrations" className="text-xs font-medium text-primary hover:underline">{t('Ir a Conexiones')}</Link>
               <div className="flex items-center gap-2">
                 <Button variant="ghost" onClick={() => setWizardOpen(false)} disabled={installing}>{t('Cancelar')}</Button>
-                <Button variant="primary" onClick={doInstall} disabled={installing}>
+                <Button variant="primary" onClick={doInstall} disabled={installing} data-track="template-install">
                   {installing ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
                   {missing.length === 0 ? t('Instalar') : t('Instalar de todas formas')}
                 </Button>

@@ -264,10 +264,17 @@ export function Tabs({
   tabs,
   active,
   onChange,
+  pillId = 'tab-pill',
 }: {
   tabs: { key: string; label: string }[];
   active: string;
   onChange: (key: string) => void;
+  /**
+   * Identidad de la pastilla animada. Dos grupos de pestañas montados a la vez con el MISMO id se
+   * disputan una sola pastilla (framer las trata como el mismo elemento y la hace volar de un grupo al
+   * otro), así que cada grupo extra de una misma pantalla necesita el suyo.
+   */
+  pillId?: string;
 }) {
   return (
     <div className="flex items-center gap-1 rounded-lg border border-border bg-surface p-0.5">
@@ -282,7 +289,7 @@ export function Tabs({
         >
           {active === t.key && (
             <motion.span
-              layoutId="tab-pill"
+              layoutId={pillId}
               className="absolute inset-0 rounded-md bg-elevated"
               transition={{ type: 'spring', stiffness: 400, damping: 32 }}
             />

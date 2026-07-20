@@ -27,3 +27,17 @@ export function setCurrentWorkspace(workspaceId: string): void {
 export function currentWorkspace(): string | undefined {
   return storage.getStore()?.workspaceId;
 }
+
+/**
+ * Ejecuta `fn` en modo SISTEMA: sin tenant, de modo que RLS NO filtra y se ve todo (M84).
+ *
+ * Existe por una sola razón: el panel de analítica de plataforma tiene que cruzar todos los workspaces,
+ * y durante una petición autenticada el contexto ya trae el tenant del JWT, así que RLS lo acotaría.
+ *
+ * Es deliberadamente FEO de invocar y fácil de encontrar con un grep. Quien lo llame debe haber
+ * comprobado ANTES que quien pide es administrador de plataforma; esta función no comprueba nada, solo
+ * quita la red. Todo uso nuevo debería mirarse con la misma lupa que un `DROP`.
+ */
+export function runInSystemMode<T>(fn: () => T): T {
+  return storage.run({}, fn);
+}

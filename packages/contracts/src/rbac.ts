@@ -8,7 +8,9 @@ import type { Role } from './enums';
  */
 export const ROLE_SCOPES: Record<Role, string[]> = {
   OWNER: ['*'],
-  ADMIN: ['workspace:*', 'workflow:*', 'agent:*', 'execution:*', 'connector:*', 'integration:*', 'tool:*', 'secret:read', 'plugin:*', 'apikey:manage', 'team:manage'],
+  // M84: `analytics:read` es de OWNER/ADMIN. No se hereda de `workspace:*`: son datos de navegación
+  // POR PERSONA, así que darlos a EDITOR/VIEWER sería vigilar a los compañeros.
+  ADMIN: ['workspace:*', 'workflow:*', 'agent:*', 'execution:*', 'connector:*', 'integration:*', 'tool:*', 'secret:read', 'plugin:*', 'apikey:manage', 'team:manage', 'analytics:read'],
   EDITOR: [
     'workflow:read',
     'workflow:write',

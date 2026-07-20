@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Moon, Sun, Monitor, Bell, KeyRound, Building2, ShieldCheck, LogOut } from 'lucide-react';
 import { Page } from '../app/AppShell';
 import { Card, PageHeader, Switch, Input, Button, Badge } from '../ui';
@@ -7,6 +7,7 @@ import { cn } from '../lib/cn';
 import { api } from '../lib/api';
 import { useAuth, canApprove, useCan, AUTH_MODE, type Role } from '../lib/auth';
 import { useT } from '../i18n';
+import { useAnalytics } from '../analytics/useAnalytics';
 
 const ROLES: Role[] = ['OWNER', 'ADMIN', 'EDITOR', 'VIEWER'];
 
@@ -90,6 +91,15 @@ export function SettingsPage() {
   const theme = useUI((s) => s.theme);
   const setTheme = useUI((s) => s.setTheme);
   const canManageKeys = useCan('apikey:manage');
+  const { trackEvent } = useAnalytics();
+
+  // M84: apertura de Configuración. Ref para que el doble montaje de StrictMode no cuente dos visitas.
+  const openedRef = useRef(false);
+  useEffect(() => {
+    if (openedRef.current) return;
+    openedRef.current = true;
+    trackEvent('settings.opened');
+  }, [trackEvent]);
 
   return (
     <Page className="max-w-3xl space-y-6">

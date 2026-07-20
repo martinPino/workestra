@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Check, ShieldAlert, Plug, Unplug, Lock, Zap } from 'lucide-react';
@@ -10,6 +10,7 @@ import { api } from '../lib/api';
 import { ProviderLogo, hasProviderLogo } from '../lib/provider-logos';
 import { useAuth, useCan } from '../lib/auth';
 import { useT } from '../i18n';
+import { useAnalytics } from '../analytics/useAnalytics';
 
 const PROVIDER_GRADIENT: Record<string, string> = {
   dev: 'from-fuchsia-500 to-purple-700',
@@ -27,12 +28,19 @@ function ConnectorsManager() {
   const { data: connectors } = useConnectors(!!connecting);
   const qc = useQueryClient();
   const [err, setErr] = useState<string | null>(null);
+  const { trackEvent } = useAnalytics();
 
   const byProvider = new Map((connectors ?? []).map((c) => [c.provider, c]));
 
   // Detiene el polling cuando el conector en curso pasa a `connected`.
   useEffect(() => {
-    if (connecting && byProvider.get(connecting)?.status === 'connected') setConnecting(null);
+    if (!connecting) return;
+    const c = byProvider.get(connecting);
+    if (c?.status !== 'connected') return;
+    // M84: conectar de verdad no es pulsar el botón ni abrir el popup de OAuth — es que el sondeo vea el
+    // conector en 'connected'. Antes de eso el conector no sirve para nada, y muchos abandonos viven ahí.
+    trackEvent('connector.connected', { entityType: 'connector', entityId: c.id, props: { provider: connecting } });
+    setConnecting(null);
   }, [connectors, connecting]);
 
   const connect = async (provider: string) => {
@@ -110,6 +118,7 @@ function ConnectorsManager() {
                         variant={p.configured ? 'primary' : 'secondary'}
                         onClick={() => connect(p.provider)}
                         disabled={!p.configured || connecting === p.provider}
+                        data-track="connector-connect"
                       >
                         <Plug size={14} /> {connecting === p.provider ? t('Conectando…') : t('Conectar')}
                       </Button>
@@ -133,6 +142,16 @@ function ConnectorsManager() {
 
 export function Integrations() {
   const t = useT();
+  const { trackEvent } = useAnalytics();
+
+  // M84: apertura de Conexiones. Ref para que el doble montaje de StrictMode no cuente dos visitas.
+  const openedRef = useRef(false);
+  useEffect(() => {
+    if (openedRef.current) return;
+    openedRef.current = true;
+    trackEvent('connector.opened');
+  }, [trackEvent]);
+
   return (
     <Page className="space-y-6">
       <PageHeader title={t('Conexiones')} subtitle={t('Conecta las apps de tu equipo una vez; tus flujos las usan desde el editor.')} />

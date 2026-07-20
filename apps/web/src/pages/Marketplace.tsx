@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Search, Star, Download, Clock, Users, Sparkles, ArrowRight } from 'lucide-react';
@@ -7,6 +7,7 @@ import { PageHeader, Input } from '../ui';
 import { ProviderLogo, hasProviderLogo } from '../lib/provider-logos';
 import { cn } from '../lib/cn';
 import { useT } from '../i18n';
+import { useAnalytics } from '../analytics/useAnalytics';
 import { MARKETPLACE, KINDS, COLLECTIONS, type MarketItem, type MarketKind } from '../marketplace/catalog';
 
 const DIFFICULTY_TONE: Record<MarketItem['difficulty'], string> = {
@@ -112,6 +113,15 @@ export function Marketplace() {
   const [q, setQ] = useState('');
   const [kind, setKind] = useState<MarketKind | 'all'>('all');
   const [collection, setCollection] = useState<string | null>(null);
+  const { trackEvent, trackSearch } = useAnalytics();
+
+  // M84: apertura del catálogo. Ref para que el doble montaje de StrictMode no cuente dos visitas.
+  const openedRef = useRef(false);
+  useEffect(() => {
+    if (openedRef.current) return;
+    openedRef.current = true;
+    trackEvent('marketplace.opened');
+  }, [trackEvent]);
 
   const items = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -122,6 +132,18 @@ export function Marketplace() {
       return true;
     });
   }, [q, kind, collection]);
+
+  // M84: búsqueda con debounce a propósito. Emitir por pulsación convertiría «facturas» en ocho búsquedas
+  // y cada `resultCount` sería el de un prefijo a medio escribir, no el de lo que la persona buscaba.
+  // `trackSearch` solo manda un hash y la longitud en tramos: el texto no sale del navegador.
+  const resultsRef = useRef(items.length);
+  resultsRef.current = items.length;
+  useEffect(() => {
+    const query = q.trim();
+    if (!query) return undefined;
+    const timer = setTimeout(() => void trackSearch('marketplace', query, resultsRef.current), 600);
+    return () => clearTimeout(timer);
+  }, [q, trackSearch]);
 
   return (
     <Page className="space-y-6">

@@ -10,6 +10,7 @@ import { api, type ExecutionRow, type ReviewDto } from '../lib/api';
 import { useAuth, canApprove } from '../lib/auth';
 import { statusLabel, triggerLabel } from '../lib/labels';
 import { useT } from '../i18n';
+import { useAnalytics, useTabTracking } from '../analytics/useAnalytics';
 
 type Tone = 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'accent';
 
@@ -124,6 +125,15 @@ export function Executions() {
   const t = useT();
   const [tab, setTab] = useState('all');
   const [wfFilter, setWfFilter] = useState(''); // '' = todos los workflows
+  const { trackEvent } = useAnalytics();
+  // M84: las pestañas de esta pantalla van prefijadas ('exec:all'…) porque el catálogo de `tab` es común
+  // a todas las pantallas y 'all'/'ok' sueltos chocarían con los del editor.
+  useTabTracking(`exec:${tab}`);
+  // Cambiar de pestaña ES el filtro por estado de esta pantalla; la clave de la pestaña ya es un slug.
+  const changeTab = (key: string) => {
+    setTab(key);
+    trackEvent('filter.applied', { props: { filter: 'status', value: key } });
+  };
   const { data: workflows } = useWorkflows();
   const statusFilter = tab === 'reviews' ? 'WAITING_HUMAN' : undefined;
   const { data, isLoading, error } = useExecutions(statusFilter, wfFilter || undefined);
@@ -156,7 +166,7 @@ export function Executions() {
             </select>
             <Tabs
               active={tab}
-              onChange={setTab}
+              onChange={changeTab}
               tabs={[
                 { key: 'all', label: t('Todas') },
                 { key: 'reviews', label: waitingCount ? `${t('Revisiones')} · ${waitingCount}` : t('Revisiones') },

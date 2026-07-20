@@ -29,6 +29,7 @@ import {
 } from '@core/infra';
 import { createRuntimeRegistry, resolveConnectorToken, pollDriveFiles, fetchDriveFileBytes, pollSentryIssues } from '@core/sdk-plugins';
 import { createLlmRouter } from '@core/llm';
+import { startAnalyticsRollup } from './analytics-rollup';
 
 /**
  * Worker durable de la cola `execution`. Consume jobs encolados por la API, ejecuta con la MISMA
@@ -275,6 +276,11 @@ async function main(): Promise<void> {
   }
   setInterval(() => void pollSentryBindings(), 60_000);
   void pollSentryBindings(); // primera pasada al arrancar (fija la línea base de cada proyecto)
+
+  // M84: rollup de la analítica de producto. Vive en el worker y no en la API porque es trabajo de fondo
+  // con picos: dentro del proceso que atiende peticiones, una pasada lenta se nota como latencia en la
+  // interfaz. Se autodesactiva sin Postgres y nunca deja escapar una excepción (ver el fichero).
+  startAnalyticsRollup(prisma);
 
   console.log('Worker durable AgentFlow escuchando las colas "execution" y "schedule"…');
 }

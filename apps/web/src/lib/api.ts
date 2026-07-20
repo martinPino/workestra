@@ -1,5 +1,23 @@
-import type { WorkflowGraph, ExecutionEvent } from '@core/contracts';
+import type {
+  WorkflowGraph,
+  ExecutionEvent,
+  ActiveUsersRow,
+  EntityRow,
+  EntityType,
+  ErrorRow,
+  EventName,
+  FeatureUsageRow,
+  FunnelRow,
+  RetentionRow,
+  SearchRow,
+  SessionsRow,
+  SurfaceRow,
+  TabDwellRow,
+} from '@core/contracts';
 import { currentToken, ensureDevSession, AUTH_MODE, useAuth, type Role, type SessionUser } from './auth';
+// M84: `api` no es un componente, así que no puede usar el hook; se emite con `track` a pelo.
+// El transporte de analítica usa `fetch` global (no este envoltorio), así que no hay ciclo.
+import { track } from '../analytics/tracker';
 
 // Normaliza: quita barra(s) final(es) para no generar `//ruta` (que en Nest da 404).
 const API = (import.meta.env.VITE_API_URL ?? 'http://localhost:3001').replace(/\/+$/, '');
@@ -156,8 +174,46 @@ export interface AgentDraft {
   isOrchestrator: boolean;
 }
 
+/** Resumen del panel de analítica (M84): lo que devuelve `GET /insights/overview` de una tacada. */
+export interface InsightsOverviewDto {
+  surfaces: SurfaceRow[];
+  tabs: TabDwellRow[];
+  sessions: SessionsRow;
+  active: ActiveUsersRow[];
+  errors: ErrorRow[];
+}
+
+/**
+ * Ventana del panel de analítica (M84).
+ *
+ * `scope: 'all'` cruza TODOS los workspaces y el backend solo se lo consiente a un administrador de
+ * plataforma (si no, 400). Sin él, la API usa el workspace de la sesión verificada: el ámbito nunca sale
+ * de aquí, así que mandar el parámetro no es lo que da permiso.
+ */
+export interface InsightsQuery {
+  days: number;
+  scope?: 'all';
+}
+
+const insightsQs = (q: InsightsQuery, extra: Record<string, string> = {}): string => {
+  const p = new URLSearchParams({ days: String(q.days), ...extra });
+  if (q.scope) p.set('scope', q.scope);
+  return p.toString();
+};
+
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
+    // M84: aquí es donde un error del backend se convierte en un error que alguien VE, así que aquí es
+    // donde se cuenta. Es el único punto por el que pasan todas las llamadas del producto: sin esto, el
+    // panel de «errores más frecuentes» está estructuralmente vacío y parece que no falla nada.
+    //
+    // EL CÓDIGO SE DERIVA DEL ESTADO HTTP Y DE NADA MÁS. Ni `detail`, ni el cuerpo, ni el mensaje del
+    // `Error` que se lanza abajo pueden entrar en el evento: ese cuerpo es la vía de fuga conocida —el
+    // backend devuelve en `message` valores de un grafo y trozos de prompt—, y una vez dentro de la
+    // analítica se queda ahí. `http-<status>` ya es un slug por construcción, así que no viaja NI UN
+    // carácter de texto libre. Se emite ANTES de leer el cuerpo, para que no haya forma de que el cuerpo
+    // llegue a esta llamada ni por descuido de quien edite esto después.
+    track('error.displayed', { props: { kind: 'api', code: `http-${res.status}`, httpStatus: res.status } });
     let detail = '';
     try {
       detail = (await res.json())?.message ?? '';
@@ -248,10 +304,28 @@ export const api = {
     fetch(`${API}/workflows/${id}/versions`, { headers: authHeaders() }).then((r) =>
       json<Array<{ id: string; version: number; state: string; publishedAt: string | null }>>(r),
     ),
-  execute: (workflowId: string, context?: Record<string, unknown>) =>
-    fetch(`${API}/executions`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ workflowId, context }) }).then((r) =>
-      json<{ executionId: string; status: string }>(r),
-    ),
+  /**
+   * M84: aquí se marca el ARRANQUE de una ejecución manual. Es el evento que no se puede rellenar hacia
+   * atrás, así que se emite pase lo que pase.
+   *
+   * OJO con el desenlace: este POST solo ENCOLA (devuelve QUEUED/RUNNING, nunca un estado terminal), así
+   * que un `succeeded` aquí contaría como buena toda ejecución aceptada y la tasa de fallo saldría
+   * siempre a cero. Por eso aquí solo se emite `failed` cuando la ejecución ni siquiera llega a arrancar;
+   * el desenlace real lo emite el editor cuando el stream llega a SUCCEEDED/FAILED.
+   */
+  execute: async (workflowId: string, context?: Record<string, unknown>) => {
+    track('workflow.run.started', { entityType: 'workflow', entityId: workflowId, props: { trigger: 'manual' } });
+    try {
+      return await fetch(`${API}/executions`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ workflowId, context }),
+      }).then((r) => json<{ executionId: string; status: string }>(r));
+    } catch (e) {
+      track('workflow.run.failed', { entityType: 'workflow', entityId: workflowId });
+      throw e;
+    }
+  },
   getExecution: (id: string) => fetch(`${API}/executions/${id}`, { headers: authHeaders() }).then((r) => json<ExecutionDetailDto>(r)),
   // --- Claves de API / MCP (M32): conectar Claude Desktop/ChatGPT/Cursor ---
   listApiKeys: () => fetch(`${API}/api-keys`, { headers: authHeaders() }).then((r) => json<ApiKeyView[]>(r)),
@@ -413,6 +487,31 @@ export const api = {
     rawFetch(`${API}/team/invite/${token}/accept`, { method: 'POST', headers, body: JSON.stringify(input) }).then((r) =>
       json<{ accessToken: string; user: SessionUser }>(r),
     ),
+
+  // --- Analítica de producto (M84): panel interno. Exige `analytics:read` (OWNER/ADMIN) y, para
+  // `scope: 'all'`, además ser administrador de plataforma. Las dos cosas las decide el servidor. ---
+  /** Qué puede ver quien pregunta. El nav se apoya en esto para no enseñar una puerta que no abre. */
+  insightsMe: () => fetch(`${API}/insights/me`, { headers: authHeaders() }).then((r) => json<{ platformAdmin: boolean }>(r)),
+  insightsOverview: (q: InsightsQuery) =>
+    fetch(`${API}/insights/overview?${insightsQs(q)}`, { headers: authHeaders() }).then((r) => json<InsightsOverviewDto>(r)),
+  /** Lo más tocado de un tipo. `name`/`entityType` van tipados: el servidor solo acepta los del catálogo. */
+  insightsEntities: (q: InsightsQuery & { name: EventName; entityType: EntityType }) =>
+    fetch(`${API}/insights/entities?${insightsQs(q, { name: q.name, entityType: q.entityType })}`, { headers: authHeaders() }).then((r) =>
+      json<EntityRow[]>(r),
+    ),
+  /** Uso por función CRUZADO CONTRA EL INVENTARIO: incluye los ceros, que es de lo que va el informe. */
+  insightsFeatures: (q: InsightsQuery) =>
+    fetch(`${API}/insights/features?${insightsQs(q)}`, { headers: authHeaders() }).then((r) => json<FeatureUsageRow[]>(r)),
+  insightsRetention: (q: InsightsQuery & { cohortDays: number }) =>
+    fetch(`${API}/insights/retention?${insightsQs(q, { cohortDays: String(q.cohortDays) })}`, { headers: authHeaders() }).then((r) =>
+      json<RetentionRow[]>(r),
+    ),
+  insightsSearch: (q: InsightsQuery) =>
+    fetch(`${API}/insights/search?${insightsQs(q)}`, { headers: authHeaders() }).then((r) => json<SearchRow[]>(r)),
+  insightsFunnel: (q: InsightsQuery & { steps: EventName[]; windowMinutes: number }) =>
+    fetch(`${API}/insights/funnel?${insightsQs(q, { steps: q.steps.join(','), windowMinutes: String(q.windowMinutes) })}`, {
+      headers: authHeaders(),
+    }).then((r) => json<FunnelRow[]>(r)),
 
   // --- Escalado humano (M5-B) ---
   devToken: (role: Role, sub = `dev_${role.toLowerCase()}`) =>

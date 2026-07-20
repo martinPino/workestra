@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { UserPlus, Copy, Check, Ban, RotateCcw, Trash2, Loader2, Crown, Mail } from 'lucide-react';
 import { Page } from '../app/AppShell';
@@ -6,6 +6,7 @@ import { PageHeader, Button, Input, Badge } from '../ui';
 import { api, type TeamMemberDto, type TeamDataDto } from '../lib/api';
 import type { Role } from '../lib/auth';
 import { useT } from '../i18n';
+import { useAnalytics } from '../analytics/useAnalytics';
 
 const ROLE_LABEL: Record<Role, string> = { OWNER: 'Propietario', ADMIN: 'Administrador', EDITOR: 'Miembro', VIEWER: 'Solo lectura' };
 const ROLE_TONE: Record<Role, 'accent' | 'primary' | 'default'> = { OWNER: 'accent', ADMIN: 'primary', EDITOR: 'default', VIEWER: 'default' };
@@ -33,6 +34,15 @@ export function Team() {
   const t = useT();
   const qc = useQueryClient();
   const { data, isLoading, error } = useQuery({ queryKey: ['team'], queryFn: api.getTeam, retry: false });
+  const { trackEvent } = useAnalytics();
+
+  // M84: apertura de Equipo. Ref para que el doble montaje de StrictMode no cuente dos visitas.
+  const openedRef = useRef(false);
+  useEffect(() => {
+    if (openedRef.current) return;
+    openedRef.current = true;
+    trackEvent('team.opened');
+  }, [trackEvent]);
 
   const [email, setEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<Role>('EDITOR');
