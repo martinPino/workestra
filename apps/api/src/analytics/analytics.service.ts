@@ -13,6 +13,22 @@ import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.
 
 export const ANALYTICS_SINK = Symbol('ANALYTICS_SINK');
 
+/**
+ * Interruptor general de la analítica (M84). Apagado por DEFECTO: recoger datos de navegación de personas
+ * es algo que se enciende a propósito, no algo que pasa porque nadie se acordó de apagarlo.
+ *
+ * Se lee en cada llamada, no una vez al arrancar, para que cambiar la variable en Railway surta efecto en
+ * cuanto el servicio reinicia sin depender de ningún caché nuestro.
+ *
+ * Es la ÚNICA fuente de verdad: la usan la ingesta (para no guardar) y el endpoint de configuración (para
+ * que el navegador ni siquiera emita, que es donde está el ahorro de verdad). Si algún día se quiere un
+ * interruptor en caliente —una fila en base de datos o los feature flags de Railway—, se cambia aquí y
+ * nada más.
+ */
+export function analyticsEnabled(): boolean {
+  return (process.env.ANALYTICS_ENABLED ?? '').trim().toLowerCase() === 'true';
+}
+
 /** Tope por workspace y minuto. Generoso para uso real (100 personas a 60 ev/min) y ruinoso para un bucle. */
 const MAX_EVENTS_PER_MINUTE = 6_000;
 /** El reloj del cliente se acota a ±24 h: un dispositivo con la hora torcida falsearía el DAU de todos. */
@@ -41,6 +57,9 @@ export class AnalyticsService {
    * su cola, y se perderían también los 49 buenos.
    */
   async ingest(batch: AnalyticsBatch, workspaceId: string, userId: string): Promise<{ accepted: number; dropped: number }> {
+    // Apagado: se descarta en silencio. El cliente ya no debería estar mandando, pero una pestaña abierta
+    // desde antes de apagarlo sí lo haría, y esa no puede seguir escribiendo.
+    if (!analyticsEnabled()) return { accepted: 0, dropped: batch.events.length };
     if (!this.allow(workspaceId, batch.events.length)) {
       this.log.warn(`rate limit: workspace ${workspaceId} supera ${MAX_EVENTS_PER_MINUTE} eventos/min`);
       return { accepted: 0, dropped: batch.events.length };

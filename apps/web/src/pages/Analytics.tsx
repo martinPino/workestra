@@ -686,6 +686,9 @@ export function Analytics() {
 
   const me = useInsightsMe();
   const platformAdmin = me.data?.platformAdmin ?? false;
+  // Con la recogida apagada, TODO sale a cero. Un cero que parece una medición y no lo es engaña más que
+  // una página en blanco, así que se dice arriba del todo y sin ambigüedad.
+  const collecting = me.data?.collecting ?? true;
   // El ámbito solo se pide si de verdad se puede: sin ser administrador de plataforma, `scope=all` es un
   // 400 en toda la página. Si alguien pierde el permiso con el interruptor puesto, cae solo al suyo.
   const q: InsightsQuery = { days, scope: platformAdmin && allWorkspaces ? 'all' : undefined };
@@ -719,6 +722,15 @@ export function Analytics() {
           </div>
         }
       />
+
+      {!collecting && (
+        <Card className="border-warning/40 bg-warning/5 p-4">
+          <p className="text-sm font-medium text-txt-primary">{t('La recogida de datos está apagada')}</p>
+          <p className="mt-1 text-xs leading-relaxed text-txt-secondary">
+            {t('Todo lo que ves abajo está a cero porque no se está midiendo, no porque nadie use el producto. Para encenderla, pon ANALYTICS_ENABLED=true en el servicio de la API.')}
+          </p>
+        </Card>
+      )}
 
       {overview.error ? (
         <EmptyState

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ANALYTICS_SCHEMA_VERSION, type AnalyticsSink, type StoredAnalyticsEvent } from '@core/contracts';
-import { AnalyticsService } from './analytics.service';
+import { AnalyticsService, analyticsEnabled } from './analytics.service';
 import { PlatformAdminService, parseAllowlist } from './platform-admin.guard';
 
 /** Sumidero de juguete que se queda con lo escrito para poder mirarlo. */
@@ -39,6 +39,12 @@ const ev = (over: Record<string, unknown> = {}) => ({
 });
 
 const batch = (...events: unknown[]) => ({ v: ANALYTICS_SCHEMA_VERSION as 1, events: events as never });
+
+// La analítica está APAGADA por defecto (ver `analyticsEnabled`), así que los tests de ingesta la encienden
+// a propósito. Que haya que hacerlo es justamente la garantía que queremos.
+beforeEach(() => {
+  process.env.ANALYTICS_ENABLED = 'true';
+});
 
 describe('Ingesta de analítica — atribución y aislamiento', () => {
   it('el workspace y el usuario SIEMPRE salen de la sesión, nunca del cuerpo', async () => {
@@ -168,5 +174,39 @@ describe('Administrador de plataforma — un correo no es una identidad', () => 
   it('parseAllowlist normaliza espacios y mayúsculas', () => {
     expect(parseAllowlist(' A@b.com ,, C@D.com ')).toEqual(['a@b.com', 'c@d.com']);
     expect(parseAllowlist(undefined)).toEqual([]);
+  });
+});
+
+describe('Interruptor general — apagado por defecto', () => {
+  beforeEach(() => {
+    delete process.env.ANALYTICS_ENABLED;
+  });
+
+  it('sin la variable NO se recoge nada: recoger navegación de personas se enciende a propósito', () => {
+    expect(analyticsEnabled()).toBe(false);
+  });
+
+  it('solo el valor exacto «true» enciende (nada de «1», «yes» o vacío)', () => {
+    for (const v of ['1', 'yes', 'on', '', ' ', 'false', 'TRUE ']) {
+      process.env.ANALYTICS_ENABLED = v;
+      expect(analyticsEnabled()).toBe(v.trim().toLowerCase() === 'true');
+    }
+  });
+
+  it('apagado, la ingesta descarta TODO aunque el lote sea válido', async () => {
+    // Una pestaña abierta desde antes de apagarlo seguiría mandando: no puede seguir escribiendo.
+    delete process.env.ANALYTICS_ENABLED;
+    const { rows, sink } = fakeSink();
+    const res = await svc(sink).ingest(batch(ev(), ev({ seq: 2 })), 'ws', 'u');
+    expect(res.accepted).toBe(0);
+    expect(res.dropped).toBe(2);
+    expect(rows).toHaveLength(0);
+  });
+
+  it('encendido vuelve a aceptar, sin reiniciar nada del servicio', async () => {
+    process.env.ANALYTICS_ENABLED = 'true';
+    const { rows, sink } = fakeSink();
+    expect((await svc(sink).ingest(batch(ev()), 'ws', 'u')).accepted).toBe(1);
+    expect(rows).toHaveLength(1);
   });
 });

@@ -3,8 +3,9 @@ import { AnalyticsBatchSchema, EventNameSchema, EntityTypeSchema, type Analytics
 import { ScopesGuard } from '../rbac/scopes.guard';
 import { RequireScopes } from '../rbac/scopes.decorator';
 import { Workspace } from '../auth/workspace.decorator';
+import { Public } from '../auth/public.decorator';
 import type { JwtPayload } from '../auth/auth.service';
-import { AnalyticsService } from './analytics.service';
+import { AnalyticsService, analyticsEnabled } from './analytics.service';
 import { PlatformAdminGuard, PlatformAdminService } from './platform-admin.guard';
 
 type AuthedReq = { user: JwtPayload };
@@ -22,6 +23,20 @@ export class IngestController {
    * 202: aceptado. El navegador no espera resultado —manda y sigue—, así que devolver el detalle no
    * aporta nada y sí invitaría a que el cliente reintentase por cosas que no son suyas.
    */
+  /**
+   * Si la analítica está encendida. PÚBLICO porque el navegador lo consulta antes de saber quién es (el
+   * proveedor envuelve también /login) y porque no revela nada: solo dice si hay telemetría.
+   *
+   * Es la pieza que de verdad ahorra: con esto el navegador ni arranca el reloj ni escucha eventos ni
+   * manda nada. Apagarlo solo en el servidor ahorraría el almacenamiento, no el trabajo del dispositivo
+   * de quien usa el producto.
+   */
+  @Get('config')
+  @Public()
+  config() {
+    return { enabled: analyticsEnabled() };
+  }
+
   @Post()
   @HttpCode(202)
   async ingest(@Body() body: unknown, @Workspace() workspaceId: string, @Req() req: AuthedReq) {
@@ -47,10 +62,12 @@ export class InsightsController {
     private readonly admin: PlatformAdminService,
   ) {}
 
-  /** Qué puede ver quien pregunta. El nav del front se apoya en esto; la API lo exige igual. */
+  /** Qué puede ver quien pregunta. El nav del front se apoya en esto; la API lo exige igual.
+   *  Se devuelve también si la recogida está encendida: con el interruptor apagado, un panel a cero no es
+   *  una medición —es que no se está midiendo—, y el panel tiene que poder decirlo. */
   @Get('me')
   me(@Req() req: AuthedReq) {
-    return { platformAdmin: this.admin.isAdmin(req.user.sub) };
+    return { platformAdmin: this.admin.isAdmin(req.user.sub), collecting: analyticsEnabled() };
   }
 
   @Get('overview')

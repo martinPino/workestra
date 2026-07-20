@@ -491,7 +491,7 @@ export const api = {
   // --- Analítica de producto (M84): panel interno. Exige `analytics:read` (OWNER/ADMIN) y, para
   // `scope: 'all'`, además ser administrador de plataforma. Las dos cosas las decide el servidor. ---
   /** Qué puede ver quien pregunta. El nav se apoya en esto para no enseñar una puerta que no abre. */
-  insightsMe: () => fetch(`${API}/insights/me`, { headers: authHeaders() }).then((r) => json<{ platformAdmin: boolean }>(r)),
+  insightsMe: () => fetch(`${API}/insights/me`, { headers: authHeaders() }).then((r) => json<{ platformAdmin: boolean; collecting: boolean }>(r)),
   insightsOverview: (q: InsightsQuery) =>
     fetch(`${API}/insights/overview?${insightsQs(q)}`, { headers: authHeaders() }).then((r) => json<InsightsOverviewDto>(r)),
   /** Lo más tocado de un tipo. `name`/`entityType` van tipados: el servidor solo acepta los del catálogo. */

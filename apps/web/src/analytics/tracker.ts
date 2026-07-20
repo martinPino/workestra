@@ -1,6 +1,6 @@
 import type { AnalyticsEvent, EntityType, ErrorKind, EventName, Surface } from '@core/contracts';
 import { nextSeq, touch, toSurface } from './session';
-import { enqueue, flushNow, restoreQueue } from './transport';
+import { clearQueue, enqueue, flushNow, restoreQueue } from './transport';
 
 /**
  * Núcleo del seguimiento (M84): emitir eventos y medir cuánto se está en cada sitio.
@@ -30,6 +30,14 @@ interface View {
 let view: View | null = null;
 let started = false;
 let lastEmit = 0;
+/**
+ * Compuerta general (M84). Empieza APAGADA y solo la abre el servidor: mientras esté cerrada no se emite
+ * nada, no se arranca el reloj de permanencia y no se escucha ningún evento del documento.
+ *
+ * Apagarlo solo en el servidor ahorraría el almacenamiento; apagarlo AQUÍ ahorra además el trabajo en el
+ * dispositivo de quien usa el producto y su batería, que es de quien no es el dato.
+ */
+let enabled = false;
 
 function now(): number {
   return Date.now();
@@ -93,6 +101,7 @@ export function track(
     props?: Record<string, unknown>;
   } = {},
 ): void {
+  if (!enabled) return;
   try {
     const { sessionId, seq } = nextSeq();
     const ev: AnalyticsEvent = {
@@ -120,7 +129,7 @@ export function track(
  * habría dos relojes y dos juegos de escuchas contando lo mismo.
  */
 export function startTracking(): () => void {
-  if (started) return () => {};
+  if (started || !enabled) return () => {};
   started = true;
   restoreQueue();
 
@@ -176,6 +185,23 @@ export function startTracking(): () => void {
     clearInterval(tick);
     started = false;
   };
+}
+
+/**
+ * Abre o cierra la compuerta. Lo llama el proveedor con lo que dice el servidor.
+ * Al cerrarla se tira lo que hubiera pendiente: si se apagó la recogida, lo ya recogido tampoco se manda.
+ */
+export function setEnabled(on: boolean): void {
+  if (enabled === on) return;
+  enabled = on;
+  if (!on) {
+    view = null;
+    clearQueue();
+  }
+}
+
+export function isEnabled(): boolean {
+  return enabled;
 }
 
 /** Último evento emitido (para pruebas manuales desde la consola). */

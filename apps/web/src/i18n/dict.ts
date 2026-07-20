@@ -1376,4 +1376,7 @@ export const EN: Record<string, string> = {
   "Historial · Correctas": "History · Successful",
   "Historial · Con incidencias": "History · Failed",
   "Historial · Revisiones": "History · Reviews",
+  "La recogida de datos está apagada": "Data collection is off",
+  "Todo lo que ves abajo está a cero porque no se está midiendo, no porque nadie use el producto. Para encenderla, pon ANALYTICS_ENABLED=true en el servicio de la API.":
+    "Everything below reads zero because nothing is being measured, not because nobody uses the product. To turn it on, set ANALYTICS_ENABLED=true on the API service.",
 };
