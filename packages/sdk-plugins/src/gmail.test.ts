@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { gmailRawMessage, safeResponseJson, rowIsAllEmpty } from './connector-node';
+import { gmailRawMessage, safeResponseJson, rowIsAllEmpty, emptyRowMessage } from './connector-node';
 
 const decode = (raw: string): string => Buffer.from(raw, 'base64url').toString('utf8');
 
@@ -69,5 +69,28 @@ describe('rowIsAllEmpty — la fila vacía de Sheets que fingía éxito', () => 
     expect(rowIsAllEmpty('no es json')).toBe(false);
     expect(rowIsAllEmpty('{"otra":"cosa"}')).toBe(false);
     expect(rowIsAllEmpty('{"values":[]}')).toBe(false);
+  });
+
+  // El mensaje es el único hilo del que tira quien ve el aviso: sin nombrar la referencia rota, «revisa los
+  // datos» obliga a repasar celda por celda. El caso real: apuntar a la salida de un paso de IA por el nombre
+  // del nodo (`{{llm_1.monto}}`) en vez de `{{agent:llm_1.output}}`.
+  it('el error NOMBRA las referencias que no resolvieron', () => {
+    const msg = emptyRowMessage(['llm_1.monto', 'llm_1.fecha']);
+    expect(msg).toContain('{{llm_1.monto}}');
+    expect(msg).toContain('{{llm_1.fecha}}');
+    expect(msg).toContain('la fila quedó vacía');
+  });
+
+  it('sin referencias rotas (los datos llegaron vacíos de verdad) no inventa pistas', () => {
+    const msg = emptyRowMessage([]);
+    expect(msg).toContain('la fila quedó vacía');
+    expect(msg).not.toContain('no resolvieron');
+  });
+
+  it('con muchas referencias rotas recorta la lista en vez de escupir un muro', () => {
+    const msg = emptyRowMessage(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']);
+    expect(msg).toContain('{{a}}');
+    expect(msg).toContain('…'); // se cortó
+    expect(msg).not.toContain('{{h}}');
   });
 });

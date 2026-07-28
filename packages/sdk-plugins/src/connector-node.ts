@@ -41,6 +41,27 @@ export function rowIsAllEmpty(interpolatedBody: string): boolean {
   }
 }
 
+/**
+ * Mensaje del corte por fila vacía. NOMBRA las referencias que no resolvieron: sin ellas, «revisa los datos»
+ * obliga a adivinar cuál de las celdas falló entre todas las del cuerpo. El fallo típico es apuntar a la
+ * salida de un paso por el nombre del nodo a secas —la de un paso de IA vive en `{{agent:<nodo>.output}}`—,
+ * y verlo escrito lo convierte en un arreglo de un segundo.
+ */
+export function emptyRowMessage(unresolved: string[]): string {
+  const pistas = unresolved.length
+    ? ` Estas referencias no resolvieron: ${unresolved
+        .slice(0, 6)
+        .map((r) => `{{${r}}}`)
+        .join(', ')}${unresolved.length > 6 ? ', …' : ''}.`
+    : '';
+  return (
+    'connector: la fila quedó vacía (todas las columnas).' +
+    pistas +
+    ' Revisa los datos que referencia —probablemente el paso anterior no devolvió nada—. ' +
+    'Google aceptaría la fila en blanco y no verías el error.'
+  );
+}
+
 export function gmailRawMessage(msg: { to?: string; subject?: string; text?: string }): string {
   const headerSafe = (s: string): string => s.replace(/[\r\n]+/g, ' ').trim();
   const to = headerSafe(String(msg.to ?? ''));
@@ -171,12 +192,7 @@ export class ConnectorNodeExecutor implements INodeExecutor {
       // siguiente append vuelve a A1—. Una fila entera vacía nunca es intencional: se corta con un mensaje
       // claro en vez de fingir éxito. Es el único caso donde una ref sin resolver SÍ rompe, y con motivo.
       if (connector.provider === 'google-sheets' && resolvedPath.includes(':append') && rowIsAllEmpty(body)) {
-        return store({
-          error:
-            'connector: la fila quedó vacía (todas las columnas). Revisa los datos que referencia —probablemente ' +
-            'el paso anterior no devolvió nada—. Google aceptaría la fila en blanco y no verías el error.',
-          unresolved,
-        });
+        return store({ error: emptyRowMessage(unresolved), unresolved });
       }
     }
 
