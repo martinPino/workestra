@@ -55,6 +55,28 @@ describe('ExtractTextNodeExecutor (nodo Extraer texto, M49)', () => {
     expect(seenLang).toBe('eng+spa'); // idioma por defecto: español + inglés
   });
 
+  // Google Drive entrega PDFs válidos con `Content-Type: application/octet-stream`. Fiarse de la etiqueta
+  // hacía que `extract` rechazara facturas reales; ahora se mira el CONTENIDO (la firma `%PDF`).
+  it('reconoce un PDF entregado como octet-stream por su firma, no por la etiqueta', async () => {
+    // Un PDF mínimo válido: empieza por «%PDF-1.4». pdf-parse extrae poco, pero no debe dar «no soportado».
+    const pdfBytes = new TextEncoder().encode('%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF');
+    const pdf: StoredFile = { name: 'factura', mimeType: 'application/octet-stream', bytes: pdfBytes };
+    const r = await run(pdf, 'f1');
+    // No es «tipo no soportado»: fue por la rama PDF (extrajo, o avisó de que no tiene capa de texto).
+    expect(out(r).error ?? '').not.toContain('no soportado');
+  });
+
+  it('reconoce una imagen octet-stream por su número mágico y la manda a OCR', async () => {
+    const jpg: StoredFile = { name: 'recibo', mimeType: 'application/octet-stream', bytes: new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]) };
+    const r = await run(jpg, 'f1', { ocr: async () => 'TOTAL 100' });
+    expect(out(r).text).toBe('TOTAL 100');
+  });
+
+  it('un octet-stream SIN firma se intenta como texto (mal etiquetado, no basura binaria)', async () => {
+    const txt: StoredFile = { name: 'datos', mimeType: 'application/octet-stream', bytes: new TextEncoder().encode('columna1,columna2') };
+    expect(out(await run(txt, 'f1')).text).toBe('columna1,columna2');
+  });
+
   it('errores legibles sin romper el flujo: sin fichero, no encontrado, tipo no soportado', async () => {
     expect(out(await run(null, '')).error).toContain('indica el fichero');
     expect(out(await run(null, 'noexiste')).error).toContain('no se encontró');

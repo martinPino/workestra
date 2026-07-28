@@ -33,6 +33,32 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error('el OCR tardó demasiado')), ms))]);
 }
 
+/**
+ * Tipo REAL del fichero, mirando primero sus bytes y solo después la etiqueta MIME.
+ *
+ * Google Drive (y muchos servidores) entregan un PDF perfectamente válido con `Content-Type:
+ * application/octet-stream` —«unos bytes cualesquiera»—, así que fiarse solo de la etiqueta hacía que
+ * `extract` rechazara facturas reales. Los formatos que nos importan empiezan por una firma inequívoca:
+ * un PDF por `%PDF`, un PNG/JPG/GIF por su número mágico. Se comprueban esas firmas ANTES de creer la
+ * etiqueta; si el contenido no dice nada, se cae a lo que diga el MIME.
+ */
+function detectKind(bytes: Uint8Array, mimeType: string): 'pdf' | 'image' | 'text' | 'unknown' {
+  const b = bytes;
+  // %PDF
+  if (b.length >= 4 && b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46) return 'pdf';
+  // PNG (89 50 4E 47), JPEG (FF D8 FF), GIF (47 49 46)
+  if (b.length >= 4 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'image';
+  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image';
+  if (b.length >= 3 && b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) return 'image';
+  // Sin firma reconocible: la etiqueta decide.
+  if (/pdf/i.test(mimeType)) return 'pdf';
+  if (/^image\//i.test(mimeType)) return 'image';
+  if (/^text\/|json|xml|csv/i.test(mimeType)) return 'text';
+  // `octet-stream` sin firma: lo más probable es texto plano mal etiquetado; se intenta como texto.
+  if (/octet-stream/i.test(mimeType)) return 'text';
+  return 'unknown';
+}
+
 /** Acepta un id suelto o una referencia `{{file:KEY}}` (objeto JSON con `.id`) ya interpolada. */
 function fileIdOf(raw: string): string {
   const s = raw.trim();
@@ -72,20 +98,22 @@ export class ExtractTextNodeExecutor implements INodeExecutor {
     const file = await this.files.get(ctx.workspaceId, id);
     if (!file) return store({ error: 'extract: no se encontró el fichero (¿caducó?).' });
 
+    // Por CONTENIDO, no por la etiqueta: Drive entrega PDFs válidos como `octet-stream` (ver detectKind).
+    const kind = detectKind(file.bytes, file.mimeType);
     let text: string;
     try {
-      if (/pdf/i.test(file.mimeType)) {
+      if (kind === 'pdf') {
         const r = await loadPdfParse()(Buffer.from(file.bytes));
         text = (r.text ?? '').trim();
         if (!text) {
           return store({ name: file.name, chars: 0, text: '', note: 'PDF sin capa de texto (¿escaneado? sube la imagen y usa OCR).' });
         }
-      } else if (/^image\//i.test(file.mimeType)) {
+      } else if (kind === 'image') {
         // M50: imagen (foto/escaneo) → OCR. Idioma configurable; por defecto español + inglés.
         const lang = String(ctx.config.lang ?? '').trim() || 'eng+spa';
         text = (await withTimeout(this.ocr(file.bytes, lang), OCR_TIMEOUT)).trim();
         if (!text) return store({ name: file.name, chars: 0, text: '', note: 'No se detectó texto en la imagen.' });
-      } else if (/^text\/|json|xml|csv/i.test(file.mimeType)) {
+      } else if (kind === 'text') {
         text = new TextDecoder().decode(file.bytes);
       } else {
         return store({ error: `extract: tipo de fichero no soportado (${file.mimeType}).` });
