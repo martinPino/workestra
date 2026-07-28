@@ -88,11 +88,26 @@ describe('listDriveFolders', () => {
     expect(res.folders).toEqual([{ id: 'f1', name: 'Facturas' }, { id: 'f2', name: 'Recibos' }]);
   });
 
-  it('descarta filas sin id o sin nombre, y devuelve [] en error', async () => {
+  it('descarta filas sin id o sin nombre', async () => {
     const bad = await listDriveFolders({ token: 't', fetchFn: async () => ({ ok: true, json: async () => ({ files: [{ id: '', name: 'x' }, { id: 'ok', name: 'Buena' }] }) }) });
     expect(bad.folders).toEqual([{ id: 'ok', name: 'Buena' }]);
-    const err = await listDriveFolders({ token: 't', fetchFn: async () => ({ ok: false, json: async () => ({}) }) });
+    expect(bad.error).toBeUndefined();
+  });
+
+  it('un Drive sin carpetas es [] SIN error (no es un fallo)', async () => {
+    const empty = await listDriveFolders({ token: 't', fetchFn: async () => ({ ok: true, json: async () => ({ files: [] }) }) });
+    expect(empty.folders).toEqual([]);
+    expect(empty.error).toBeUndefined();
+  });
+
+  it('un rechazo de Google expone el motivo (no lo traga como Drive vacío)', async () => {
+    const err = await listDriveFolders({
+      token: 't',
+      // Google devuelve el detalle como {error:{message,...}} con el status HTTP.
+      fetchFn: async () => ({ ok: false, status: 403, json: async () => ({ error: { message: 'Insufficient Permission' } }) }),
+    });
     expect(err.folders).toEqual([]);
+    expect(err.error).toEqual({ status: 403, message: 'Insufficient Permission' });
   });
 });
 

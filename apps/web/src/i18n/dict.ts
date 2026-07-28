@@ -685,6 +685,9 @@ export const EN: Record<string, string> = {
   'Pegar un ID manualmente': 'Paste an ID manually',
   'Elegir de la lista': 'Choose from the list',
   'No pudimos listar tus carpetas; pega el ID de la carpeta.': "We couldn't list your folders; paste the folder ID.",
+  'No pudimos listar tus carpetas. Suele ser que el permiso de Drive no se concedió: reconéctalo y acepta el acceso, o pega el ID de la carpeta.':
+    "We couldn't list your folders. This usually means the Drive permission wasn't granted: reconnect and accept access, or paste the folder ID.",
+  'Reconectar Google Drive': 'Reconnect Google Drive',
   // --- M55: filtro de ejecuciones por workflow ---
   'Todos los workflows': 'All workflows',
   'Workflow': 'Workflow',

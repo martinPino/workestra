@@ -47,16 +47,34 @@ export interface DriveFolder {
   name: string;
 }
 
+export interface DriveFoldersResult {
+  folders: DriveFolder[];
+  /**
+   * Presente SOLO cuando Google rechazó la petición. Antes se devolvía `{folders: []}` ante cualquier fallo, lo
+   * que convertía un 403 (scope de Drive no concedido, API no habilitada) en un desplegable vacío sin
+   * explicación: el usuario no sabía si su Drive estaba vacío o si algo había fallado. Ahora el motivo real
+   * viaja hasta el servicio, que lo registra y lo expone para que la UI ofrezca reconectar / pegar el ID.
+   */
+  error?: { status?: number; message: string };
+}
+
 /**
  * Lista las CARPETAS del Drive del usuario (para poblar el desplegable del trigger, M54). Devuelve hasta 100
- * carpetas no papelera, ordenadas por nombre. Puro con `fetch` inyectable → testeable; en error devuelve [].
+ * carpetas no papelera, ordenadas por nombre. Puro con `fetch` inyectable → testeable. Un Drive sin carpetas es
+ * `{folders: []}` sin `error`; un rechazo de Google es `{folders: [], error}` con el motivo de Google.
  */
-export async function listDriveFolders(opts: { token: string; fetchFn?: Fetchish }): Promise<{ folders: DriveFolder[] }> {
+export async function listDriveFolders(opts: { token: string; fetchFn?: Fetchish }): Promise<DriveFoldersResult> {
   const fetchFn = opts.fetchFn ?? (globalThis.fetch as unknown as Fetchish);
   const q = encodeURIComponent("mimeType = 'application/vnd.google-apps.folder' and trashed = false");
   const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&orderBy=name&pageSize=100`;
   const res = await fetchFn(url, { headers: { authorization: `Bearer ${opts.token}` } });
-  if (!res.ok) return { folders: [] };
+  if (!res.ok) {
+    // Google devuelve el detalle como JSON `{error:{message,status}}`; lo extraemos para diagnosticar (el
+    // caso típico es 403 por scope de Drive no consentido). Cuerpo no-JSON → mensaje genérico.
+    const body = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+    const message = body.error?.message || 'Google Drive rechazó la petición.';
+    return { folders: [], error: { status: (res as { status?: number }).status, message } };
+  }
   const data = (await res.json().catch(() => ({}))) as { files?: DriveFolder[] }; // cuerpo no-JSON con 2xx → []
   const folders = (data.files ?? []).filter((f) => f && f.id && typeof f.name === 'string');
   return { folders };

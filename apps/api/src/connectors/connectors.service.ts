@@ -1,4 +1,4 @@
-import { Injectable, Inject, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { randomBytes, createHash } from 'node:crypto';
 import type { ConnectorRecord } from '@core/engine';
@@ -45,6 +45,7 @@ function getByPath(obj: unknown, path: string): unknown {
  */
 @Injectable()
 export class ConnectorsService {
+  private readonly logger = new Logger(ConnectorsService.name);
   /** Nonces de state ya consumidos (anti-replay). Best-effort en memoria; el TTL del JWT es el tope. */
   private readonly usedStates = new Map<string, number>();
 
@@ -112,7 +113,16 @@ export class ConnectorsService {
     if (c.provider !== 'google-drive') throw new BadRequestException('El conector no es de Google Drive.');
     const resolved = await resolveConnectorToken(this.p.connectors, this.p.secrets, connectorId, workspaceId);
     if (!resolved) throw new BadRequestException('El conector de Google Drive no está conectado (vuelve a conectarlo).');
-    return listDriveFolders({ token: resolved.token });
+    const result = await listDriveFolders({ token: resolved.token });
+    if (result.error) {
+      // Google rechazó el listado. Lo registramos con el motivo exacto (diagnosticable en los logs) y lo
+      // propagamos como 400 para que la UI muestre el fallback «pega el ID» en vez de un desplegable vacío que
+      // parece un Drive sin carpetas. El caso típico es scope de Drive no concedido (conexión anterior a
+      // añadir el scope): la solución es reconectar y aceptar el permiso de Drive.
+      this.logger.warn(`[drive-folders] connector=${connectorId} status=${result.error.status ?? '?'} google="${result.error.message}"`);
+      throw new BadRequestException(`No pudimos listar tus carpetas de Drive: ${result.error.message}`);
+    }
+    return { folders: result.folders };
   }
 
   /**

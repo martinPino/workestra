@@ -561,7 +561,7 @@ function DriveSection({ wfId }: { wfId: string }) {
   const qc = useQueryClient();
   const { connected: drive, busy: connBusy, connect } = useProviderConnection('google-drive');
   const { data: schedules } = useSchedules(wfId);
-  const { data: folderData, isLoading: foldersLoading, isError: foldersError } = useDriveFolders(drive?.id ?? null);
+  const { data: folderData, isLoading: foldersLoading, isError: foldersError, error: foldersErr } = useDriveFolders(drive?.id ?? null);
   const [folderId, setFolderId] = useState('');
   const [manual, setManual] = useState(false); // pegar el ID a mano (subcarpetas no listadas)
   const [everyMin, setEveryMin] = useState(5);
@@ -627,7 +627,22 @@ function DriveSection({ wfId }: { wfId: string }) {
                   placeholder={t('ID de la carpeta (vacío = toda tu unidad)')}
                   className="h-8 w-full rounded-lg border border-border bg-surface px-2 font-mono text-xs text-txt-primary outline-none placeholder:font-sans placeholder:text-txt-disabled focus:border-primary/60"
                 />
-                <span className="text-[11px] text-txt-disabled">{t('No pudimos listar tus carpetas; pega el ID de la carpeta.')}</span>
+                {/* El caso típico es que el permiso de Drive no se concedió (conexión anterior a añadir el
+                    scope): reconectar y aceptar el acceso a Drive lo arregla. Si no, se puede seguir con el ID. */}
+                <span className="text-[11px] text-txt-disabled">
+                  {t('No pudimos listar tus carpetas. Suele ser que el permiso de Drive no se concedió: reconéctalo y acepta el acceso, o pega el ID de la carpeta.')}
+                </span>
+                <button
+                  type="button"
+                  onClick={doConnect}
+                  disabled={!canApprove(role) || connBusy}
+                  className="self-start text-[11px] font-medium text-primary hover:underline disabled:opacity-40"
+                >
+                  {connBusy ? t('Conectando…') : t('Reconectar Google Drive')}
+                </button>
+                {foldersErr instanceof Error && (
+                  <span className="text-[10px] text-txt-disabled/70">{foldersErr.message}</span>
+                )}
               </>
             ) : manual ? (
               <>
