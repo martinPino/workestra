@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { ExecutionContext } from '@core/contracts';
-import { interpolate, hasTemplate } from './interpolate';
+import { interpolate, hasTemplate, unresolvedRefs } from './interpolate';
 
 const ctx = (variables: Record<string, unknown>): ExecutionContext =>
   ({ variables, ticket: { title: 'Ticket X' }, repository: {} }) as unknown as ExecutionContext;
@@ -108,3 +108,31 @@ describe('interpolate — {{fecha}} relativa a la ejecución', () => {
     expect(interpolate('{"from":"{{fecha:-1d}}"}', base, true, NOW)).toBe('{"from":"2026-07-15T11:30:45"}');
   });
 });
+
+// M85: una referencia rota se vuelve '' en silencio (por diseño), pero ahora se puede DETECTAR para
+// dejar constancia. Era la causa de fondo del «append responde 200 y no escribe nada».
+describe('unresolvedRefs — señalar las referencias que no existen', () => {
+  const c = ctx({ existe: 'sí', vacia: '', 'agent:x': { output: 'ok' } });
+
+  it('lista solo las rutas INEXISTENTES', () => {
+    expect(unresolvedRefs('{{existe}} y {{noexiste}}', c)).toEqual(['noexiste']);
+    expect(unresolvedRefs('{{agent:x.output}}', c)).toEqual([]); // navega a un subcampo que sí existe
+    expect(unresolvedRefs('{{agent:x.nope}}', c)).toEqual(['agent:x.nope']);
+  });
+
+  it('una variable que existe y vale cadena vacía NO es una ref rota (es un valor legítimo)', () => {
+    expect(unresolvedRefs('{{vacia}}', c)).toEqual([]);
+  });
+
+  it('las fechas del motor nunca cuentan como rotas', () => {
+    expect(unresolvedRefs('{{fecha:-1d}} {{fecha}}', c)).toEqual([]);
+  });
+
+  it('sin placeholders, no hay nada que señalar', () => {
+    expect(unresolvedRefs('texto plano', c)).toEqual([]);
+  });
+
+  it('deduplica: la misma ref rota dos veces se lista una', () => {
+    expect(unresolvedRefs('{{x}} {{x}}', c)).toEqual(['x']);
+  });
+})

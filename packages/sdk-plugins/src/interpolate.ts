@@ -100,3 +100,32 @@ export function interpolate(template: string, ctx: ExecutionContext, jsonSafe = 
 export function hasTemplate(s: string): boolean {
   return /\{\{[^}]+\}\}/.test(s);
 }
+
+/**
+ * Referencias `{{...}}` de `template` que NO resuelven a nada en el contexto (la ruta no existe).
+ *
+ * Es la señal que faltaba: `interpolate` convierte una referencia rota en cadena vacía a propósito —muchos
+ * flujos cuentan con que un `{{ticket.key}}` sin ticket quede en blanco— pero eso mismo hacía que un error
+ * de cableado desapareciera sin rastro. Un conector que escribe una fila entera de celdas vacías respondía
+ * «200, escrito» sin que nadie pudiera ver POR QUÉ. Esto NO cambia lo que se interpola; solo permite a los
+ * nodos DEJAR CONSTANCIA de las referencias que no encontraron, para que se vean en el replay.
+ *
+ * Solo cuenta como rota una ruta INEXISTENTE (`undefined`). Una variable que existe y vale cadena vacía es
+ * un valor legítimo, no un fallo, y no se marca. Las fechas del motor (`{{fecha:…}}`) tampoco: siempre
+ * resuelven.
+ */
+export function unresolvedRefs(template: string, ctx: ExecutionContext, now: number = Date.now()): string[] {
+  const lookup: Record<string, unknown> = {
+    ...(ctx.variables as Record<string, unknown>),
+    ticket: ctx.ticket,
+    repository: ctx.repository,
+    variables: ctx.variables,
+  };
+  const bad = new Set<string>();
+  for (const m of template.matchAll(/\{\{([^}]+)\}\}/g)) {
+    const path = m[1];
+    if (resolveFecha(path, now) !== undefined) continue;
+    if (getPath(lookup, path) === undefined) bad.add(path.trim());
+  }
+  return [...bad];
+}

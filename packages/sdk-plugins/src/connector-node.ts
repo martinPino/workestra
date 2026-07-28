@@ -3,7 +3,7 @@ import type { IConnectorRepository, ISecretStore } from '@core/engine';
 import { getConnectorProvider } from './connector-providers';
 import { parseTokenBlob, serializeTokenBlob, needsRefresh, refreshAccessToken } from './oauth-token';
 import { jiraAccessibleResources } from './jira-webhooks';
-import { interpolate } from './interpolate';
+import { interpolate, unresolvedRefs } from './interpolate';
 
 /**
  * Construye el mensaje RFC822 que exige la API de Gmail (`{ raw: base64url(mime) }`). Se llama DESPUÉS de
@@ -22,6 +22,22 @@ export function safeResponseJson(text: string, token: string): unknown {
     return JSON.parse(text);
   } catch {
     return undefined;
+  }
+}
+
+/**
+ * ¿El cuerpo de un «append» de Sheets es una fila con TODAS las celdas vacías? El cuerpo ya interpolado
+ * tiene la forma `{"values":[["a","b",…]]}`. Se corta solo cuando todas las celdas de la primera fila son
+ * cadenas vacías o espacios; si algo falla al parsear, se deja pasar (no es este guard quien decide).
+ */
+export function rowIsAllEmpty(interpolatedBody: string): boolean {
+  try {
+    const parsed = JSON.parse(interpolatedBody) as { values?: unknown };
+    const row = Array.isArray(parsed.values) ? parsed.values[0] : undefined;
+    if (!Array.isArray(row) || row.length === 0) return false;
+    return row.every((c) => typeof c !== 'number' && String(c ?? '').trim() === '');
+  } catch {
+    return false;
   }
 }
 
@@ -140,10 +156,28 @@ export class ConnectorNodeExecutor implements INodeExecutor {
     // va después para que `extraHeaders` nunca pueda sobrescribir el token de autenticación.
     const headers: Record<string, string> = { ...(provider.extraHeaders ?? {}), authorization: `Bearer ${token}` };
     let body: string | undefined;
+    // Referencias `{{…}}` que no resolvieron en la ruta ni en el cuerpo. No rompe nada —muchos flujos usan
+    // a propósito un campo opcional que puede quedar vacío—, pero deja constancia para el replay: un error
+    // de cableado deja de desaparecer sin rastro. Se calcula sobre las plantillas ORIGINALES.
+    const unresolved = [...unresolvedRefs(String(ctx.config.path ?? '/'), ctx.context)];
     if (method !== 'GET' && method !== 'HEAD' && rawBody != null) {
       headers['content-type'] = 'application/json';
       const bodyStr = typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody);
+      unresolved.push(...unresolvedRefs(bodyStr, ctx.context));
       body = interpolate(bodyStr, ctx.context, true); // jsonSafe: escapa strings incrustados
+
+      // Google Sheets, «añadir fila»: si TODAS las celdas quedaron vacías, la API responde «200, escrito»
+      // y no se ve nada —una fila en blanco es invisible para su detección de tabla, así que además el
+      // siguiente append vuelve a A1—. Una fila entera vacía nunca es intencional: se corta con un mensaje
+      // claro en vez de fingir éxito. Es el único caso donde una ref sin resolver SÍ rompe, y con motivo.
+      if (connector.provider === 'google-sheets' && resolvedPath.includes(':append') && rowIsAllEmpty(body)) {
+        return store({
+          error:
+            'connector: la fila quedó vacía (todas las columnas). Revisa los datos que referencia —probablemente ' +
+            'el paso anterior no devolvió nada—. Google aceptaría la fila en blanco y no verías el error.',
+          unresolved,
+        });
+      }
     }
 
     // Gmail: la API exige el mensaje RFC822 en base64url dentro de `{ raw }`. La acción guarda un body
@@ -184,7 +218,8 @@ export class ConnectorNodeExecutor implements INodeExecutor {
       // Redacta el propio token si el endpoint lo reflejara: nunca debe quedar en estado persistido.
       const bodyPreview = text.slice(0, 4000).split(current).join('«redacted»');
       const json = safeResponseJson(text, current); // respuesta parseada para {{connector:nodo.json.…}} (M28b)
-      return store({ status: res.status, ok: res.ok, provider: connector.provider, bodyPreview, json });
+      // `unresolved` viaja en el resultado cuando hay referencias rotas: se ve en el replay sin romper el flujo.
+      return store({ status: res.status, ok: res.ok, provider: connector.provider, bodyPreview, json, ...(unresolved.length ? { unresolved } : {}) });
     } catch (e) {
       return store({ error: e instanceof Error ? e.message : String(e) });
     }

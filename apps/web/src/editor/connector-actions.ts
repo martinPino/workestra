@@ -124,7 +124,9 @@ export const CONNECTOR_ACTIONS: Record<string, ConnectorAction[]> = {
       ],
       build: (p) => ({
         method: 'POST',
-        path: `/spreadsheets/${p.spreadsheetId}/values/${encodeURIComponent(p.range || 'A1')}:append?valueInputOption=USER_ENTERED`,
+        // `insertDataOption=INSERT_ROWS`: inserta una fila nueva en vez de sobrescribir. Sin esto, el modo por
+        // defecto (OVERWRITE) puede pisar datos que haya debajo de la tabla detectada.
+        path: `/spreadsheets/${p.spreadsheetId}/values/${encodeURIComponent(p.range || 'A1')}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
         // Se separa por columnas en el editor; cada celda conserva sus {{datos}} y se interpola al ejecutar.
         body: JSON.stringify({ values: [(p.values ?? '').split('|').map((s) => s.trim())] }),
       }),

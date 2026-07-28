@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { gmailRawMessage, safeResponseJson } from './connector-node';
+import { gmailRawMessage, safeResponseJson, rowIsAllEmpty } from './connector-node';
 
 const decode = (raw: string): string => Buffer.from(raw, 'base64url').toString('utf8');
 
@@ -49,5 +49,25 @@ describe('safeResponseJson (M28b)', () => {
 
   it('no-JSON (HTML, texto) → undefined', () => {
     expect(safeResponseJson('<html>error</html>', 'tok')).toBeUndefined();
+  });
+});
+
+// M85: Google Sheets acepta una fila 100% vacía y responde «200, escrito» sin que se vea nada. Como una
+// fila entera vacía nunca es intencional, el nodo la corta antes con un mensaje claro.
+describe('rowIsAllEmpty — la fila vacía de Sheets que fingía éxito', () => {
+  it('detecta una fila con TODAS las celdas vacías o en blanco', () => {
+    expect(rowIsAllEmpty('{"values":[["","",""]]}')).toBe(true);
+    expect(rowIsAllEmpty('{"values":[["  ","   "]]}')).toBe(true); // solo espacios: sigue siendo vacía
+  });
+
+  it('NO corta si alguna celda tiene contenido', () => {
+    expect(rowIsAllEmpty('{"values":[["","GERMAN",""]]}')).toBe(false);
+    expect(rowIsAllEmpty('{"values":[["", 0, ""]]}')).toBe(false); // un 0 es un dato, no un vacío
+  });
+
+  it('ante un cuerpo que no es la forma esperada, NO decide (deja pasar)', () => {
+    expect(rowIsAllEmpty('no es json')).toBe(false);
+    expect(rowIsAllEmpty('{"otra":"cosa"}')).toBe(false);
+    expect(rowIsAllEmpty('{"values":[]}')).toBe(false);
   });
 });
