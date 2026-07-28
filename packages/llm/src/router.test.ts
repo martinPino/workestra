@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { ILlmProvider, LlmRequest, LlmResponse } from '@core/contracts';
 import { ModelRouter } from './router';
-import { isProviderRateLimited } from './rate-limit';
+import { isProviderUnavailable } from './rate-limit';
 
 function fakeProvider(id: string, behavior: (req: LlmRequest) => LlmResponse | never): ILlmProvider {
   return {
@@ -23,15 +23,30 @@ const rateLimit = (): never => {
 };
 
 describe('ModelRouter — fallback entre proveedores (M33)', () => {
-  it('isProviderRateLimited detecta 429/cuota y no otros errores', () => {
-    expect(isProviderRateLimited(new Error('LLM HTTP 429: ...'))).toBe(true);
-    expect(isProviderRateLimited(new Error('Rate limit reached'))).toBe(true);
-    expect(isProviderRateLimited(new Error('tokens per day (TPD)'))).toBe(true);
-    expect(isProviderRateLimited(new Error('HTTP 500 server error'))).toBe(false);
-    expect(isProviderRateLimited(new Error('modelo inválido'))).toBe(false);
+  it('isProviderUnavailable detecta 429/cuota y no otros errores', () => {
+    expect(isProviderUnavailable(new Error('LLM HTTP 429: ...'))).toBe(true);
+    expect(isProviderUnavailable(new Error('Rate limit reached'))).toBe(true);
+    expect(isProviderUnavailable(new Error('tokens per day (TPD)'))).toBe(true);
+    expect(isProviderUnavailable(new Error('HTTP 500 server error'))).toBe(false);
+    expect(isProviderUnavailable(new Error('modelo inválido'))).toBe(false);
     // NO falsos positivos: un 400 de validación cuyo cuerpo/modelo contiene «quota»/«429» sueltos.
-    expect(isProviderRateLimited(new Error('LLM HTTP 400: your quota configuration field is invalid'))).toBe(false);
-    expect(isProviderRateLimited(new Error('LLM HTTP 400 para el modelo «gpt-429-turbo»: model_not_found'))).toBe(false);
+    expect(isProviderUnavailable(new Error('LLM HTTP 400: your quota configuration field is invalid'))).toBe(false);
+    expect(isProviderUnavailable(new Error('LLM HTTP 400 para el modelo «gpt-429-turbo»: model_not_found'))).toBe(false);
+  });
+
+  // REGRESIÓN: mensajes REALES capturados de los tres proveedores con las cuentas agotadas. El de Anthropic
+  // llega como HTTP 400 (no 429), así que se trataba como error fatal: la cadena moría en Anthropic y NUNCA
+  // probaba el eslabón siguiente —que tenía saldo—. Todo el flujo caía con «credit balance is too low».
+  it('trata saldo agotado y credencial rechazada como «prueba el siguiente proveedor»', () => {
+    expect(
+      isProviderUnavailable(
+        new Error('Anthropic HTTP 400: {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API."}}'),
+      ),
+    ).toBe(true);
+    expect(isProviderUnavailable(new Error('LLM HTTP 403: '))).toBe(true); // clave revocada (Groq)
+    expect(isProviderUnavailable(new Error('LLM HTTP 429: You exceeded your current quota, please check your plan and billing details.'))).toBe(true);
+    expect(isProviderUnavailable(new Error('LLM HTTP 401: invalid api key'))).toBe(true);
+    expect(isProviderUnavailable(new Error('LLM HTTP 402: payment required'))).toBe(true);
   });
 
   it('cae al siguiente proveedor cuando el primario está agotado, con su modelo', async () => {
@@ -64,6 +79,27 @@ describe('ModelRouter — fallback entre proveedores (M33)', () => {
     ]);
     const res = await router.chat({ model: 'llama-3.3-70b-versatile', messages: [] });
     expect(res.providerId).toBe('anthropic');
+  });
+
+  // REGRESIÓN del incidente real: Groq con la clave revocada (403), OpenAI sin cuota (429) y Anthropic sin
+  // saldo (400). Antes, el 400 de Anthropic cortaba la cadena y el flujo entero moría con «credit balance is
+  // too low» AUNQUE OpenRouter —el último eslabón— tuviera saldo de sobra.
+  it('llega hasta OpenRouter aunque Anthropic responda «sin saldo» con un HTTP 400', async () => {
+    const router = new ModelRouter();
+    router.registerProvider(fakeProvider('openai-compatible', () => { throw new Error('LLM HTTP 403: '); }));
+    router.registerProvider(fakeProvider('openai', () => { throw new Error('LLM HTTP 429: You exceeded your current quota, please check your plan and billing details.'); }));
+    router.registerProvider(fakeProvider('anthropic', () => { throw new Error('Anthropic HTTP 400: {"error":{"message":"Your credit balance is too low to access the Anthropic API."}}'); }));
+    router.registerProvider(fakeProvider('openrouter', (req) => ok('openrouter', req.model)));
+    router.setDefault('openai-compatible');
+    router.setFallbackChain([
+      { providerId: 'openai-compatible', model: 'llama-3.3-70b-versatile' },
+      { providerId: 'openai', model: 'gpt-4o-mini' },
+      { providerId: 'anthropic', model: 'claude-haiku-4-5-20251001' },
+      { providerId: 'openrouter', model: 'openai/gpt-4o-mini' },
+    ]);
+    const res = await router.chat({ model: 'llama-3.3-70b-versatile', messages: [] });
+    expect(res.providerId).toBe('openrouter');
+    expect(res.model).toBe('openai/gpt-4o-mini');
   });
 
   it('infiere el proveedor por prefijo cuando el modelo no está en el registro', async () => {

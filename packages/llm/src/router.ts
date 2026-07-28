@@ -1,6 +1,6 @@
 import type { ILlmProvider, LlmRequest, LlmResponse } from '@core/contracts';
 import { getModelInfo } from './pricing';
-import { isProviderRateLimited } from './rate-limit';
+import { isProviderUnavailable } from './rate-limit';
 
 /** Un eslabón de la cadena de fallback: qué proveedor probar y con qué modelo. */
 export interface FallbackEntry {
@@ -78,8 +78,9 @@ export class ModelRouter {
       try {
         return await provider.chat({ ...req, model });
       } catch (e) {
-        // Solo se cae al siguiente proveedor si el actual está AGOTADO (429/cuota); otros errores se lanzan.
-        if (!isProviderRateLimited(e)) throw e;
+        // Solo se cae al siguiente proveedor si el actual NO PUEDE atender (cuota, saldo o credencial);
+        // un error de la petición (modelo inválido, 400 de validación) se lanza: fallaría igual en todos.
+        if (!isProviderUnavailable(e)) throw e;
         lastErr = e;
       }
     }
