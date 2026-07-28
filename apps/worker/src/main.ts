@@ -160,12 +160,24 @@ async function main(): Promise<void> {
       console.warn(`[schedule] ${schedule.id}: proveedor de sondeo no soportado (${poll.provider}).`);
       return;
     }
-    const cursorKey = `af:drivepoll:${schedule.id}`;
+    // El cursor se identifica por WORKFLOW + CARPETA, no por el id del schedule: `reconcileFromGraph` hace
+    // borra-y-recrea al publicar, así que el id cambia en cada publicación. Con el id dentro de la clave, cada
+    // «Publicar» estrenaba cursor y volvía a fijar la línea base en «ahora» → los ficheros subidos justo antes
+    // no disparaban NUNCA (y dejaban una clave huérfana en Redis). Workflow y carpeta sí son estables.
+    //
+    // El sufijo `v2` es deliberado: el criterio del sondeo pasó de `modifiedTime` a `createdTime`, y los
+    // cursores v1 guardaban un `modifiedTime`. Reinterpretarlos con el criterio nuevo re-procesaría de golpe
+    // todo lo subido desde entonces (con sus efectos reales: correos, filas, cuota de IA). Estrenando espacio
+    // de nombres, el primer sondeo tras desplegar se re-basifica solo y no dispara hacia atrás.
+    const cursorKey = `af:drivepoll:v2:${wf.id}:${poll.folderId ?? 'all'}`;
     const cursor = await redis.get(cursorKey);
     const nowIso = new Date().toISOString();
+    // TTL que se renueva en cada sondeo: un flujo que deja de vigilar no deja la clave ahí para siempre, y si
+    // vuelve meses después re-basifica (que es lo prudente) en vez de disparar por todo el histórico.
+    const CURSOR_TTL_S = 30 * 24 * 3600;
     if (!cursor) {
       // Primer sondeo: fija la línea base «desde ahora» (no dispara por ficheros preexistentes).
-      await redis.set(cursorKey, nowIso);
+      await redis.set(cursorKey, nowIso, 'EX', CURSOR_TTL_S);
       console.log(`[schedule] ${schedule.id}: sondeo Drive inicializado en ${nowIso}.`);
       return;
     }
@@ -196,7 +208,7 @@ async function main(): Promise<void> {
       console.log(`[schedule] ${schedule.id}: Drive «${f.name}» → ejecución ${execId}.`);
     }
     // Avanza el cursor SOLO tras encolar el lote (si algo falla antes, se reintenta el mismo lote).
-    await redis.set(cursorKey, newSince);
+    await redis.set(cursorKey, newSince, 'EX', CURSOR_TTL_S);
   }
 
   const scheduleWorker = new Worker<{ scheduleId: string; workflowId: string; workspaceId: string }>(

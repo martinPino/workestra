@@ -44,7 +44,14 @@ describe('pollDriveFiles', () => {
       token: 't',
       sinceIso: '2026-07-07T16:00:00.000Z', // posterior al modifiedTime, anterior a la subida
       fetchFn: async (url) => {
-        expect(url).toContain('createdTime'); // pide y ordena por fecha de subida
+        const u = decodeURIComponent(url);
+        // El FILTRO va por createdTime… (no basta con que la palabra aparezca en `fields`)
+        expect(u).toContain("createdTime > '2026-07-07T16:00:00.000Z'");
+        expect(u).not.toContain('modifiedTime >');
+        // …y el ORDEN también: la paginación (pageSize=25) recorta por el criterio de orden, así que ordenar
+        // por `modifiedTime` devolvería un lote arbitrario respecto a la subida y el cursor saltaría por
+        // encima de ficheros no vistos. Sin esta aserción, revertir solo el orderBy pasaba desapercibido.
+        expect(u).toContain('orderBy=createdTime');
         return { ok: true, json: async () => ({ files: [recienSubido] }) };
       },
     });
