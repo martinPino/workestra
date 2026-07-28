@@ -33,7 +33,9 @@ BEGIN
     'Workflow','Agent','Execution','Webhook','ScheduledTrigger','TriggerBinding','Secret','Tool','Connector','Memory','Prompt','Plugin',
     -- M84 (analítica): mismas políticas que el resto. La vista global del dashboard corre a propósito
     -- FUERA del contexto de tenant (modo sistema), que es una decisión explícita y auditable.
-    'AnalyticsEvent','AnalyticsHourlyView','AnalyticsHourlyEvent','AnalyticsUserDay','AnalyticsSession','AnalyticsSearchTerm'
+    'AnalyticsEvent','AnalyticsHourlyView','AnalyticsHourlyEvent','AnalyticsUserDay','AnalyticsSession','AnalyticsSearchTerm',
+    -- M85: los shares se aíslan por tenant; la lectura pública corre en modo sistema (GUC NULL → fail-open).
+    'WorkflowShare'
   ] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', t);
     EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY;', t);

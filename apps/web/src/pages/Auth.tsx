@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth, hasValidSession, type SessionUser } from '../lib/auth';
@@ -38,6 +38,15 @@ function cleanError(e: unknown): string {
   return msg.replace(/^HTTP \d+:\s*/, '');
 }
 
+/**
+ * Destino seguro tras iniciar sesión (M85): permite volver a la página que mandó aquí (p. ej. importar un
+ * enlace compartido) vía `?next=`. Solo rutas internas: debe empezar por una única `/` (evita open redirects
+ * a `//host` o a otro dominio). Cualquier otra cosa cae a la home.
+ */
+function safeNext(raw: string | null): string {
+  return raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : '/';
+}
+
 /** Marco visual compartido por Login, Registro y Aceptar invitación: tarjeta centrada con la marca. */
 export function AuthShell({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   const t = useT();
@@ -71,6 +80,7 @@ function Field({ label, ...props }: { label: string } & React.InputHTMLAttribute
 
 function useAuthSubmit() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const setAuth = useAuth((s) => s.setAuth);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -80,7 +90,7 @@ function useAuthSubmit() {
     try {
       const { accessToken, user } = await fn();
       setAuth({ token: accessToken, user });
-      navigate('/', { replace: true });
+      navigate(safeNext(params.get('next')), { replace: true });
     } catch (e) {
       setError(cleanError(e));
     } finally {
@@ -92,10 +102,11 @@ function useAuthSubmit() {
 
 export function Login() {
   const t = useT();
+  const [params] = useSearchParams();
   const { run, error, busy } = useAuthSubmit();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  if (hasValidSession()) return <Navigate to="/" replace />;
+  if (hasValidSession()) return <Navigate to={safeNext(params.get('next'))} replace />;
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -124,11 +135,12 @@ export function Login() {
 
 export function Register() {
   const t = useT();
+  const [params] = useSearchParams();
   const { run, error, busy } = useAuthSubmit();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  if (hasValidSession()) return <Navigate to="/" replace />;
+  if (hasValidSession()) return <Navigate to={safeNext(params.get('next'))} replace />;
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();

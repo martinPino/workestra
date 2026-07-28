@@ -28,3 +28,4 @@ export * from './adapters/email';
 export * from './password';
 export * from './analytics/postgres-sink';
 export * from './analytics/noop-sink';
+export * from './adapters/share-repo';

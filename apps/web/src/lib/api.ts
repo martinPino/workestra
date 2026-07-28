@@ -13,6 +13,9 @@ import type {
   SessionsRow,
   SurfaceRow,
   TabDwellRow,
+  CreateShareRequest,
+  CreateShareResponse,
+  SharePreviewResponse,
 } from '@core/contracts';
 import { currentToken, ensureDevSession, AUTH_MODE, useAuth, type Role, type SessionUser } from './auth';
 // M84: `api` no es un componente, así que no puede usar el hook; se emite con `track` a pelo.
@@ -304,6 +307,21 @@ export const api = {
     fetch(`${API}/workflows/${id}/versions`, { headers: authHeaders() }).then((r) =>
       json<Array<{ id: string; version: number; state: string; publishedAt: string | null }>>(r),
     ),
+
+  // --- Compartir por enlace (M85): un workflow sanitizado viaja como plantilla portable ---
+  // `dryRun` (por defecto) solo devuelve el informe de qué viajaría; sin él crea el enlace.
+  createShare: (id: string, body: CreateShareRequest) =>
+    fetch(`${API}/workflows/${id}/share`, { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) }).then((r) =>
+      json<CreateShareResponse>(r),
+    ),
+  // Lectura PÚBLICA del enlace (invitado sin sesión): rawFetch, sin Bearer ni recuperación 401 (como getInvite).
+  getShare: (token: string) => rawFetch(`${API}/shares/${token}`, { headers }).then((r) => json<SharePreviewResponse>(r)),
+  // Importar a la cuenta del usuario autenticado: crea agentes + workflow y cuenta la instalación.
+  importShare: (token: string) =>
+    fetch(`${API}/shares/${token}/import`, { method: 'POST', headers: authHeaders() }).then((r) => json<{ imported: true }>(r)),
+  // Revocar un enlace creado (deja de resolver para quien lo tenga).
+  revokeShare: (token: string) =>
+    fetch(`${API}/shares/${token}`, { method: 'DELETE', headers: authHeaders() }).then((r) => json<{ revoked: true }>(r)),
   /**
    * M84: aquí se marca el ARRANQUE de una ejecución manual. Es el evento que no se puede rellenar hacia
    * atrás, así que se emite pase lo que pase.

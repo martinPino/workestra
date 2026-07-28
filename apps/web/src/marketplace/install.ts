@@ -1,7 +1,7 @@
 import { api } from '../lib/api';
 import { docToWorkflowGraph } from '../graph';
 import type { GraphDoc } from '../editor/model';
-import type { MarketItem } from './catalog';
+import type { MarketItem, InstallRecipe } from './catalog';
 
 export interface InstallResult {
   workflowId?: string;
@@ -33,12 +33,14 @@ function resolveDoc(doc: GraphDoc, idByRef: Map<string, string>, connectorIdByPr
 }
 
 /**
- * Instala un item del marketplace (M75): crea sus agentes, resuelve las referencias en el grafo y crea el
- * workflow ya cableado. `connectorIdByProvider` mapea proveedor→id de un conector YA conectado del usuario,
- * para dejar los nodos de conector listos cuando sea posible. Usa las APIs existentes (crear agente/workflow).
+ * Instala una RECETA (M75): crea sus agentes, resuelve las referencias en el grafo y crea el workflow ya
+ * cableado. `connectorIdByProvider` mapea proveedor→id de un conector YA conectado del usuario, para dejar
+ * los nodos de conector listos cuando sea posible. Usa las APIs existentes (crear agente/workflow).
+ *
+ * Se extrajo de `installItem` (M85) para que el importador de enlaces compartidos reuse EXACTAMENTE el mismo
+ * camino: una receta armada desde el doc portable compartido entra por aquí igual que la del marketplace.
  */
-export async function installItem(item: MarketItem, connectorIdByProvider: Map<string, string>): Promise<InstallResult> {
-  const recipe = item.install;
+export async function installRecipe(recipe: InstallRecipe, connectorIdByProvider: Map<string, string>): Promise<InstallResult> {
   const idByRef = new Map<string, string>();
   const agentIds: string[] = [];
 
@@ -64,4 +66,9 @@ export async function installItem(item: MarketItem, connectorIdByProvider: Map<s
   }
 
   return { workflowId, agentIds };
+}
+
+/** Instala un item del marketplace (M75): envoltorio fino sobre `installRecipe` con la receta del item. */
+export async function installItem(item: MarketItem, connectorIdByProvider: Map<string, string>): Promise<InstallResult> {
+  return installRecipe(item.install, connectorIdByProvider);
 }

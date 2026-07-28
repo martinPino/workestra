@@ -19,6 +19,7 @@ import { Team } from './pages/Team';
 import { Analytics } from './pages/Analytics';
 import { Login, Register } from './pages/Auth';
 import { AcceptInvite } from './pages/AcceptInvite';
+import { ImportShare } from './pages/ImportShare';
 import { ensureDevSession, useAuth, isExpired } from './lib/auth';
 import { api } from './lib/api';
 import './index.css';
@@ -50,6 +51,9 @@ void ensureDevSession(api.base).finally(() => {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/invite/:token" element={<AcceptInvite />} />
+            {/* M85: importar un workflow compartido. Pública a propósito (fuera de ProtectedRoute/AppShell):
+                se ve la vista previa antes de iniciar sesión; importar exige sesión (redirige a /login?next=…). */}
+            <Route path="/import/:token" element={<ImportShare />} />
             <Route
               element={
                 <ProtectedRoute>

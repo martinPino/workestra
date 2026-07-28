@@ -19,6 +19,7 @@ import { McpModule } from './mcp/mcp.module';
 import { LlmKeysModule } from './llm-keys/llm-keys.module';
 import { TeamModule } from './team/team.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { SharesModule } from './shares/shares.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
     LlmKeysModule,
     TeamModule,
     AnalyticsModule,
+    SharesModule,
   ],
   controllers: [HealthController],
   providers: [

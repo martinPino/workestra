@@ -10,6 +10,7 @@ import type {
   IEventStore,
   ISecretStore,
   IWebhookRepository,
+  IShareRepository,
   IScheduleRepository,
   IConnectorRepository,
   ITriggerBindingRepository,
@@ -36,6 +37,7 @@ import {
   InMemoryEventStore,
   InMemorySecretStore,
   InMemoryWebhookRepository,
+  InMemoryShareRepository,
   InMemoryScheduleRepository,
   InMemoryConnectorRepository,
   InMemoryTriggerBindingRepository,
@@ -48,6 +50,7 @@ import {
   PrismaEventStore,
   PrismaSecretStore,
   PrismaWebhookRepository,
+  PrismaShareRepository,
   PrismaScheduleRepository,
   PrismaConnectorRepository,
   PrismaTriggerBindingRepository,
@@ -82,6 +85,7 @@ export interface PersistenceBundle {
   secrets: ISecretStore;
   /** Webhooks de ingreso (M7): triggers entrantes firmados que arrancan ejecuciones. */
   webhooks: IWebhookRepository;
+  shares: IShareRepository;
   /** Triggers programados (M7-B): registro durable de schedules cron/intervalo. */
   schedules: IScheduleRepository;
   /** Conectores (M11): integraciones OAuth para dispatch saliente autenticado. */
@@ -193,6 +197,7 @@ async function buildPersistence(): Promise<PersistenceBundle> {
       events: new PrismaEventStore(prisma),
       secrets: new PrismaSecretStore(prisma),
       webhooks: new PrismaWebhookRepository(prisma),
+      shares: new PrismaShareRepository(prisma),
       schedules: new PrismaScheduleRepository(prisma),
       connectors: new PrismaConnectorRepository(prisma),
       triggerBindings: new PrismaTriggerBindingRepository(prisma),
@@ -220,6 +225,7 @@ async function buildPersistence(): Promise<PersistenceBundle> {
     events: new InMemoryEventStore(),
     secrets: new InMemorySecretStore(),
     webhooks: new InMemoryWebhookRepository(),
+    shares: new InMemoryShareRepository(),
     schedules: new InMemoryScheduleRepository(),
     connectors: new InMemoryConnectorRepository(),
     triggerBindings: new InMemoryTriggerBindingRepository(),

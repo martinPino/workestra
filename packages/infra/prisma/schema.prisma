@@ -596,3 +596,27 @@ model AnalyticsSearchTerm {
   @@id([workspaceId, day, queryHash])
   @@index([workspaceId, day])
 }
+
+/// Compartir un workflow por enlace (M85). El token en claro viaja en /import/<token>; en BD solo su hash.
+/// `snapshot` es la copia SANITIZADA e INMUTABLE del workflow (como WorkflowVersion.graphSnapshot): editar
+/// o borrar el workflow origen después NO altera ni filtra lo ya compartido. `workflowId` es columna suelta
+/// SIN relación, a propósito: así un `onDelete: Cascade` del Workflow nunca toca el share.
+model WorkflowShare {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  workflowId      String? // origen, solo informativo (sin relación)
+  sourceName      String // nombre denormalizado para mostrar sin cargar el workflow
+  tokenHash       String    @unique // sha256(tokenEnClaro) hex
+  snapshot        Json // PortableWorkflowDoc sanitizado
+  report          Json // ShareReport congelado (qué se quitó/redactó)
+  redactionCount  Int       @default(0)
+  createdByUserId String
+  createdAt       DateTime  @default(now())
+  expiresAt       DateTime? // null = sin caducidad
+  revokedAt       DateTime? // revocación blanda: conserva importCount
+  importCount        Int       @default(0)
+  lastImportedAt     DateTime?
+  importerWorkspaceIds String[] @default([]) // workspaces distintos que importaron; importCount = su tamaño
+
+  @@index([workspaceId])
+}

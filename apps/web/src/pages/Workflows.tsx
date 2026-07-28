@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Plus, Boxes, GitBranch, Play, Workflow as WorkflowIcon, Trash2, X, Sparkles, Plug, Copy, Check, KeyRound, Store } from 'lucide-react';
+import { Plus, Boxes, GitBranch, Play, Workflow as WorkflowIcon, Trash2, X, Sparkles, Plug, Copy, Check, KeyRound, Store, Share2 } from 'lucide-react';
 import { Page } from '../app/AppShell';
 import { Card, Button, PageHeader, Badge, Dot, EmptyState, Skeleton, IconButton, Input, Textarea } from '../ui';
+import { ShareDialog } from './share/ShareDialog';
 import { useWorkflows } from '../lib/hooks';
 import { api, type WorkflowDto, type ApiKeyView } from '../lib/api';
 import { STARTER_DOC, docToWorkflowGraph } from '../graph';
@@ -562,6 +563,7 @@ function WorkflowCard({ wf, index, onOpen }: { wf: WorkflowDto; index: number; o
   const { trackEvent } = useAnalytics();
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [sharing, setSharing] = useState(false); // M85: diálogo «Compartir por enlace»
   const [err, setErr] = useState<string | null>(null);
 
   const del = async () => {
@@ -596,6 +598,16 @@ function WorkflowCard({ wf, index, onOpen }: { wf: WorkflowDto; index: number; o
               <Badge tone={wf.status === 'ACTIVE' ? 'success' : 'default'}>
                 <Dot tone={wf.status === 'ACTIVE' ? 'success' : 'default'} /> {wf.status.toLowerCase()}
               </Badge>
+              <IconButton
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSharing(true);
+                }}
+                aria-label={t('Compartir por enlace')}
+                className="opacity-0 transition-opacity group-hover:opacity-100 hover:text-primary"
+              >
+                <Share2 size={14} />
+              </IconButton>
               {canDelete && (
                 <IconButton
                   onClick={(e) => {
@@ -643,6 +655,7 @@ function WorkflowCard({ wf, index, onOpen }: { wf: WorkflowDto; index: number; o
           </div>
         )}
       </Card>
+      {sharing && <ShareDialog workflowId={wf.id} workflowName={wf.name} onClose={() => setSharing(false)} />}
     </motion.div>
   );
 }

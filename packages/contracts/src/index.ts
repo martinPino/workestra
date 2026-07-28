@@ -10,3 +10,4 @@ export * from './memory';
 export * from './refs';
 export * from './analytics';
 export * from './analytics-sink';
+export * from './share';

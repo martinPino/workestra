@@ -1382,4 +1382,68 @@ export const EN: Record<string, string> = {
   "La recogida de datos está apagada": "Data collection is off",
   "Todo lo que ves abajo está a cero porque no se está midiendo, no porque nadie use el producto. Para encenderla, pon ANALYTICS_ENABLED=true en el servicio de la API.":
     "Everything below reads zero because nothing is being measured, not because nobody uses the product. To turn it on, set ANALYTICS_ENABLED=true on the API service.",
+
+  // --- M85 · compartir un workflow por enlace + importar desde un enlace compartido ---
+  'Compartir por enlace': 'Share via link',
+  'Preparando la vista previa…': 'Preparing the preview…',
+  'El enlace se ha revocado. Ya no funciona para nadie.': 'The link has been revoked. It no longer works for anyone.',
+  'Enlace listo. Quien lo abra podrá importar una copia a su cuenta.': 'Link ready. Anyone who opens it can import a copy into their account.',
+  'Enlace para compartir': 'Link to share',
+  'Copiar enlace': 'Copy link',
+  'Caduca el': 'Expires on',
+  'Este enlace no caduca.': 'This link never expires.',
+  'Se compartirá': 'What will be shared',
+  'pasos del flujo': 'flow steps',
+  'asistentes con sus instrucciones': 'assistants with their instructions',
+  'Las instrucciones de los asistentes viajan tal cual. Revisa que no contengan datos privados antes de compartir.':
+    'Assistant instructions travel as-is. Check they contain no private data before sharing.',
+  'Se quitará': 'What will be removed',
+  'Quien lo importe pondrá lo suyo en su lugar.': 'Whoever imports it will put their own in its place.',
+  'Se ocultará': 'What will be hidden',
+  'posibles secretos detectados y tapados dentro de los textos.': 'possible secrets detected and masked inside the texts.',
+  'Hay que revisar esto antes de compartir': 'Review this before sharing',
+  'Esto parece un secreto pero no estamos seguros. Revísalo y, si es seguro, marca «Compartir igualmente».':
+    'This looks like a secret but we are not sure. Review it and, if it is safe, tick “Share anyway”.',
+  'Compartir igualmente': 'Share anyway',
+  'El enlace caduca en': 'The link expires in',
+  'No se pudo crear el enlace. Inténtalo de nuevo.': 'Could not create the link. Please try again.',
+  'Crear enlace': 'Create link',
+  '7 días': '7 days',
+  '30 días': '30 days',
+  '90 días': '90 days',
+  'Sin caducidad': 'No expiry',
+  // Qué se quita del grafo al compartir (lenguaje humano)
+  'la conexión a la app': 'the app connection',
+  'el identificador de tu cuenta': 'your account identifier',
+  'la carpeta seleccionada': 'the selected folder',
+  'la URL del servidor MCP': 'the MCP server URL',
+  'las cabeceras (pueden llevar tu clave de API)': 'the headers (they may carry your API key)',
+  'la clave incrustada en la URL': 'the key embedded in the URL',
+  'las herramientas propias de tu espacio': 'the tools specific to your workspace',
+  'un dato propio de tu espacio': 'a value specific to your workspace',
+  // Página pública de importar
+  'Este enlace ya no está disponible': 'This link is no longer available',
+  'Puede que haya caducado o que quien lo compartió lo haya revocado. Pídele un enlace nuevo.':
+    'It may have expired or the person who shared it may have revoked it. Ask them for a new link.',
+  'Ir a Workestra': 'Go to Workestra',
+  'Te han compartido una automatización': 'An automation has been shared with you',
+  'Vista previa de solo lectura. Al importar, crearemos una copia en tu cuenta con tus asistentes y tu flujo.':
+    'Read-only preview. When you import, we will create a copy in your account with your assistants and your flow.',
+  'Los pasos del flujo': 'The flow steps',
+  'Los asistentes': 'The assistants',
+  'Vas a necesitar': 'You will need',
+  'Podrás importarlo igualmente y configurar estos pasos después, en el editor.':
+    'You can import it anyway and set these steps up later, in the editor.',
+  'Se creará una copia en tu cuenta.': 'A copy will be created in your account.',
+  'Inicia sesión para importarlo a tu cuenta.': 'Sign in to import it into your account.',
+  'Importar a mi cuenta': 'Import to my account',
+  'Iniciar sesión para importar': 'Sign in to import',
+  // «Vas a necesitar…» (derivado de lo que se quitó)
+  'conectar tus apps': 'connect your apps',
+  'elegir tu cuenta': 'choose your account',
+  'elegir tu carpeta': 'choose your folder',
+  'poner la URL de tu servidor MCP': 'set your MCP server URL',
+  'poner tu clave de API': 'add your API key',
+  'elegir tus herramientas': 'choose your tools',
+  'configurar lo tuyo': 'set up your own',
 };

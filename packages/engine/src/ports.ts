@@ -393,6 +393,51 @@ export interface WebhookRecord {
   active: boolean;
 }
 
+/** Registro de shares (M85): un enlace público que expone una copia sanitizada e inmutable de un workflow. */
+export interface ShareRecord {
+  id: string;
+  workspaceId: string;
+  workflowId: string | null;
+  sourceName: string;
+  tokenHash: string;
+  snapshot: unknown;
+  report: unknown;
+  redactionCount: number;
+  createdByUserId: string;
+  createdAt: string;
+  expiresAt: string | null;
+  revokedAt: string | null;
+  importCount: number;
+  lastImportedAt: string | null;
+  /** Workspaces DISTINTOS que ya importaron. `importCount` = su tamaño: un contador honesto, no inflable en bucle. */
+  importerWorkspaceIds: string[];
+}
+
+export interface IShareRepository {
+  create(input: {
+    workspaceId: string;
+    workflowId: string | null;
+    sourceName: string;
+    tokenHash: string;
+    snapshot: unknown;
+    report: unknown;
+    redactionCount: number;
+    createdByUserId: string;
+    expiresAt: string | null;
+  }): Promise<ShareRecord>;
+  /** Busca por hash del token. La lectura pública lo usa SIN contexto de tenant (token globalmente único). */
+  findByTokenHash(tokenHash: string): Promise<ShareRecord | null>;
+  listByWorkspace(workspaceId: string): Promise<ShareRecord[]>;
+  /**
+   * Registra una importación desde `importerWorkspaceId`. Corre en modo sistema: quien importa no es el dueño
+   * del share. Idempotente por workspace: si ese workspace ya importó, no vuelve a sumar (el contador no se
+   * infla llamando en bucle desde la misma cuenta).
+   */
+  bumpImport(id: string, importerWorkspaceId: string): Promise<void>;
+  /** Revocación blanda: conserva la fila y el recuento. Solo el dueño (comprobado en el servicio). */
+  revoke(id: string): Promise<void>;
+}
+
 /** Registro de webhooks: un workflow puede exponer varios endpoints de ingreso firmados. */
 export interface IWebhookRepository {
   create(input: {

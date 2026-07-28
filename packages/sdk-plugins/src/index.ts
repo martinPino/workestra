@@ -28,3 +28,4 @@ export * from './github-api';
 export * from './interpolate';
 export * from './handoff';
 export * from './runtime-registry';
+export * from './share/sanitize';
