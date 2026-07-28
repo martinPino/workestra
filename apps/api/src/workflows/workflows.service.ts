@@ -5,6 +5,7 @@ import { createLlmRouter } from '@core/llm';
 import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
 import { assertInWorkspace } from '../tenant/tenant.util';
 import { TriggersService } from '../triggers/triggers.service';
+import { SchedulesService } from '../schedules/schedules.service';
 import { extractJsonObject, buildGeneratePrompt, isRateLimitError } from './generate.util';
 import { buildAssistantPreamble } from './assistant-context';
 import { LlmKeysService } from '../llm-keys/llm-keys.service';
@@ -14,6 +15,7 @@ export class WorkflowsService {
   constructor(
     @Inject(PERSISTENCE) private readonly p: PersistenceBundle,
     private readonly triggers: TriggersService,
+    private readonly schedules: SchedulesService,
     private readonly llmKeys: LlmKeysService,
   ) {}
 
@@ -65,7 +67,12 @@ export class WorkflowsService {
   /** Congela el draft en una versión inmutable `published` (M4p). */
   async publish(id: string, workspaceId: string) {
     await this.getOwned(id, workspaceId);
-    return this.p.workflows.publish(id);
+    const version = await this.p.workflows.publish(id);
+    // M53: el nodo Trigger es la FUENTE ÚNICA DE VERDAD. Al publicar reconciliamos el sondeo de Google Drive
+    // desde el grafo congelado (crea/actualiza/borra el ScheduledTrigger que el worker sondea). Es best-effort
+    // y NUNCA lanza, así que publicar sigue funcionando aunque no haya cola (dev) o falle la reconciliación.
+    await this.schedules.reconcileFromGraph(id, workspaceId, version.graph);
+    return version;
   }
 
   async listVersions(id: string, workspaceId: string) {

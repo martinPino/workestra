@@ -193,7 +193,13 @@ export function TriggerForm({
           {choice === 'schedule' && <ScheduleSection wfId={wfId} />}
           {choice.startsWith('jira.') && <JiraSection wfId={wfId} eventId={choice} />}
           {choice === 'webhook' && <WebhookSection wfId={wfId} />}
-          {choice === 'google-drive.file_created' && <DriveSection wfId={wfId} />}
+          {choice === 'google-drive.file_created' && (
+            <DriveSection
+              wfId={wfId}
+              initialFolderId={typeof value.folderId === 'string' ? value.folderId : ''}
+              onFolderId={(id) => onChange({ ...value, folderId: id })}
+            />
+          )}
           {choice === 'sentry.issue_created' && <SentrySection wfId={wfId} />}
           <Leftovers wfId={wfId} choice={choice} />
         </>
@@ -555,14 +561,23 @@ function WebhookSection({ wfId }: { wfId: string }) {
 }
 
 /** Google Drive: conectar + carpeta + frecuencia de sondeo → crea el schedule con `poll` (M52). */
-function DriveSection({ wfId }: { wfId: string }) {
+function DriveSection({ wfId, initialFolderId = '', onFolderId }: { wfId: string; initialFolderId?: string; onFolderId?: (id: string) => void }) {
   const t = useT();
   const { role } = useAuth();
   const qc = useQueryClient();
   const { connected: drive, busy: connBusy, connect } = useProviderConnection('google-drive');
   const { data: schedules } = useSchedules(wfId);
   const { data: folderData, isLoading: foldersLoading, isError: foldersError, error: foldersErr } = useDriveFolders(drive?.id ?? null);
-  const [folderId, setFolderId] = useState('');
+  // M53: sembramos la carpeta desde el nodo Trigger (fuente de verdad): así la UI refleja lo ya configurado.
+  const [folderIdState, setFolderIdRaw] = useState(initialFolderId);
+  const folderId = folderIdState;
+  // La carpeta elegida se escribe DE VUELTA en la config del nodo Trigger. Sin esto, al publicar el flujo se
+  // creaba el sondeo sobre TODA la unidad de Drive en vez de la carpeta que se ve aquí: el nodo no era la
+  // fuente de verdad de la carpeta, solo del evento. Era la mitad que faltaba del arreglo del disparador.
+  const setFolderId = (id: string): void => {
+    setFolderIdRaw(id);
+    onFolderId?.(id);
+  };
   const [manual, setManual] = useState(false); // pegar el ID a mano (subcarpetas no listadas)
   const [everyMin, setEveryMin] = useState(5);
   const [busy, setBusy] = useState(false);

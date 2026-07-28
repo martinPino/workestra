@@ -9,5 +9,7 @@ import { RbacModule } from '../rbac/rbac.module';
   imports: [AuthModule, RbacModule],
   controllers: [SchedulesController, ScheduleAdminController],
   providers: [SchedulesService, { provide: SCHEDULE_QUEUE, useFactory: createScheduleQueue }],
+  // M53: WorkflowsService reutiliza SchedulesService para reconciliar el sondeo de Drive al publicar.
+  exports: [SchedulesService],
 })
 export class SchedulesModule {}
