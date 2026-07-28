@@ -1,14 +1,23 @@
 /**
- * Sondeo de Google Drive (M52): lista los ficheros de una carpeta MODIFICADOS desde la última vez, para el
+ * Sondeo de Google Drive (M52): lista los ficheros AÑADIDOS a una carpeta desde la última vez, para el
  * trigger «Google Drive: nuevo fichero». Puro y con `fetch` inyectable → testeable sin red. El worker lo usa
  * con el token OAuth del conector de Drive; guarda el `newSince` para el próximo sondeo (así solo dispara por
  * ficheros nuevos, sin duplicar).
+ *
+ * El cursor va por `createdTime` (cuándo ENTRÓ el fichero en Drive), NO por `modifiedTime`. Drive CONSERVA la
+ * fecha de modificación del fichero de origen al subirlo: una factura creada ayer en tu disco y subida hoy
+ * llega con `modifiedTime` de ayer. Filtrando por `modifiedTime > cursor` esos ficheros nacen «viejos» y NUNCA
+ * disparan —por más veces que se vuelvan a subir—, que es el caso NORMAL (descargas un PDF y lo subes).
+ * `createdTime` sí es el instante de la subida. Además esto quita un bucle de ruido: un fichero que el propio
+ * flujo modifica (p. ej. la hoja de cálculo donde escribe, si vive en la misma carpeta) ya no se re-dispara.
  */
 export interface DriveFile {
   id: string;
   name: string;
   mimeType: string;
   modifiedTime: string;
+  /** Instante en que el fichero ENTRÓ en Drive (fecha de subida). Es lo que gobierna el cursor. */
+  createdTime?: string;
 }
 
 type Fetchish = (url: string, init?: { headers?: Record<string, string> }) => Promise<{ ok: boolean; json: () => Promise<unknown> }>;
@@ -37,9 +46,9 @@ export async function fetchDriveFileBytes(opts: {
   return new Uint8Array(await res.arrayBuffer());
 }
 
-/** Construye la query de la Drive API v3 para «ficheros de esta carpeta modificados después de `sinceIso`». */
+/** Construye la query de la Drive API v3 para «ficheros AÑADIDOS a esta carpeta después de `sinceIso`». */
 export function driveQuery(folderId: string | undefined, sinceIso: string): string {
-  return [`modifiedTime > '${sinceIso}'`, folderId ? `'${folderId}' in parents` : '', 'trashed = false'].filter(Boolean).join(' and ');
+  return [`createdTime > '${sinceIso}'`, folderId ? `'${folderId}' in parents` : '', 'trashed = false'].filter(Boolean).join(' and ');
 }
 
 export interface DriveFolder {
@@ -81,8 +90,8 @@ export async function listDriveFolders(opts: { token: string; fetchFn?: Fetchish
 }
 
 /**
- * Devuelve los ficheros nuevos y el `newSince` a persistir (el `modifiedTime` máximo visto, o el `sinceIso` si
- * no hubo ninguno). Ordenados por `modifiedTime` ascendente para disparar en orden.
+ * Devuelve los ficheros recién AÑADIDOS y el `newSince` a persistir (el `createdTime` máximo visto, o el
+ * `sinceIso` si no hubo ninguno). Ordenados por `createdTime` ascendente para disparar en orden de llegada.
  */
 export async function pollDriveFiles(opts: {
   token: string;
@@ -92,11 +101,13 @@ export async function pollDriveFiles(opts: {
 }): Promise<{ files: DriveFile[]; newSince: string }> {
   const fetchFn = opts.fetchFn ?? (globalThis.fetch as unknown as Fetchish);
   const q = encodeURIComponent(driveQuery(opts.folderId, opts.sinceIso));
-  const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,mimeType,modifiedTime)&orderBy=modifiedTime&pageSize=25`;
+  const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,mimeType,modifiedTime,createdTime)&orderBy=createdTime&pageSize=25`;
   const res = await fetchFn(url, { headers: { authorization: `Bearer ${opts.token}` } });
   if (!res.ok) return { files: [], newSince: opts.sinceIso }; // 401/red: no avanzamos el cursor, se reintenta
   const data = (await res.json().catch(() => ({}))) as { files?: DriveFile[] }; // cuerpo no-JSON con 2xx → no dispara
-  const files = (data.files ?? []).filter((f) => f && f.id && f.modifiedTime);
-  const newSince = files.reduce((max, f) => (f.modifiedTime > max ? f.modifiedTime : max), opts.sinceIso);
+  // Sin `createdTime` no se puede situar el fichero en el tiempo: se descarta en vez de avanzar el cursor a
+  // ciegas (mejor no disparar que perder el rastro de lo que ya se procesó).
+  const files = (data.files ?? []).filter((f) => f && f.id && f.createdTime);
+  const newSince = files.reduce((max, f) => ((f.createdTime as string) > max ? (f.createdTime as string) : max), opts.sinceIso);
   return { files, newSince };
 }

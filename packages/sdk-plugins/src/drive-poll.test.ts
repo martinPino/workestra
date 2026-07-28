@@ -2,9 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { driveQuery, pollDriveFiles, fetchDriveFileBytes, isNativeGoogleDoc, listDriveFolders, type DriveFile } from './drive-poll';
 
 describe('driveQuery', () => {
-  it('filtra por modificación posterior y no papelera', () => {
+  it('filtra por ENTRADA en Drive (createdTime) posterior y no papelera', () => {
     const q = driveQuery(undefined, '2026-07-07T00:00:00.000Z');
-    expect(q).toContain("modifiedTime > '2026-07-07T00:00:00.000Z'");
+    expect(q).toContain("createdTime > '2026-07-07T00:00:00.000Z'");
+    // Por `modifiedTime` NO: Drive conserva la fecha del fichero de origen al subirlo, así que un PDF
+    // creado ayer y subido hoy nunca dispararía (ver el test de regresión de `pollDriveFiles`).
+    expect(q).not.toContain('modifiedTime');
     expect(q).toContain('trashed = false');
     expect(q).not.toContain('in parents');
   });
@@ -22,10 +25,34 @@ describe('isNativeGoogleDoc', () => {
   });
 });
 
-const file = (id: string, modifiedTime: string): DriveFile => ({ id, name: `${id}.pdf`, mimeType: 'application/pdf', modifiedTime });
+/** Fichero de Drive. `createdTime` (subida) manda; `modifiedTime` por defecto imita el caso real: MÁS VIEJO. */
+const file = (id: string, createdTime: string, modifiedTime = '2020-01-01T00:00:00.000Z'): DriveFile => ({
+  id,
+  name: `${id}.pdf`,
+  mimeType: 'application/pdf',
+  modifiedTime,
+  createdTime,
+});
 
 describe('pollDriveFiles', () => {
-  it('devuelve los ficheros y avanza el cursor al modifiedTime máximo', async () => {
+  // REGRESIÓN: subes a Drive un PDF que creaste ayer (o que descargaste) — Drive le conserva la fecha de
+  // modificación ORIGINAL, muy anterior al cursor. Con el filtro por `modifiedTime` el fichero nacía «viejo»
+  // y no disparaba nunca, por más veces que se volviera a subir. Es el caso NORMAL, no un borde.
+  it('dispara por un fichero SUBIDO ahora aunque su modifiedTime sea antiquísimo', async () => {
+    const recienSubido = file('factura', '2026-07-07T16:36:00.000Z', '2026-07-06T06:50:00.000Z');
+    const res = await pollDriveFiles({
+      token: 't',
+      sinceIso: '2026-07-07T16:00:00.000Z', // posterior al modifiedTime, anterior a la subida
+      fetchFn: async (url) => {
+        expect(url).toContain('createdTime'); // pide y ordena por fecha de subida
+        return { ok: true, json: async () => ({ files: [recienSubido] }) };
+      },
+    });
+    expect(res.files.map((f) => f.id)).toEqual(['factura']);
+    expect(res.newSince).toBe('2026-07-07T16:36:00.000Z'); // el cursor avanza por createdTime
+  });
+
+  it('devuelve los ficheros y avanza el cursor al createdTime máximo', async () => {
     const files = [file('a', '2026-07-07T10:00:00.000Z'), file('b', '2026-07-07T12:00:00.000Z')];
     const res = await pollDriveFiles({
       token: 'secret-token',
@@ -61,16 +88,24 @@ describe('pollDriveFiles', () => {
     expect(res.newSince).toBe('2026-07-07T00:00:00.000Z');
   });
 
-  it('descarta filas sin id o sin modifiedTime (robustez)', async () => {
+  it('descarta filas sin id o sin createdTime (robustez)', async () => {
     const res = await pollDriveFiles({
       token: 't',
       sinceIso: '2026-07-07T00:00:00.000Z',
       fetchFn: async () => ({
         ok: true,
-        json: async () => ({ files: [file('a', '2026-07-07T10:00:00.000Z'), { id: '', name: 'x', mimeType: 'application/pdf', modifiedTime: '2026-07-07T11:00:00.000Z' }] }),
+        json: async () => ({
+          files: [
+            file('a', '2026-07-07T10:00:00.000Z'),
+            { id: '', name: 'x', mimeType: 'application/pdf', modifiedTime: '2026-07-07T11:00:00.000Z', createdTime: '2026-07-07T11:00:00.000Z' },
+            // Sin `createdTime` no se puede situar en el tiempo: se descarta y NO contamina el cursor.
+            { id: 'sin-fecha', name: 'y.pdf', mimeType: 'application/pdf', modifiedTime: '2026-07-07T23:00:00.000Z' } as DriveFile,
+          ],
+        }),
       }),
     });
     expect(res.files.map((f) => f.id)).toEqual(['a']);
+    expect(res.newSince).toBe('2026-07-07T10:00:00.000Z'); // no avanzó por la fila sin createdTime
   });
 });
 

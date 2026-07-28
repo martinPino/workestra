@@ -191,7 +191,7 @@ async function main(): Promise<void> {
         trigger: 'drive',
         scheduleId: schedule.id,
         'file:trigger': fileRef,
-        driveFile: { id: f.id, name: f.name, mimeType: f.mimeType, modifiedTime: f.modifiedTime },
+        driveFile: { id: f.id, name: f.name, mimeType: f.mimeType, modifiedTime: f.modifiedTime, createdTime: f.createdTime },
       });
       console.log(`[schedule] ${schedule.id}: Drive «${f.name}» → ejecución ${execId}.`);
     }
