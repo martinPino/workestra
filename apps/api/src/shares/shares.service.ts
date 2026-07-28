@@ -71,7 +71,10 @@ export class SharesService {
     await this.p.shares.create({
       workspaceId,
       workflowId,
-      sourceName: wf.name,
+      // OJO: el nombre SANITIZADO (`doc.name`), no `wf.name`. La preview pública devuelve `sourceName`, así que
+      // el nombre crudo del flujo llegaría al enlace sin pasar por el escáner —justo la fuga que el E2E pilló—.
+      // Guardando el redactado, el secreto ni siquiera se persiste en la fila del share.
+      sourceName: doc.name,
       tokenHash: sha256(token),
       snapshot: doc,
       report,

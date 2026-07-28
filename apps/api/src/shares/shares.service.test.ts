@@ -220,6 +220,21 @@ describe('SharesService — compartir por enlace (M85)', () => {
     expect(JSON.stringify(shares.records[0].snapshot)).not.toContain(SECRET);
   });
 
+  it('un secreto en el NOMBRE del flujo no llega ni al sourceName guardado ni a la preview pública', async () => {
+    const { svc, workflows, shares } = setup();
+    const SECRET = 'af_LIVEPLANTED0123456789ABCDEF';
+    workflows.add('wf1', WS, `Flujo con ${SECRET} dentro`, cleanGraph());
+
+    const created = await svc.createShare('wf1', WS, USER, dto({ dryRun: false }));
+
+    // No persistido en la fila (defensa en profundidad: el crudo ni se guarda).
+    expect(shares.records[0].sourceName).not.toContain(SECRET);
+    expect(shares.records[0].sourceName).toContain('SECRETO_REDACTADO');
+    // Y la preview pública (lo que ve cualquiera con el enlace) tampoco lo expone.
+    const preview = await svc.preview(created.token!);
+    expect(preview.name).not.toContain(SECRET);
+  });
+
   it('la vista de listado NO expone el hash del token ni el snapshot', async () => {
     const { svc, workflows } = setup();
     workflows.add('wf1', WS, 'Mi flujo', cleanGraph());
