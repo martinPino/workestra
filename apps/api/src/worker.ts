@@ -7,6 +7,9 @@ import { authMiddleware, type AuthVariables } from './http/auth.middleware';
 import { buildCloudflarePersistence, closeBundle } from './http/composition';
 import { buildServices, type Services } from './http/services';
 import { agentsRouter } from './http/routers/agents';
+import { workflowsRouter } from './http/routers/workflows';
+import { executionsRouter } from './http/routers/executions';
+import { llmKeysRouter } from './http/routers/llm-keys';
 import type { Env } from './http/env';
 
 export { ExecutionRoom } from './durable/execution-room';
@@ -15,15 +18,15 @@ export { WorkspaceUsage } from './durable/workspace-usage';
 /**
  * Entry del API en Cloudflare Workers. Sustituye a `main.ts` (NestFactory + Express).
  *
- * ⚠️ PORT INCOMPLETO. Solo están portadas las rutas de `/agents`. El resto de controllers responden 501
+ * ⚠️ PORT INCOMPLETO. Faltan los routers de `PENDIENTES`, que responden 501
  * con la lista de lo que falta (ver `PENDIENTES`), en vez de 404: un 404 se confundiría con una ruta que
  * no existe y haría pensar que el port está terminado. NO desplegar esto como el API de producción
  * todavía — por eso tampoco hay workflow de deploy.
  */
 
 const PENDIENTES = [
-  'auth', 'workflows', 'executions', 'webhooks', 'schedules', 'connectors',
-  'triggers', 'api-keys', 'mcp', 'llm-keys', 'team', 'analytics', 'shares',
+  'auth', 'webhooks', 'schedules', 'connectors', 'triggers',
+  'api-keys', 'mcp', 'team', 'analytics', 'shares',
 ];
 
 type AppEnv = { Bindings: Env; Variables: AuthVariables & { services: Services } };
@@ -86,6 +89,9 @@ function createApp(jwtSecret: string) {
   });
 
   app.route('/agents', agentsRouter());
+  app.route('/workflows', workflowsRouter());
+  app.route('/executions', executionsRouter());
+  app.route('/llm-keys', llmKeysRouter());
 
   app.all('*', (c) =>
     c.json(

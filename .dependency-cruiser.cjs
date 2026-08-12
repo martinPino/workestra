@@ -54,6 +54,9 @@ module.exports = {
           '(^|/)(main|demo)\\.tsx?$',
           '\\.(test|spec)\\.ts$',
           '\\.config\\.(js|cjs|mjs|ts)$',
+          // Stubs que solo referencia el `alias` de wrangler.jsonc en tiempo de build: nadie los
+          // importa desde el código, y sin esto su aviso de huérfano taparía los huérfanos de verdad.
+          '^apps/api/src/stubs/',
         ],
       },
       to: {},

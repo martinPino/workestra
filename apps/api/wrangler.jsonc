@@ -16,6 +16,17 @@
 
   "observability": { "enabled": true },
 
+  // Las librerías de OCR/PDF/navegador se cargan con un `require()` perezoso, pero el bundler las
+  // resuelve igual y entran en el Worker: 1,01 → 3,04 MB gzip de código que ahí no puede correr. Se
+  // sustituyen por un stub que falla con un mensaje claro cuando alguien ejecuta uno de esos nodos.
+  // Se retira en la fase 5, cuando pasen a Containers/Sandboxes.
+  "alias": {
+    "tesseract.js": "./src/stubs/node-only.ts",
+    "pdf-parse": "./src/stubs/node-only.ts",
+    "playwright": "./src/stubs/node-only.ts",
+    "playwright-core": "./src/stubs/node-only.ts"
+  },
+
   // Pool de Postgres del lado de Cloudflare. El id sale de `wrangler hyperdrive create`; apunta al
   // MISMO Postgres que usa Railway, que es lo que hace posible la convivencia.
   "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "<pendiente: wrangler hyperdrive create>" }],
