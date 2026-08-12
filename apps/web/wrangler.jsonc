@@ -1,0 +1,20 @@
+{
+  // SPA servida por Workers Assets. Sin `main`: es un Worker de solo assets, así que las peticiones
+  // las resuelve la red de Cloudflare sin invocar código (ni facturación por request).
+  //
+  // Sustituye a `serve.mjs` (el servidor estático del contenedor de Railway). Fase 1 de
+  // docs/CLOUDFLARE.md: la web ya sirve desde Cloudflare mientras el API sigue en Railway; a qué
+  // backend apunta lo decide `VITE_API_URL`, que se hornea EN BUILD (ver .github/workflows/deploy-web.yml).
+  "$schema": "https://developers.cloudflare.com/schemas/wrangler.json",
+  "name": "workestra-web",
+  "compatibility_date": "2026-08-01",
+  "assets": {
+    "directory": "./dist",
+    // React Router hace enrutado en cliente: `/console/<id>` no existe como fichero. Sin esto,
+    // recargar cualquier ruta profunda devuelve 404 en vez de la SPA.
+    "not_found_handling": "single-page-application"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

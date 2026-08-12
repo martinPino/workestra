@@ -1,0 +1,52 @@
+# Despliega la SPA (apps/web) a Cloudflare Workers Assets en cada push a main que la toque.
+# Fase 1 de docs/CLOUDFLARE.md. Requiere el secret CLOUDFLARE_API_TOKEN (Account → Workers Scripts →
+# Edit) y la variable de repo VITE_API_URL. El account id no es sensible (sale en las URLs del panel).
+name: Deploy web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/**'
+      - 'packages/contracts/**'
+      - 'packages/domain/**'
+      - '.github/workflows/deploy-web.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # La web importa @core/contracts y @core/domain desde su `dist`, no desde el fuente: hay que
+      # construir los paquetes antes que el bundle (el gotcha de CLAUDE.md, aquí en CI).
+      - name: Build
+        # VITE_API_URL se hornea en el bundle EN BUILD; no es un secreto de runtime del Worker, así
+        # que va como variable de repo. Si cambia el dominio del API, hay que re-desplegar la web.
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_AUTH_MODE: local
+        run: pnpm --filter @app/web... build
+
+      - name: Deploy to Cloudflare
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: 17f37efbe20aedf19b87e142e76a9fce
+          workingDirectory: apps/web
+          command: deploy

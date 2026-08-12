@@ -1,0 +1,12 @@
+# Política de caché de la SPA (la misma que aplicaba serve.mjs en Railway). Vite copia public/ a
+# dist/, y Workers Assets lee este fichero desde la raíz del directorio de assets.
+#
+# El HTML NO se cachea: es el único fichero con nombre estable, y es quien referencia los bundles
+# con hash. Si se cachea, un despliegue nuevo no lo recoge nadie hasta que expire.
+/index.html
+  Cache-Control: no-cache
+
+# Los bundles llevan hash en el nombre (Vite), así que un contenido nuevo es una URL nueva:
+# son inmutables y se pueden cachear para siempre.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
