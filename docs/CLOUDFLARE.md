@@ -95,15 +95,17 @@ Dos consecuencias de diseño, no negociables:
 |---|---|
 | 1 — `web` a Workers Assets | **Hecha.** Falta crear el proyecto en Cloudflare y fijar `VITE_API_URL` |
 | 2 — Adaptadores en `@core/infra` | **Hecha.** Con tests contra bindings falsos |
-| 3 — `api` a Hono sobre Workers | **A medias.** Worker empaqueta y arranca; falta portar 13 de 14 routers |
+| 3 — `api` a Hono sobre Workers | **A medias.** Worker empaqueta; 4 de 14 routers portados |
 | 4 — Ejecución a Workflows | Sin empezar |
 | 5 — `code`/`browser`/OCR a Containers | Sin empezar |
 
 Lo que falta de la fase 3:
 
-1. **Rutas** — 13 controllers a routers de Hono; `/agents` ya está y sirve de patrón. Son delegación
-   fina: el riesgo no es la lógica, es perder un `@RequireScopes` por el camino (no rompe ningún test
-   y abre una escritura a VIEWER) o invertir el orden entre una ruta literal y una paramétrica.
+1. **Rutas** — faltan 10: `auth`, `webhooks`, `schedules`, `connectors`, `triggers`, `api-keys`,
+   `mcp`, `team`, `analytics` y `shares`. Portados: `agents`, `workflows`, `executions` (que absorbe
+   el de escalado humano) y `llm-keys`. Son delegación fina: el riesgo no es la lógica, es perder un
+   `@RequireScopes` por el camino (no rompe ningún test y abre una escritura a VIEWER) o invertir el
+   orden entre una ruta literal y una paramétrica.
 2. **`AuthService`** — cambiar `@nestjs/jwt` por `signJwt`/`verifyJwt`. `verify` pasa a ser `async`.
 3. **`apps/web`** — `socket.io-client` por `WebSocket` nativo contra `/executions/:id/stream`.
 4. **Tests** — mover los de `apps/api` y `@core/infra` a `@cloudflare/vitest-pool-workers`.
@@ -114,8 +116,13 @@ entero al bundle. Lo cazó `wrangler deploy --dry-run`, no el typecheck ni los t
 patrón que `CLAUDE.md` documenta para el contenedor DI, y hasta que los tests corran en `workerd` el
 dry-run es la única red: **conviene tenerlo en CI antes de portar más rutas**.
 
-Estado del bundle tras arreglarlo: **1,01 MB gzip** de los 10 MB de techo, con el query engine WASM de
-Prisma dentro y sin rastro de `@nestjs`, `nodemailer`, `ioredis` ni `bullmq`.
+Estado del bundle: **1,31 MB gzip** de los 10 MB de techo, con el query engine WASM de Prisma dentro y
+sin rastro de `@nestjs`, `nodemailer`, `ioredis` ni `bullmq`. Las librerías de OCR/PDF/navegador se
+sustituyen por un stub vía `alias` (valían 1,7 MB de código inejecutable ahí); vuelven en la fase 5.
+
+**El despacho es INLINE mientras tanto** (`queue = null` en `http/services.ts`): la ejecución corre
+dentro de la propia invocación del Worker, con el techo de 5 min de CPU. Sirve para el editor y runs
+cortos; no para producción. Es justo lo que resuelve la fase 4.
 
 ## Fases
 
