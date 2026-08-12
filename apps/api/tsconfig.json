@@ -5,7 +5,15 @@
     "rootDir": "src",
     "types": ["node"],
     "declaration": false,
-    "sourceMap": true
+    "sourceMap": true,
+    // Los entry points nuevos de @core/infra son SUBPATHS de `exports`, que `moduleResolution: node`
+    // (node10) no sabe resolver. Se mapean a mano en vez de cambiar la resolución a `bundler`/`node16`:
+    // eso alteraría la semántica CJS/ESM de todo el paquete y `nest build` todavía depende de ella
+    // mientras exista el despliegue de Railway. Wrangler (esbuild) sí lee `exports` y no necesita esto.
+    "paths": {
+      "@core/infra/cloudflare": ["../../packages/infra/dist/cloudflare/index.d.ts"],
+      "@core/infra/postgres": ["../../packages/infra/dist/postgres.d.ts"]
+    }
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist", "**/*.test.ts"]

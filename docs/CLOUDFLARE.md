@@ -119,8 +119,14 @@ sin infra en la nube.
   lifecycle rule del bucket.
 - `DurableObjectContextStore` — implementa `IContextStore` contra el DO de la ejecución.
 - `DurableObjectEventPublisher` — implementa `IEventPublisher`; sustituye a `RedisEventPublisher`.
-- `HttpEmailService` — implementa `IEmailService` sobre una API HTTP. `nodemailer` abre un socket
-  SMTP y Workers no da TCP crudo salvo `connect()`; no merece la pena.
+- `createHttpEmailService` — los proveedores de correo por HTTP (Brevo/Resend), separados del
+  camino SMTP. `nodemailer` abre un socket SMTP y Workers no da TCP crudo salvo `connect()`.
+
+Los adaptadores de Prisma se reexportan tal cual desde `@core/infra/postgres`: son portables porque
+solo hablan con el `PrismaClient` que se les inyecta. Al separarlos salió un dato que conviene
+registrar — **`ioredis` nunca llega a un bundle**: los adaptadores de Redis lo importan solo como
+tipo (`import type`), así que se borra al compilar. El único import de Node en tiempo de ejecución
+de todo `@core/infra` es `nodemailer`.
 
 **Nada de esto toca el motor.** Es la prueba de que la arquitectura aguanta: si un adaptador nuevo
 exige cambiar `packages/engine`, es que el puerto estaba mal.

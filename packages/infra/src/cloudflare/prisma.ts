@@ -17,6 +17,14 @@ import type { HyperdriveLike } from './bindings';
  * local.
  */
 
+/**
+ * Lo único que el llamante necesita del pool: cerrarlo. Se expone así, y no como el `Pool` de `pg`, para
+ * que quien construya el bundle no tenga que depender de `@types/pg` solo por tipar una variable.
+ */
+export interface PoolLike {
+  end(): Promise<void>;
+}
+
 export interface HyperdrivePrismaOptions {
   /**
    * Conexiones máximas del pool LOCAL del Worker. Uno, a propósito: cada isolate atiende poca
@@ -33,7 +41,7 @@ export interface HyperdrivePrismaOptions {
 export function createHyperdrivePrismaClient(
   hyperdrive: HyperdriveLike,
   opts: HyperdrivePrismaOptions = {},
-): { prisma: PrismaClient; pool: Pool } {
+): { prisma: PrismaClient; pool: PoolLike } {
   const pool = new Pool({
     connectionString: hyperdrive.connectionString,
     max: opts.maxConnections ?? 1,

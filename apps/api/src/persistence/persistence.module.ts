@@ -1,31 +1,8 @@
 import { Global, Module } from '@nestjs/common';
-import type {
-  IWorkflowRepository,
-  IExecutionRepository,
-  IContextStore,
-  INodeRunRepository,
-  IAgentRepository,
-  IMemoryStore,
-  IPendingReviewRepository,
-  IEventStore,
-  ISecretStore,
-  IWebhookRepository,
-  IShareRepository,
-  IScheduleRepository,
-  IConnectorRepository,
-  ITriggerBindingRepository,
-  IApiKeyRepository,
-  IWorkspaceUsageRepository,
-  IFileStore,
-  IAuthRepository,
-  ITeamRepository,
-  IEmailService,
-} from '@core/engine';
 import type { MemoryEvent } from '@core/contracts';
 import IORedis from 'ioredis';
 import {
   createPrismaClient,
-  PrismaClient,
   InMemoryWorkflowRepository,
   InMemoryNodeRunRepository,
   InMemoryExecutionRepository,
@@ -67,44 +44,12 @@ import {
   createEmailService,
   hashPassword,
 } from '@core/infra';
+import { PERSISTENCE, type PersistenceBundle } from './bundle';
 
-export const PERSISTENCE = Symbol('PERSISTENCE');
-
-export interface PersistenceBundle {
-  mode: 'memory' | 'postgres';
-  workflows: IWorkflowRepository;
-  executions: IExecutionRepository;
-  context: IContextStore;
-  nodeRuns: INodeRunRepository;
-  agents: IAgentRepository;
-  memory: IMemoryStore;
-  pendingReviews: IPendingReviewRepository;
-  /** Stream de eventos durable (M6): fuente de verdad del replay y del catch-up tras reinicios. */
-  events: IEventStore;
-  /** Secretos cifrados en reposo (M7): firmas de webhooks, credenciales, claves de proveedor. */
-  secrets: ISecretStore;
-  /** Webhooks de ingreso (M7): triggers entrantes firmados que arrancan ejecuciones. */
-  webhooks: IWebhookRepository;
-  shares: IShareRepository;
-  /** Triggers programados (M7-B): registro durable de schedules cron/intervalo. */
-  schedules: IScheduleRepository;
-  /** Conectores (M11): integraciones OAuth para dispatch saliente autenticado. */
-  connectors: IConnectorRepository;
-  /** Bindings de disparador (M19): enlace receta↔workflow para triggers sin código (p. ej. Jira). */
-  triggerBindings: ITriggerBindingRepository;
-  /** Claves de API por workspace (M32): credencial duradera para MCP / apps externas. */
-  apiKeys: IApiKeyRepository;
-  /** Uso/cuota de tokens LLM por workspace (M33): contador diario para no agotar el presupuesto común. */
-  usage: IWorkspaceUsageRepository;
-  files: IFileStore;
-  /** Usuarios/pertenencias para login+registro con email+contraseña (M73). */
-  auth: IAuthRepository;
-  /** Gestión de equipo: miembros e invitaciones (M74). */
-  team: ITeamRepository;
-  /** Envío de correo transaccional (invitaciones); best-effort, intercambiable (M74). */
-  email: IEmailService;
-  prisma?: PrismaClient;
-}
+// El contrato del bundle vive en `bundle.ts` (sin NestJS) porque lo comparten los dos composition
+// roots: este módulo (Railway) y `http/composition.ts` (Cloudflare Workers). Se reexporta para no
+// romper los ~20 ficheros que ya lo importaban desde aquí.
+export { PERSISTENCE, type PersistenceBundle };
 
 const DEFAULT_WORKSPACE = 'ws_dev';
 

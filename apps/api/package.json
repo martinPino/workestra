@@ -26,6 +26,7 @@
     "@nestjs/platform-socket.io": "^10.4.15",
     "@nestjs/websockets": "^10.4.15",
     "bullmq": "^5.34.5",
+    "hono": "^4.13.1",
     "ioredis": "^5.4.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
@@ -35,6 +36,7 @@
   "devDependencies": {
     "@nestjs/cli": "^10.4.9",
     "@nestjs/schematics": "^10.2.3",
-    "@types/node": "^22.10.2"
+    "@types/node": "^22.10.2",
+    "wrangler": "^4.122.0"
   }
 }
