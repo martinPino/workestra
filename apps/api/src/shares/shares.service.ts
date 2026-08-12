@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, UnprocessableEntityException } from '../http/common';
 import { createHash, randomBytes } from 'node:crypto';
 import type {
   Agent,

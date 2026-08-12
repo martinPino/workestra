@@ -1,4 +1,4 @@
-import { Injectable, Inject, BadRequestException, OnModuleInit } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException, OnModuleInit } from '../http/common';
 import type { Queue } from 'bullmq';
 import type { WorkflowGraph } from '@core/contracts';
 import type { ScheduleRecord, SchedulePoll } from '@core/engine';

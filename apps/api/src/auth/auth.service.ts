@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '../http/common';
 import { JwtService } from '@nestjs/jwt';
 import type { Role } from '@core/contracts';
 import type { RegisterDto, LoginDto } from '@core/contracts';

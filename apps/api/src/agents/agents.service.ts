@@ -1,4 +1,4 @@
-import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException, BadRequestException } from '../http/common';
 import { type Role, type McpServerRef, McpServerRefSchema, AgentDraftSchema, type AgentDraft, type MemoryScope } from '@core/contracts';
 import { createLlmRouter } from '@core/llm';
 import { McpHttpClient } from '@core/infra';

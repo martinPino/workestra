@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '../http/common';
 
 /**
  * Verifica que un recurso pertenece al workspace AUTENTICADO. Lanza 404 (no 403) a propósito: no

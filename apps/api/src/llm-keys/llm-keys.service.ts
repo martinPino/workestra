@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '../http/common';
 import type { ISecretStore } from '@core/engine';
 import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
 

@@ -1,4 +1,4 @@
-import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException, BadRequestException } from '../http/common';
 import type { Queue } from 'bullmq';
 import { emptyContext, type ExecutionStatus, type TriggerType } from '@core/contracts';
 import { validateDag } from '@core/domain';

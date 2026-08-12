@@ -1,5 +1,5 @@
 import type { Role } from '@core/contracts';
-import { UnauthorizedException } from './errors';
+import { UnauthorizedException } from './common';
 
 /**
  * JWT HS256 sobre WebCrypto, en sustitución de `@nestjs/jwt`.

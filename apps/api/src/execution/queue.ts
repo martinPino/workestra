@@ -1,6 +1,6 @@
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy } from '../http/common';
 import type { ExecutionEvent } from '@core/contracts';
 import { ExecutionEventHub } from './execution-event-hub';
 

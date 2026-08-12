@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '../http/common';
 import { createHash, randomBytes } from 'node:crypto';
 import type { InviteMemberDto, UpdateMemberDto, AcceptInviteDto, Role } from '@core/contracts';
 import { hashPassword } from '@core/infra';

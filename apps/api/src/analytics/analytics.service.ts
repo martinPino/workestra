@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '../http/common';
 import {
   parseAnalyticsEvent,
   type AnalyticsBatch,

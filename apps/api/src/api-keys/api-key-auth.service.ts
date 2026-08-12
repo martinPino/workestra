@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '../http/common';
 import type { IApiKeyRepository, ApiKeyRecord } from '@core/engine';
 import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
 import { generateRawKey, hashKey, type ApiKeyPrincipal } from './api-key.util';

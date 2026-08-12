@@ -1,6 +1,6 @@
 import type { MiddlewareHandler } from 'hono';
 import { can } from '@core/contracts';
-import { ForbiddenException } from './errors';
+import { ForbiddenException } from './common';
 import type { AuthVariables } from './auth.middleware';
 
 /**

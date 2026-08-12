@@ -1,4 +1,4 @@
-import { Injectable, Inject, BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException, NotFoundException, UnauthorizedException } from '../http/common';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import {
   TRIGGER_EVENTS,

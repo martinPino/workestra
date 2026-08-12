@@ -1,4 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject } from '../http/common';
 import { EventEmitter } from 'node:events';
 import type { ExecutionEvent } from '@core/contracts';
 import { EXECUTION_EVENT_SCHEMA_VERSION } from '@core/contracts';

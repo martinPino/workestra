@@ -5,7 +5,7 @@ import { hashKey } from '../api-keys/api-key.util';
 import type { PersistenceBundle } from '../persistence/bundle';
 import { authMiddleware, __resetStatusCache, type AuthVariables } from './auth.middleware';
 import { requireScopes } from './scopes.middleware';
-import { toErrorResponse } from './errors';
+import { toErrorResponse } from './common';
 import { signJwt } from './jwt';
 
 const SECRET = 'secreto-de-pruebas';

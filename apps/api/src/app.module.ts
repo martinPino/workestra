@@ -1,5 +1,6 @@
 import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_FILTER } from '@nestjs/core';
+import { HttpErrorFilter } from './http/http-error.filter';
 import { ConfigModule } from '@nestjs/config';
 import { HealthController } from './health/health.controller';
 import { RbacModule } from './rbac/rbac.module';
@@ -46,6 +47,9 @@ import { SharesModule } from './shares/shares.module';
     // Auth GLOBAL: toda ruta exige JWT salvo las marcadas @Public(). El workspace del token es la
     // fuente de verdad del tenant para todo el scoping/ownership posterior.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    // Los servicios lanzan los HttpError de `http/common.ts`, que Nest no reconoce. Sin este filtro
+    // saldrían como 500 en vez de 404/403 — ver http-error.filter.ts.
+    { provide: APP_FILTER, useClass: HttpErrorFilter },
   ],
 })
 export class AppModule implements NestModule {

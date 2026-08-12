@@ -1,4 +1,4 @@
-import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException, BadRequestException } from '../http/common';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { WebhookRecord } from '@core/engine';
 import { setCurrentWorkspace } from '@core/infra';

@@ -3,7 +3,7 @@ import type { Role } from '@core/contracts';
 import { setCurrentWorkspace } from '@core/infra/postgres';
 import type { PersistenceBundle } from '../persistence/bundle';
 import { isApiKey, resolveApiKey } from '../api-keys/api-key.util';
-import { UnauthorizedException, InternalServerErrorException } from './errors';
+import { UnauthorizedException, InternalServerErrorException } from './common';
 import { verifyJwt, type JwtPayload } from './jwt';
 import { isPublicRoute } from './public-routes';
 

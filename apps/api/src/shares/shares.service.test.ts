@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { NotFoundException, UnprocessableEntityException } from '../http/common';
 import { CreateShareRequestSchema, type Agent, type WorkflowGraph } from '@core/contracts';
 import { sanitizeWorkflowForShare } from '@core/sdk-plugins';
 import type { IShareRepository, ShareRecord } from '@core/engine';

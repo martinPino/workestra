@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException } from '@nestjs/common';
+import { Injectable, ForbiddenException } from '../http/common';
 import type { Role } from '@core/contracts';
 import { can } from './rbac.policy';
 

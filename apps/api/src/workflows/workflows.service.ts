@@ -1,4 +1,4 @@
-import { Injectable, Inject, BadRequestException } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException } from '../http/common';
 import { WorkflowGraphSchema, type WorkflowGraph } from '@core/contracts';
 import { validateDag } from '@core/domain';
 import { createLlmRouter } from '@core/llm';

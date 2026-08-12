@@ -1,4 +1,4 @@
-import { Injectable, Inject, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException, NotFoundException, Logger } from '../http/common';
 import { JwtService } from '@nestjs/jwt';
 import { randomBytes, createHash } from 'node:crypto';
 import type { ConnectorRecord } from '@core/engine';

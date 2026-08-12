@@ -1,4 +1,4 @@
-import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException, BadRequestException } from '../http/common';
 import type { PendingReviewRecord } from '@core/engine';
 import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
 import { ExecutionsService } from './executions.service';

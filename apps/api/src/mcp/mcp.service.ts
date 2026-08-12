@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { Injectable } from '@nestjs/common';
+import { Injectable } from '../http/common';
 import { McpServer, StreamableHTTPServerTransport, isInitializeRequest } from './mcp-sdk';
 import type { McpServerLike, StreamableTransportLike } from './mcp-sdk';
 import { registerTools, type McpContext } from './tools';

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { UnauthorizedException } from '@nestjs/common';
+import { UnauthorizedException } from '../http/common';
 import type { TriggerBindingRecord } from '@core/engine';
 import { TriggersService } from './triggers.service';
 import type { PersistenceBundle } from '../persistence/persistence.module';
