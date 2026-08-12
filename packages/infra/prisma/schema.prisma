@@ -4,6 +4,11 @@
 
 generator client {
   provider = "prisma-client-js"
+  // `driverAdapters` permite inyectar el driver de conexión en vez de usar el motor nativo de Prisma.
+  // Es lo que hace posible correr en Cloudflare Workers: allí no hay binario del query engine, así que
+  // la conexión la abre `pg` a través del pool de Hyperdrive (ver src/cloudflare/prisma.ts). En Node el
+  // comportamiento no cambia: `createPrismaClient()` sigue usando el motor nativo.
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {

@@ -1,56 +1,19 @@
 import nodemailer, { type Transporter } from 'nodemailer';
 import type { IEmailService, EmailMessage } from '@core/engine';
+import { ConsoleEmailAdapter, ResendEmailAdapter, BrevoEmailAdapter } from './email-http';
 
-/**
- * Sin proveedor de correo (M74): registra el mensaje en consola y devuelve false («no entregado»). Es el
- * fallback en dev y cuando falta RESEND_API_KEY. El flujo de invitación sigue funcionando porque el enlace
- * también se devuelve en la respuesta de la API para copiarlo a mano.
- */
-export class ConsoleEmailAdapter implements IEmailService {
-  readonly configured = false;
-  async send(msg: EmailMessage): Promise<boolean> {
-    console.log(`[email:console] (sin proveedor) para=${msg.to} asunto="${msg.subject}"`);
-    return false;
-  }
-}
-
-/**
- * Envío por Resend (M74) vía su API HTTP (fetch, sin dependencia). Best-effort: cualquier fallo se registra
- * y devuelve false; nunca lanza, para no tumbar la creación de la invitación. Requiere RESEND_API_KEY y una
- * dirección remitente verificada en EMAIL_FROM (p. ej. "AgentFlow <no-reply@tudominio.com>").
- */
-export class ResendEmailAdapter implements IEmailService {
-  readonly configured = true;
-  constructor(
-    private readonly apiKey: string,
-    private readonly from: string,
-  ) {}
-
-  async send(msg: EmailMessage): Promise<boolean> {
-    try {
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { authorization: `Bearer ${this.apiKey}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ from: this.from, to: [msg.to], subject: msg.subject, html: msg.html, text: msg.text }),
-        signal: AbortSignal.timeout(10_000),
-      });
-      if (!res.ok) {
-        console.error(`[email:resend] fallo ${res.status} enviando a ${msg.to}`);
-        return false;
-      }
-      return true;
-    } catch (e) {
-      console.error('[email:resend] error de red:', e instanceof Error ? e.message : String(e));
-      return false;
-    }
-  }
-}
+// Los proveedores HTTP (consola/Resend/Brevo) viven en `email-http.ts`, sin dependencias de Node, para que
+// el bundle de Cloudflare Workers pueda importarlos SIN arrastrar nodemailer. Se reexportan aquí para no
+// romper a quien ya importaba `@core/infra`.
+export { ConsoleEmailAdapter, ResendEmailAdapter, BrevoEmailAdapter, parseFrom, createHttpEmailService } from './email-http';
 
 /**
  * Envío por SMTP (M74) — el camino GRATIS sin verificar dominio: usa una cuenta de correo existente (p. ej.
  * Gmail con una «contraseña de aplicación»). `nodemailer` es JS puro (sin binario nativo → sin riesgo de
  * build). Best-effort: cualquier fallo se registra y devuelve false; nunca lanza. Config por env:
  * SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS (para Gmail: smtp.gmail.com:465 secure=true).
+ *
+ * SOLO NODE: abre un socket TCP. En Cloudflare Workers no existe esta ruta (ver `createHttpEmailService`).
  */
 export class SmtpEmailAdapter implements IEmailService {
   readonly configured = true;
@@ -81,48 +44,6 @@ export class SmtpEmailAdapter implements IEmailService {
       return false;
     }
   }
-}
-
-/**
- * Envío por Brevo (M74) vía su API HTTP (puerto 443 → funciona en PaaS que bloquean SMTP como Railway).
- * Gratis (300/día) y sin dominio: basta verificar UN remitente en Brevo. Best-effort: nunca lanza, devuelve
- * false si falla. `from` es "Nombre <email>"; el email DEBE ser un remitente verificado en la cuenta Brevo.
- */
-export class BrevoEmailAdapter implements IEmailService {
-  readonly configured = true;
-  private readonly sender: { email: string; name: string };
-  constructor(
-    private readonly apiKey: string,
-    from: string,
-  ) {
-    this.sender = parseFrom(from);
-  }
-
-  async send(msg: EmailMessage): Promise<boolean> {
-    try {
-      const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: { 'api-key': this.apiKey, 'content-type': 'application/json', accept: 'application/json' },
-        body: JSON.stringify({ sender: this.sender, to: [{ email: msg.to }], subject: msg.subject, htmlContent: msg.html, textContent: msg.text }),
-        signal: AbortSignal.timeout(10_000),
-      });
-      if (!res.ok) {
-        console.error(`[email:brevo] fallo ${res.status} enviando a ${msg.to}`);
-        return false;
-      }
-      return true;
-    } catch (e) {
-      console.error('[email:brevo] error de red:', e instanceof Error ? e.message : String(e));
-      return false;
-    }
-  }
-}
-
-/** Parsea "Nombre <email@dominio>" → { name, email }; si no lleva nombre, usa "AgentFlow". */
-function parseFrom(raw: string): { email: string; name: string } {
-  const m = raw.match(/^\s*(.*?)\s*<([^>]+)>\s*$/);
-  if (m) return { name: (m[1] || 'AgentFlow').replace(/^"|"$/g, ''), email: m[2].trim() };
-  return { name: 'AgentFlow', email: raw.trim() };
 }
 
 /**
