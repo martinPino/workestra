@@ -1,8 +1,8 @@
 import { Body, Controller, Delete, Get, Inject, Param, Post, Req, Res } from '@nestjs/common';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { setCurrentWorkspace } from '@core/infra';
+import { setCurrentWorkspace } from '@core/infra/postgres';
 import { Public } from '../auth/public.decorator';
-import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
+import { PERSISTENCE, type PersistenceBundle } from '../persistence/bundle';
 import { resolveApiKey, type ApiKeyPrincipal } from '../api-keys/api-key.util';
 import { McpService } from './mcp.service';
 

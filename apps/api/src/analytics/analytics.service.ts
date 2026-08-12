@@ -8,8 +8,8 @@ import {
   type EventName,
   type StoredAnalyticsEvent,
 } from '@core/contracts';
-import { runInSystemMode } from '@core/infra';
-import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
+import { runInSystemMode } from '@core/infra/postgres';
+import { PERSISTENCE, type PersistenceBundle } from '../persistence/bundle';
 
 export const ANALYTICS_SINK = Symbol('ANALYTICS_SINK');
 

@@ -18,8 +18,8 @@ import {
   type JiraProject,
 } from '@core/sdk-plugins';
 import type { TriggerBindingRecord } from '@core/engine';
-import { setCurrentWorkspace } from '@core/infra';
-import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
+import { setCurrentWorkspace } from '@core/infra/postgres';
+import { PERSISTENCE, type PersistenceBundle } from '../persistence/bundle';
 import { assertInWorkspace } from '../tenant/tenant.util';
 import { ExecutionsService } from '../execution/executions.service';
 

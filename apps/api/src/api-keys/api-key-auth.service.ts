@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '../http/common';
 import type { IApiKeyRepository, ApiKeyRecord } from '@core/engine';
-import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
+import { PERSISTENCE, type PersistenceBundle } from '../persistence/bundle';
 import { generateRawKey, hashKey, type ApiKeyPrincipal } from './api-key.util';
 
 /** Vista pública de una clave (sin hash ni clave en claro): para listarlas en la UI. */

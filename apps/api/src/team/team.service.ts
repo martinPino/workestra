@@ -1,9 +1,9 @@
 import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '../http/common';
 import { createHash, randomBytes } from 'node:crypto';
 import type { InviteMemberDto, UpdateMemberDto, AcceptInviteDto, Role } from '@core/contracts';
-import { hashPassword } from '@core/infra';
+import { hashPassword } from '@core/infra/postgres';
 import type { TeamMember, AuthAccount } from '@core/engine';
-import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
+import { PERSISTENCE, type PersistenceBundle } from '../persistence/bundle';
 import { AuthService, type SessionResult } from '../auth/auth.service';
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 días

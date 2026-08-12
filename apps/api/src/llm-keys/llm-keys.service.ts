@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Injectable } from '../http/common';
 import type { ISecretStore } from '@core/engine';
-import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
+import { PERSISTENCE, type PersistenceBundle } from '../persistence/bundle';
 
 /** Proveedores para los que un workspace puede aportar SU propia clave (BYOK, M35). */
 export const BYOK_PROVIDERS = ['openai', 'anthropic', 'openrouter', 'groq'] as const;

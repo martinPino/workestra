@@ -10,9 +10,9 @@ import type {
   WorkflowGraph,
 } from '@core/contracts';
 import { sanitizeWorkflowForShare } from '@core/sdk-plugins';
-import { runInSystemMode } from '@core/infra';
+import { runInSystemMode } from '@core/infra/postgres';
 import type { ShareRecord } from '@core/engine';
-import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
+import { PERSISTENCE, type PersistenceBundle } from '../persistence/bundle';
 import { assertInWorkspace } from '../tenant/tenant.util';
 
 /**

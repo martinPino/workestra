@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import type { JwtPayload } from '../auth/auth.service';
-import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
+import { PERSISTENCE, type PersistenceBundle } from '../persistence/bundle';
 
 /**
  * Administrador de PLATAFORMA (M84): quien puede ver la analítica cruzando TODOS los workspaces.

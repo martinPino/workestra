@@ -1,6 +1,6 @@
 import { Injectable, Inject, NotFoundException, BadRequestException } from '../http/common';
 import type { PendingReviewRecord } from '@core/engine';
-import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
+import { PERSISTENCE, type PersistenceBundle } from '../persistence/bundle';
 import { ExecutionsService } from './executions.service';
 import { ExecutionEventHub } from './execution-event-hub';
 

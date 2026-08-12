@@ -1,8 +1,8 @@
 import { Injectable, Inject, NotFoundException, BadRequestException } from '../http/common';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { WebhookRecord } from '@core/engine';
-import { setCurrentWorkspace } from '@core/infra';
-import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
+import { setCurrentWorkspace } from '@core/infra/postgres';
+import { PERSISTENCE, type PersistenceBundle } from '../persistence/bundle';
 import { assertInWorkspace } from '../tenant/tenant.util';
 import { triggerEventOf } from '../workflows/trigger.util';
 import { ExecutionsService } from '../execution/executions.service';

@@ -1,9 +1,9 @@
 import { Injectable, Inject, NotFoundException, BadRequestException } from '../http/common';
 import { type Role, type McpServerRef, McpServerRefSchema, AgentDraftSchema, type AgentDraft, type MemoryScope } from '@core/contracts';
 import { createLlmRouter } from '@core/llm';
-import { McpHttpClient } from '@core/infra';
+import { McpHttpClient } from '@core/infra/postgres';
 import { z } from 'zod';
-import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
+import { PERSISTENCE, type PersistenceBundle } from '../persistence/bundle';
 import { LlmKeysService } from '../llm-keys/llm-keys.service';
 import { extractJsonObject, isRateLimitError } from '../workflows/generate.util';
 import { buildAssistantPreamble } from '../workflows/assistant-context';

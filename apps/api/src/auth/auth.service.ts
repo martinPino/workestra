@@ -2,8 +2,8 @@ import { Inject, Injectable } from '../http/common';
 import { JwtService } from '@nestjs/jwt';
 import type { Role } from '@core/contracts';
 import type { RegisterDto, LoginDto } from '@core/contracts';
-import { hashPassword, verifyPassword } from '@core/infra';
-import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
+import { hashPassword, verifyPassword } from '@core/infra/postgres';
+import { PERSISTENCE, type PersistenceBundle } from '../persistence/bundle';
 
 export interface JwtPayload {
   sub: string;

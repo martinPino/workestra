@@ -2,7 +2,7 @@ import { Injectable, Inject, BadRequestException, OnModuleInit } from '../http/c
 import type { Queue } from 'bullmq';
 import type { WorkflowGraph } from '@core/contracts';
 import type { ScheduleRecord, SchedulePoll } from '@core/engine';
-import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
+import { PERSISTENCE, type PersistenceBundle } from '../persistence/bundle';
 import { assertInWorkspace } from '../tenant/tenant.util';
 import { triggerEventOf } from '../workflows/trigger.util';
 import { SCHEDULE_QUEUE } from '../execution/queue';

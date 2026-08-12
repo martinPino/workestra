@@ -2,7 +2,7 @@ import { Injectable, Inject } from '../http/common';
 import { EventEmitter } from 'node:events';
 import type { ExecutionEvent } from '@core/contracts';
 import { EXECUTION_EVENT_SCHEMA_VERSION } from '@core/contracts';
-import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
+import { PERSISTENCE, type PersistenceBundle } from '../persistence/bundle';
 
 /**
  * Hub del stream de eventos: PERSISTE cada evento en el store durable (fuente de verdad del

@@ -1,0 +1,48 @@
+{
+  // API sobre Cloudflare Workers. Fase 3 de docs/CLOUDFLARE.md.
+  //
+  // ⚠️ EL PORT ESTÁ INCOMPLETO: solo /agents está portado; el resto responde 501. Esta config existe
+  // para `wrangler dev` y para desplegar a un subdominio de pruebas contra la MISMA base de datos
+  // (paso 2 del orden de corte), NO para servir producción. Por eso no hay workflow de deploy.
+  "$schema": "https://developers.cloudflare.com/schemas/wrangler.json",
+  "name": "workestra-api",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-08-01",
+
+  // `nodejs_compat` da node:crypto (scrypt, AES-GCM), node:async_hooks (el contexto de tenant que usa
+  // la barrera RLS) y puebla process.env desde vars y secrets — que es lo que permite que
+  // createLlmRouter() y compañía sigan leyendo su configuración sin cambios.
+  "compatibility_flags": ["nodejs_compat"],
+
+  "observability": { "enabled": true },
+
+  // Pool de Postgres del lado de Cloudflare. El id sale de `wrangler hyperdrive create`; apunta al
+  // MISMO Postgres que usa Railway, que es lo que hace posible la convivencia.
+  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "<pendiente: wrangler hyperdrive create>" }],
+
+  // Ficheros efímeros de ejecución (M48). OJO: la caducidad de 48 h es una lifecycle rule del bucket,
+  // no código — sin ella el bucket crece para siempre:
+  //   wrangler r2 bucket lifecycle add workestra-files --prefix file/ --expire-days 2
+  "r2_buckets": [{ "binding": "FILES", "bucket_name": "workestra-files" }],
+
+  "durable_objects": {
+    "bindings": [
+      { "name": "EXECUTION_ROOM", "class_name": "ExecutionRoom" },
+      { "name": "WORKSPACE_USAGE", "class_name": "WorkspaceUsage" }
+    ]
+  },
+
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["ExecutionRoom", "WorkspaceUsage"]
+    }
+  ]
+
+  // Secretos (`wrangler secret put`, NUNCA aquí): JWT_SECRET, KMS_MASTER_KEY, BREVO_API_KEY o
+  // RESEND_API_KEY, y los *_CLIENT_SECRET de Slack/Jira/GitHub.
+  //
+  // KMS_MASTER_KEY debe ser EXACTAMENTE el mismo valor que en Railway: cifra los tokens de conectores
+  // con AES-GCM, y con otro valor quedan indescifrables y todo el mundo tiene que reconectar sus
+  // integraciones. Es el único dato de la migración que no se puede regenerar.
+}

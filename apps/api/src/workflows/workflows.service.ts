@@ -2,7 +2,7 @@ import { Injectable, Inject, BadRequestException } from '../http/common';
 import { WorkflowGraphSchema, type WorkflowGraph } from '@core/contracts';
 import { validateDag } from '@core/domain';
 import { createLlmRouter } from '@core/llm';
-import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
+import { PERSISTENCE, type PersistenceBundle } from '../persistence/bundle';
 import { assertInWorkspace } from '../tenant/tenant.util';
 import { TriggersService } from '../triggers/triggers.service';
 import { SchedulesService } from '../schedules/schedules.service';

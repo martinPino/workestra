@@ -95,27 +95,27 @@ Dos consecuencias de diseño, no negociables:
 |---|---|
 | 1 — `web` a Workers Assets | **Hecha.** Falta crear el proyecto en Cloudflare y fijar `VITE_API_URL` |
 | 2 — Adaptadores en `@core/infra` | **Hecha.** Con tests contra bindings falsos |
-| 3 — `api` a Hono sobre Workers | **A medias.** Base puesta; falta el port de rutas (detalle abajo) |
+| 3 — `api` a Hono sobre Workers | **A medias.** Worker empaqueta y arranca; falta portar 13 de 14 routers |
 | 4 — Ejecución a Workflows | Sin empezar |
 | 5 — `code`/`browser`/OCR a Containers | Sin empezar |
 
-Lo que falta de la fase 3, en orden de dependencia:
+Lo que falta de la fase 3:
 
-1. **Middleware de auth** — port de `JwtAuthGuard` sobre `http/jwt.ts`. Debe conservar las dos
-   credenciales (JWT y API key `af_…`), el rechazo de tokens con `kind`, la revalidación de cuenta
-   cerrada con cache de 10 s y el *fail-open* si la BD falla. Es la pieza más delicada de todo el
-   port: es la única que decide quién entra.
-2. **Middleware de scopes** — port de `ScopesGuard`. Los scopes dejan de ser metadatos de decorador y
-   pasan a declararse en la tabla de rutas.
-3. **`AuthService`** — cambiar `@nestjs/jwt` por `signJwt`/`verifyJwt`. `verify` pasa a ser `async`.
-4. **Servicios** — cambiar el import de `@nestjs/common` por `../http/errors` en los 23 ficheros.
-   Mecánico: los nombres de las excepciones y los decoradores no-op ya coinciden.
-5. **Rutas** — 14 controllers a routers de Hono. Son delegación fina, el riesgo está en no perder
-   ningún `@RequireScopes` por el camino.
-6. **`worker.ts` + `wrangler.jsonc`** — entry, bindings y `onError` que traduce `HttpError`.
-7. **`apps/web`** — `socket.io-client` por `WebSocket` nativo contra el DO.
-8. **Tests** — mover los de `apps/api` y `@core/infra` a `@cloudflare/vitest-pool-workers`. Hasta
-   entonces, verde en `vitest` sobre Node NO es evidencia de que el Worker arranque.
+1. **Rutas** — 13 controllers a routers de Hono; `/agents` ya está y sirve de patrón. Son delegación
+   fina: el riesgo no es la lógica, es perder un `@RequireScopes` por el camino (no rompe ningún test
+   y abre una escritura a VIEWER) o invertir el orden entre una ruta literal y una paramétrica.
+2. **`AuthService`** — cambiar `@nestjs/jwt` por `signJwt`/`verifyJwt`. `verify` pasa a ser `async`.
+3. **`apps/web`** — `socket.io-client` por `WebSocket` nativo contra `/executions/:id/stream`.
+4. **Tests** — mover los de `apps/api` y `@core/infra` a `@cloudflare/vitest-pool-workers`.
+
+Sobre el punto 4, la lección ya llegó: `pnpm verify` daba verde mientras el Worker **no empaquetaba**,
+porque los servicios importaban `PERSISTENCE` desde `persistence.module.ts` y eso arrastraba NestJS
+entero al bundle. Lo cazó `wrangler deploy --dry-run`, no el typecheck ni los tests. Es el mismo
+patrón que `CLAUDE.md` documenta para el contenedor DI, y hasta que los tests corran en `workerd` el
+dry-run es la única red: **conviene tenerlo en CI antes de portar más rutas**.
+
+Estado del bundle tras arreglarlo: **1,01 MB gzip** de los 10 MB de techo, con el query engine WASM de
+Prisma dentro y sin rastro de `@nestjs`, `nodemailer`, `ioredis` ni `bullmq`.
 
 ## Fases
 

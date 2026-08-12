@@ -1,7 +1,7 @@
 import type { IAgentRepository, IMemoryStore, IPendingReviewRepository, IConnectorRepository, ISecretStore, IFileStore } from '@core/engine';
 import { createRuntimeRegistry, type NodeExecutorRegistry } from '@core/sdk-plugins';
 import { createLlmRouter } from '@core/llm';
-import { McpToolResolver } from '@core/infra';
+import { McpToolResolver } from '@core/infra/postgres';
 
 export const NODE_REGISTRY = Symbol('NODE_REGISTRY');
 

@@ -1,10 +1,10 @@
 import { CanActivate, ExecutionContext, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Role } from '@core/contracts';
-import { setCurrentWorkspace } from '@core/infra';
+import { setCurrentWorkspace } from '@core/infra/postgres';
 import { AuthService } from './auth.service';
 import { IS_PUBLIC_KEY } from './public.decorator';
-import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
+import { PERSISTENCE, type PersistenceBundle } from '../persistence/bundle';
 import { isApiKey, resolveApiKey } from '../api-keys/api-key.util';
 
 // Estado autoritativo de la cuenta, cacheado brevemente para no consultar la BD en CADA petición (M74).

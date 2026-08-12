@@ -12,7 +12,7 @@ import type { Server, Socket } from 'socket.io';
 import type { ExecutionEvent } from '@core/contracts';
 import { ExecutionEventHub } from './execution-event-hub';
 import { AuthService } from '../auth/auth.service';
-import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
+import { PERSISTENCE, type PersistenceBundle } from '../persistence/bundle';
 
 const room = (executionId: string) => `exec:${executionId}`;
 

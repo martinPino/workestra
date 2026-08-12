@@ -3,8 +3,8 @@ import { JwtService } from '@nestjs/jwt';
 import { randomBytes, createHash } from 'node:crypto';
 import type { ConnectorRecord } from '@core/engine';
 import { getConnectorProvider, providerEnvKeys, tokenBlobFromResponse, serializeTokenBlob, resolveConnectorToken, listDriveFolders, listSlackChannels, listSentryProjects, listGithubRepos, exchangeSentryAppCode } from '@core/sdk-plugins';
-import { setCurrentWorkspace } from '@core/infra';
-import { PERSISTENCE, type PersistenceBundle } from '../persistence/persistence.module';
+import { setCurrentWorkspace } from '@core/infra/postgres';
+import { PERSISTENCE, type PersistenceBundle } from '../persistence/bundle';
 import { assertInWorkspace } from '../tenant/tenant.util';
 
 interface OAuthState {
