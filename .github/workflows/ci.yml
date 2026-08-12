@@ -43,6 +43,13 @@ jobs:
       - name: Test
         run: pnpm test
 
+      # `pnpm verify` NO empaqueta para workerd, así que un import que arrastre NestJS, nodemailer o
+      # cualquier módulo de Node al Worker pasa verify en verde y solo falla al desplegar. Ya ocurrió
+      # una vez (ver docs/CLOUDFLARE.md). El dry-run es la única red hasta que los tests corran en
+      # workerd; no necesita credenciales.
+      - name: Cloudflare Worker bundles (dry-run)
+        run: pnpm --filter @app/api exec wrangler deploy --dry-run --outdir /tmp/worker-bundle
+
   contract-semver-gate:
     runs-on: ubuntu-latest
     steps:
