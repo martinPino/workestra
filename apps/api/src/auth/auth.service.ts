@@ -1,16 +1,12 @@
 import { Inject, Injectable } from '../http/common';
-import { JwtService } from '@nestjs/jwt';
 import type { Role } from '@core/contracts';
 import type { RegisterDto, LoginDto } from '@core/contracts';
 import { hashPassword, verifyPassword } from '@core/infra/postgres';
 import { PERSISTENCE, type PersistenceBundle } from '../persistence/bundle';
 
-export interface JwtPayload {
-  sub: string;
-  email: string;
-  role: Role;
-  workspaceId: string;
-}
+import type { TokenSigner } from './token-signer';
+import type { JwtPayload } from '../http/jwt';
+export type { JwtPayload };
 
 /** Perfil de sesión que ve el cliente (sin el hash de contraseña). */
 export interface SessionUser {
@@ -41,22 +37,23 @@ export class AccountDisabledError extends Error {
 }
 
 // El token de SESIÓN vive más que el de dev (1h) para no obligar a re-login cada hora sin tabla de refresh.
-const SESSION_TTL = '7d';
+const SESSION_TTL_SECONDS = 7 * 24 * 3600;
+const DEV_TTL_SECONDS = 3600;
 
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly jwt: JwtService,
+    private readonly jwt: TokenSigner,
     @Inject(PERSISTENCE) private readonly persistence: PersistenceBundle,
   ) {}
 
   /** DEV ONLY: emite un token de pruebas para cualquier workspace/rol. Gateado en el controller. */
-  issueDevToken(p: JwtPayload): string {
-    return this.jwt.sign(p);
+  issueDevToken(p: JwtPayload): Promise<string> {
+    return this.jwt.sign(p, DEV_TTL_SECONDS);
   }
 
-  verify(token: string): JwtPayload {
-    return this.jwt.verify<JwtPayload>(token);
+  verify(token: string): Promise<JwtPayload> {
+    return this.jwt.verify(token);
   }
 
   /**
@@ -98,9 +95,9 @@ export class AuthService {
   }
 
   /** Firma un JWT de sesión (7d) para una cuenta ya resuelta. Lo usan login, registro y aceptar invitación. */
-  issueSession(account: { id: string; email: string; name: string; role: Role; workspaceId: string }): SessionResult {
+  async issueSession(account: { id: string; email: string; name: string; role: Role; workspaceId: string }): Promise<SessionResult> {
     const payload: JwtPayload = { sub: account.id, email: account.email, role: account.role, workspaceId: account.workspaceId };
-    const accessToken = this.jwt.sign(payload, { expiresIn: SESSION_TTL });
+    const accessToken = await this.jwt.sign(payload, SESSION_TTL_SECONDS);
     return { accessToken, user: { id: account.id, email: account.email, name: account.name, role: account.role, workspaceId: account.workspaceId } };
   }
 }

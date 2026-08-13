@@ -1,9 +1,7 @@
 {
   // API sobre Cloudflare Workers. Fase 3 de docs/CLOUDFLARE.md.
   //
-  // ⚠️ EL PORT ESTÁ INCOMPLETO: solo /agents está portado; el resto responde 501. Esta config existe
-  // para `wrangler dev` y para desplegar a un subdominio de pruebas contra la MISMA base de datos
-  // (paso 2 del orden de corte), NO para servir producción. Por eso no hay workflow de deploy.
+  // Portado todo el API salvo /mcp y /analytics, que responden 501 (ver worker.ts).
   "$schema": "https://developers.cloudflare.com/schemas/wrangler.json",
   "name": "workestra-api",
   "main": "src/worker.ts",
@@ -48,7 +46,16 @@
       "tag": "v1",
       "new_sqlite_classes": ["ExecutionRoom", "WorkspaceUsage"]
     }
-  ]
+  ],
+
+  // Ejecución durable: una instancia por ejecución, con el executionId como id (dedupe). Sustituye a
+  // la cola `execution` de BullMQ y al proceso apps/worker.
+  "workflows": [{ "binding": "EXECUTION", "name": "execution", "class_name": "ExecutionWorkflow" }],
+
+  // Disparo de los triggers programados. Cada minuto porque los patrones cron son POR SCHEDULE y viven
+  // en la base de datos; Cloudflare solo admite crons fijos aquí, así que el tick es minutal y `dueNow`
+  // decide a quién le toca. Sustituye a los repeatable jobs de BullMQ.
+  "triggers": { "crons": ["* * * * *"] }
 
   // Secretos (`wrangler secret put`, NUNCA aquí): JWT_SECRET, KMS_MASTER_KEY, BREVO_API_KEY o
   // RESEND_API_KEY, y los *_CLIENT_SECRET de Slack/Jira/GitHub.

@@ -3,7 +3,7 @@ import type { Queue } from 'bullmq';
 import type { ScheduleRecord, SchedulePoll } from '@core/engine';
 import type { WorkflowGraph } from '@core/contracts';
 import { SchedulesService, isValidCron } from './schedules.service';
-import type { PersistenceBundle } from '../persistence/persistence.module';
+import type { PersistenceBundle } from '../persistence/bundle';
 
 describe('isValidCron (M7-B, validación con rangos)', () => {
   it('acepta patrones válidos', () => {
@@ -42,7 +42,7 @@ const driveGraph = (extra: Record<string, unknown> = {}) => graphWith({ event: '
 const manualGraph = () => graphWith({ event: 'manual', eventId: 'manual' });
 
 /** SchedulesService con persistencia en memoria (schedules mutables) + cola falsa (o null para simular inline). */
-function makeSvc(opts: { connectors?: Conn[]; initial?: ScheduleRecord[]; withQueue?: boolean } = {}) {
+function makeSvc(opts: { connectors?: Conn[]; initial?: ScheduleRecord[] } = {}) {
   const rows: ScheduleRecord[] = [...(opts.initial ?? [])];
   let seq = rows.length;
   const p = {
@@ -63,7 +63,7 @@ function makeSvc(opts: { connectors?: Conn[]; initial?: ScheduleRecord[]; withQu
     },
   } as unknown as PersistenceBundle;
   const queue = opts.withQueue === false ? null : ({ upsertJobScheduler: async () => undefined, removeJobScheduler: async () => undefined } as unknown as Queue);
-  return { svc: new SchedulesService(p, queue), rows };
+  return { svc: new SchedulesService(p), rows };
 }
 
 const drivePoll = (over: Partial<ScheduleRecord> = {}): ScheduleRecord => ({
@@ -127,9 +127,12 @@ describe('SchedulesService.reconcileFromGraph (M53)', () => {
     expect(rows).toHaveLength(0);
   });
 
-  it('con DISPATCH inline (sin cola) no toca nada ni rompe el publish', async () => {
-    const { svc, rows } = makeSvc({ connectors: [{ id: 'c1', provider: 'google-drive', status: 'connected' }], withQueue: false });
+  it('reconcilia sin depender de una cola: el disparo lo hace el Cron Trigger', async () => {
+    // Antes esto comprobaba lo contrario — «sin BullMQ no reconcilies»— porque el sondeo necesitaba un
+    // worker que consumiera la cola. Con el Cron Trigger la fila del schedule ES el registro, así que
+    // reconciliar siempre es correcto y ya no hay un modo en el que publicar deje el sondeo sin crear.
+    const { svc, rows } = makeSvc({ connectors: [{ id: 'c1', provider: 'google-drive', status: 'connected' }] });
     await expect(svc.reconcileFromGraph('wf1', 'ws', driveGraph())).resolves.toBeUndefined();
-    expect(rows).toHaveLength(0);
+    expect(rows.filter((r) => r.poll?.provider === 'google-drive')).toHaveLength(1);
   });
 });

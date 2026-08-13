@@ -1,11 +1,9 @@
 import { Injectable, Inject, BadRequestException, OnModuleInit } from '../http/common';
-import type { Queue } from 'bullmq';
 import type { WorkflowGraph } from '@core/contracts';
 import type { ScheduleRecord, SchedulePoll } from '@core/engine';
 import { PERSISTENCE, type PersistenceBundle } from '../persistence/bundle';
 import { assertInWorkspace } from '../tenant/tenant.util';
 import { triggerEventOf } from '../workflows/trigger.util';
-import { SCHEDULE_QUEUE } from '../execution/queue';
 
 // Valida UN campo cron (comodín, paso "/n", número "a", rango "a-b" o listas con ",") en [min,max].
 function cronFieldValid(field: string, min: number, max: number): boolean {
@@ -50,40 +48,20 @@ export interface CreateScheduleInput {
 }
 
 /**
- * Triggers programados (M7-B). Persiste el registro y planifica un JOB SCHEDULER de BullMQ
- * (cron `pattern` o intervalo `every`) cuyo `schedulerId` es el id del schedule. El worker consume
- * cada disparo y arranca una ejecución. Requiere `DISPATCH=queue` (necesita BullMQ). Al arrancar
- * RE-REGISTRA los schedules activos desde la BD (fuente de verdad) por si Redis se vació.
+ * Triggers programados (M7-B). Persiste el registro; el disparo lo hace un Cron Trigger del Worker que
+ * cada minuto lee `schedules.listActive()` y ejecuta los que tocan.
+ *
+ * Con BullMQ había DOS fuentes de verdad —la fila en Postgres y el job scheduler en Redis— y todo el
+ * cuidado de este servicio era mantenerlas sincronizadas: re-registrar al arrancar por si Redis se
+ * había vaciado, borrar el scheduler antes que la fila para no dejar un zombie disparando sin
+ * registro. Con el Cron Trigger la fila ES el registro, así que esa clase entera de desincronización
+ * deja de existir.
  */
 @Injectable()
-export class SchedulesService implements OnModuleInit {
-  constructor(
-    @Inject(PERSISTENCE) private readonly p: PersistenceBundle,
-    @Inject(SCHEDULE_QUEUE) private readonly queue: Queue | null,
-  ) {}
-
-  async onModuleInit(): Promise<void> {
-    if (!this.queue) return;
-    const active = await this.p.schedules.listActive();
-    for (const s of active) await this.registerRepeatable(s);
-  }
-
-  private repeatOpts(s: { cron: string | null; everyMs: number | null }): { pattern: string } | { every: number } {
-    return s.cron ? { pattern: s.cron } : { every: s.everyMs as number };
-  }
-
-  private async registerRepeatable(s: ScheduleRecord): Promise<void> {
-    if (!this.queue) return;
-    await this.queue.upsertJobScheduler(s.id, this.repeatOpts(s), {
-      name: 'fire',
-      data: { scheduleId: s.id, workflowId: s.workflowId, workspaceId: s.workspaceId },
-    });
-  }
+export class SchedulesService {
+  constructor(@Inject(PERSISTENCE) private readonly p: PersistenceBundle) {}
 
   async create(workflowId: string, workspaceId: string, input: CreateScheduleInput): Promise<ScheduleRecord> {
-    if (!this.queue) {
-      throw new BadRequestException('Los triggers programados requieren DISPATCH=queue (BullMQ).');
-    }
     const hasCron = typeof input.cron === 'string' && input.cron.trim().length > 0;
     const hasEvery = typeof input.everyMs === 'number' && input.everyMs > 0;
     if (hasCron === hasEvery) {
@@ -122,14 +100,9 @@ export class SchedulesService implements OnModuleInit {
       everyMs: hasEvery ? (input.everyMs as number) : null,
       poll: input.poll ?? null,
     });
-    // Atomicidad (saga): si registrar el repeatable falla, COMPENSA borrando el registro para no
-    // dejar una fila huérfana que `onModuleInit` resucitaría en un reinicio (disparo fantasma).
-    try {
-      await this.registerRepeatable(record);
-    } catch (err) {
-      await this.p.schedules.delete(record.id).catch(() => undefined);
-      throw err;
-    }
+    // La saga de compensación que había aquí (si falla registrar el repeatable, borra la fila para no
+    // dejar una huérfana que resucitaría al reiniciar) ya no hace falta: no hay segundo registro que
+    // pueda fallar. Persistir la fila ES registrar el schedule.
     return record;
   }
 
@@ -143,15 +116,10 @@ export class SchedulesService implements OnModuleInit {
    * (cambiar el disparador desactiva el sondeo).
    *
    * Idempotente: borra-y-recrea, de modo que publicar dos veces no duplica filas. Best-effort y BLINDADO:
-   * NUNCA rompe la publicación — si no hay cola (DISPATCH!=queue, donde `create` lanza) o algo falla, avisa y
-   * vuelve; publicar debe poder completarse siempre (en dev el editor mantiene el botón manual como respaldo).
+   * NUNCA rompe la publicación — si algo falla, avisa y vuelve; publicar debe poder completarse siempre
+   * (el editor mantiene el botón manual como respaldo).
    */
   async reconcileFromGraph(workflowId: string, workspaceId: string, graph: WorkflowGraph): Promise<void> {
-    // Sin BullMQ no hay worker que sondee y `create` lanzaría: saltamos SIN tocar nada para no romper el publish.
-    if (!this.queue) {
-      console.warn(`[schedule] reconcile ${workflowId}: DISPATCH!=queue; no reconcilio el sondeo de Drive.`);
-      return;
-    }
     try {
       const trigger = graph?.nodes.find((n) => n.type === 'trigger');
       const cfg = (trigger?.config ?? {}) as Record<string, unknown>;
@@ -211,10 +179,8 @@ export class SchedulesService implements OnModuleInit {
     const s = await this.p.schedules.get(id);
     if (!s) return;
     assertInWorkspace(s.workspaceId, workspaceId, 'Schedule');
-    // Quita el scheduler PRIMERO. NO tragamos el error: si Redis falla, propagamos y NO borramos la
-    // fila, de modo que el schedule sigue siendo rastreable y borrable (evita un zombie en Redis que
-    // dispararía para siempre sin registro). `removeJobScheduler` devuelve false si no existe (no lanza).
-    if (this.queue) await this.queue.removeJobScheduler(id);
+    // Basta con borrar la fila: el Cron Trigger lee de ahí, así que no queda nada que desregistrar. El
+    // baile de «quita el scheduler primero para no dejar un zombie» se va con BullMQ.
     await this.p.schedules.delete(id);
   }
 }

@@ -1,4 +1,5 @@
 import type { DurableObjectNamespaceLike, HyperdriveLike, R2BucketLike } from '@core/infra/cloudflare';
+import type { WorkflowBindingLike } from '../execution/dispatcher';
 
 /**
  * Bindings y variables del Worker del API. En Workers los recursos NO entran por URL sino por binding:
@@ -18,6 +19,8 @@ export interface Env {
   EXECUTION_ROOM: DurableObjectNamespaceLike;
   /** Un objeto por workspace: contador diario de tokens LLM (M33). */
   WORKSPACE_USAGE: DurableObjectNamespaceLike;
+  /** Ejecución durable: una instancia de Workflow por ejecución. */
+  EXECUTION: WorkflowBindingLike;
 
   /** Firma de las sesiones. Sin valor propio el Worker se niega a arrancar (igual que en Railway). */
   JWT_SECRET?: string;

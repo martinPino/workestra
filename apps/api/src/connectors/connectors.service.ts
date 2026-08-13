@@ -1,5 +1,5 @@
 import { Injectable, Inject, BadRequestException, NotFoundException, Logger } from '../http/common';
-import { JwtService } from '@nestjs/jwt';
+import type { TokenSigner } from '../auth/token-signer';
 import { randomBytes, createHash } from 'node:crypto';
 import type { ConnectorRecord } from '@core/engine';
 import { getConnectorProvider, providerEnvKeys, tokenBlobFromResponse, serializeTokenBlob, resolveConnectorToken, listDriveFolders, listSlackChannels, listSentryProjects, listGithubRepos, exchangeSentryAppCode } from '@core/sdk-plugins';
@@ -51,7 +51,7 @@ export class ConnectorsService {
 
   constructor(
     @Inject(PERSISTENCE) private readonly p: PersistenceBundle,
-    private readonly jwt: JwtService,
+    private readonly jwt: TokenSigner,
   ) {}
 
   /** Marca un nonce como usado; devuelve false si ya lo estaba (replay). Purga los caducados. */
@@ -195,9 +195,9 @@ export class ConnectorsService {
     }
     // PKCE (clientes públicos, p. ej. Sentry): el verifier se guarda dentro del state firmado; el challenge va en la URL.
     const pkce = provider.pkce ? pkcePair() : null;
-    const state = this.jwt.sign(
+    const state = await this.jwt.signClaims(
       { cid: id, ws: workspaceId, kind: 'oauth_state', jti: randomBytes(12).toString('hex'), ...(pkce ? { cv: pkce.verifier } : {}) } satisfies OAuthState,
-      { expiresIn: '5m' },
+      300, // 5 min: el state solo tiene que sobrevivir a la ida y vuelta al proveedor
     );
     const { clientId } = this.creds(provider.provider);
     const params = new URLSearchParams({
@@ -220,7 +220,7 @@ export class ConnectorsService {
     if (!code || !state) throw new BadRequestException('Faltan code/state.');
     let payload: OAuthState;
     try {
-      payload = this.jwt.verify<OAuthState>(state);
+      payload = (await this.jwt.verifyClaims(state)) as unknown as OAuthState;
     } catch {
       throw new BadRequestException('state inválido o expirado.');
     }

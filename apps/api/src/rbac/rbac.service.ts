@@ -2,6 +2,10 @@ import { Injectable, ForbiddenException } from '../http/common';
 import type { Role } from '@core/contracts';
 import { can } from './rbac.policy';
 
+/**
+ * Política RBAC como servicio. Lo usa el runtime MCP para autorizar tools; las rutas HTTP la aplican
+ * con el middleware `requireScopes`. Los dos evalúan la MISMA función `can()` de `@core/contracts`.
+ */
 @Injectable()
 export class RbacService {
   can(role: Role, scope: string): boolean {

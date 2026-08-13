@@ -4,7 +4,7 @@ import { CreateShareRequestSchema, type Agent, type WorkflowGraph } from '@core/
 import { sanitizeWorkflowForShare } from '@core/sdk-plugins';
 import type { IShareRepository, ShareRecord } from '@core/engine';
 import { SharesService } from './shares.service';
-import type { PersistenceBundle } from '../persistence/persistence.module';
+import type { PersistenceBundle } from '../persistence/bundle';
 
 /**
  * Fakes in-memory (estilo team.service.test.ts) para los TRES puertos que toca el servicio: shares, workflows

@@ -3,13 +3,14 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "AgentFlow web: editor visual (React Flow), consola de ejecución, marketplace.",
+  "description": "AgentFlow web: editor visual (React Flow), consola de ejecuci\u00f3n, marketplace.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "deploy": "wrangler deploy"
   },
   "dependencies": {
     "@core/contracts": "workspace:*",
@@ -23,7 +24,6 @@
     "react-router-dom": "^6.28.0",
     "reactflow": "^11.11.4",
     "simple-icons": "^16.25.0",
-    "socket.io-client": "^4.8.1",
     "zustand": "^5.0.2"
   },
   "devDependencies": {

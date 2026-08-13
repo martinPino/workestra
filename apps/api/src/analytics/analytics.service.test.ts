@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ANALYTICS_SCHEMA_VERSION, type AnalyticsSink, type StoredAnalyticsEvent } from '@core/contracts';
 import { AnalyticsService, analyticsEnabled } from './analytics.service';
-import { PlatformAdminService, parseAllowlist } from './platform-admin.guard';
+import { PlatformAdminService, parseAllowlist } from './platform-admin';
 
 /** Sumidero de juguete que se queda con lo escrito para poder mirarlo. */
 function fakeSink() {

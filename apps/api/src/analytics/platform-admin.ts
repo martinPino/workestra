@@ -1,5 +1,5 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import type { JwtPayload } from '../auth/auth.service';
+import { Inject, Injectable, Logger, type OnModuleInit } from '../http/common';
+
 import { PERSISTENCE, type PersistenceBundle } from '../persistence/bundle';
 
 /**
@@ -54,22 +54,6 @@ export class PlatformAdminService implements OnModuleInit {
     return !!userId && this.admins.has(userId);
   }
 }
-
-@Injectable()
-export class PlatformAdminGuard implements CanActivate {
-  constructor(private readonly svc: PlatformAdminService) {}
-
-  canActivate(ctx: ExecutionContext): boolean {
-    const req = ctx.switchToHttp().getRequest<{ user?: JwtPayload }>();
-    if (!this.svc.isAdmin(req.user?.sub)) {
-      // Mismo mensaje que un recurso inexistente: a quien no es admin no se le confirma que el panel existe.
-      throw new ForbiddenException('No disponible.');
-    }
-    return true;
-  }
-}
-
-/** Normaliza la variable de entorno a correos en minúsculas. Exportada para poder probarla. */
 export function parseAllowlist(raw?: string): string[] {
   return (raw ?? '')
     .split(',')

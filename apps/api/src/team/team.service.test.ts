@@ -1,16 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { JwtService } from '@nestjs/jwt';
+import { WebCryptoTokenSigner } from '../auth/token-signer';
 import { InMemoryIdentityStore, InMemoryAuthRepository, InMemoryTeamRepository, ConsoleEmailAdapter, hashPassword } from '@core/infra';
 import { AuthService, AccountDisabledError } from '../auth/auth.service';
 import { TeamService } from './team.service';
-import type { PersistenceBundle } from '../persistence/persistence.module';
+import type { PersistenceBundle } from '../persistence/bundle';
 
 async function setup() {
   const store = new InMemoryIdentityStore();
   const auth = new InMemoryAuthRepository(store);
   const team = new InMemoryTeamRepository(store);
   const bundle = { auth, team, email: new ConsoleEmailAdapter() } as unknown as PersistenceBundle;
-  const authSvc = new AuthService(new JwtService({ secret: 't' }), bundle);
+  const authSvc = new AuthService(new WebCryptoTokenSigner('t'), bundle);
   const svc = new TeamService(bundle, authSvc);
   const owner = await auth.createAccount({ email: 'owner@t.com', passwordHash: await hashPassword('ownerpass1'), name: 'Owner' });
   // Une a un miembro/administrador vía el flujo real invitar→aceptar; devuelve su userId.

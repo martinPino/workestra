@@ -25,10 +25,9 @@ import type { PrismaClient } from '@core/infra';
 /**
  * El conjunto de adaptadores que necesita el API, con su token de inyección.
  *
- * Vive aparte de `persistence.module.ts` porque ese fichero importa `@nestjs/common` y este contrato lo
- * comparten DOS composition roots: el módulo de Nest (Railway) y `http/composition.ts` (Workers). Es el
- * punto exacto donde se ve que el cambio de plataforma no cambia la aplicación: los dos entornos
- * construyen el mismo bundle con adaptadores distintos.
+ * Es el punto donde se ve que cambiar de plataforma no cambió la aplicación: el mismo contrato lo
+ * satisfacen los adaptadores de Prisma/Redis (Railway) y los de Hyperdrive/R2/Durable Objects, sin que
+ * ningún servicio se entere.
  */
 export const PERSISTENCE = Symbol('PERSISTENCE');
 

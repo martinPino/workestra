@@ -9,13 +9,13 @@ Everything that happens is recorded as an append-only event log that the web con
 ## The lifecycle of an execution
 
 ```
-Web (editor + console)            React Flow · Zustand · React Query
+Web (Cloudflare Workers Assets)   React Flow · Zustand · React Query
         │  publishes workflow / subscribes over WebSocket
         ▼
-API · NestJS                      REST · WS gateway · OIDC/JWT auth · RBAC · multitenancy
+API · Cloudflare Worker (Hono)    REST · JWT auth · RBAC · multitenancy
         │  dispatch
-        ├─ inline  ──────────────┐   (engine runs inside the API; dev/demo)
-        └─ queue → durable Worker ┤   (BullMQ; separate worker, resume-safe)
+        ├─ inline  ──────────────┐   (engine runs in the invocation; wrangler dev)
+        └─ Cloudflare Workflows ─┤   (durable, resume-safe, wall-clock ilimitado por step)
                                   ▼
 Engine · WorkflowRunner           DAG scheduler · retries · timeouts · fan-out/fan-in
         │  runs nodes (plugins)
@@ -23,9 +23,9 @@ Engine · WorkflowRunner           DAG scheduler · retries · timeouts · fan-o
 Nodes: agent · orchestrator · tools/MCP · connector · human · router · code · extract · download
         │  persists + emits events
         ▼
-Postgres (event log · versions · NodeRun)   +   Redis (context/checkpoint · pub/sub)
-        │
-        └─ events ──▶ Redis pub/sub ──▶ WS gateway ──▶ Web (nodes light up live)
+Postgres vía Hyperdrive (event log · versions · NodeRun)  +  Durable Object (context · pub/sub)
+        │                                                  +  R2 (ficheros efímeros)
+        └─ events ──▶ Durable Object ──▶ WebSocket ──▶ Web (nodes light up live)
 ```
 
 1. **Web** — The editor (React Flow) builds the graph and publishes it; the console subscribes

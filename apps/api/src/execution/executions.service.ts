@@ -1,5 +1,4 @@
 import { Injectable, Inject, NotFoundException, BadRequestException } from '../http/common';
-import type { Queue } from 'bullmq';
 import { emptyContext, type ExecutionStatus, type TriggerType } from '@core/contracts';
 import { validateDag } from '@core/domain';
 import { WorkflowRunner, type RunInput } from '@core/engine';
@@ -8,7 +7,7 @@ import type { NodeExecutorRegistry } from '@core/sdk-plugins';
 import { PERSISTENCE, type PersistenceBundle } from '../persistence/bundle';
 import { assertInWorkspace } from '../tenant/tenant.util';
 import { NODE_REGISTRY } from './node-registry';
-import { EXECUTION_QUEUE } from './queue';
+import { EXECUTION_QUEUE, type ExecutionDispatcher } from './dispatcher-token';
 import { ExecutionEventHub } from './execution-event-hub';
 
 const VALID_STATUSES: ExecutionStatus[] = ['QUEUED', 'RUNNING', 'PAUSED', 'WAITING_HUMAN', 'SUCCEEDED', 'FAILED', 'CANCELLED'];
@@ -21,7 +20,7 @@ export class ExecutionsService {
   constructor(
     @Inject(PERSISTENCE) private readonly p: PersistenceBundle,
     @Inject(NODE_REGISTRY) private readonly registry: NodeExecutorRegistry,
-    @Inject(EXECUTION_QUEUE) private readonly queue: Queue | null,
+    @Inject(EXECUTION_QUEUE) private readonly queue: ExecutionDispatcher | null,
     private readonly hub: ExecutionEventHub,
   ) {}
 
@@ -84,15 +83,9 @@ export class ExecutionsService {
     };
 
     if (this.queue) {
-      // Despacho DURABLE: la ejecución se encola en BullMQ (jobId = executionId para dedupe). El
-      // worker la procesa; si cae, BullMQ la reintenta y el runner reanuda desde el último nodo.
-      await this.queue.add('run', input, {
-        jobId: execution.id,
-        attempts: 5,
-        backoff: { type: 'fixed', delay: 400 },
-        removeOnComplete: 200,
-        removeOnFail: 200,
-      });
+      // Despacho DURABLE: una instancia de Workflow por ejecución, con el executionId como id (dedupe).
+      // Si el Worker cae a mitad, Workflows retoma desde el último step cerrado.
+      await this.queue.dispatch(execution.id, input);
       return { executionId: execution.id, status: 'QUEUED' as const, versionId: runVersion.id, version: runVersion.version };
     }
 
@@ -103,8 +96,18 @@ export class ExecutionsService {
   }
 
   /** Arranca el runner en el proceso de la API (background). El stream ya emite éxito/fallo. */
-  private runInline(input: RunInput): void {
-    const runner = new WorkflowRunner({
+  /**
+   * Ejecuta hasta el final y ESPERA. Es lo que invoca el `ExecutionWorkflow`: allí sí hay que aguardar
+   * —el step no puede cerrarse antes que el trabajo— mientras que `runInline` es fire-and-forget porque
+   * responde dentro de una petición HTTP.
+   */
+  async runToCompletion(input: RunInput): Promise<{ executionId: string; status: string }> {
+    await this.newRunner().run(input);
+    return { executionId: input.executionId ?? '', status: 'FINISHED' };
+  }
+
+  private newRunner(): WorkflowRunner {
+    return new WorkflowRunner({
       executions: this.p.executions,
       context: this.p.context,
       events: this.hub,
@@ -113,9 +116,14 @@ export class ExecutionsService {
       ids: this.ids,
       usage: this.p.usage, // M33: los tokens de ejecución cuentan hacia la cuota diaria del workspace
     });
-    void runner.run(input).catch(() => {
-      /* execution.failed ya fue emitido al stream por el runner */
-    });
+  }
+
+  private runInline(input: RunInput): void {
+    void this.newRunner()
+      .run(input)
+      .catch(() => {
+        /* execution.failed ya fue emitido al stream por el runner */
+      });
   }
 
   /**
@@ -156,15 +164,9 @@ export class ExecutionsService {
     };
 
     if (this.queue) {
-      // Durable: el worker deriva de nuevo `resumeCompleted` de NodeRun (Postgres) y carga el
-      // contexto de Redis. jobId distinto del original (que sigue en removeOnComplete) → sin colisión.
-      await this.queue.add('run', input, {
-        jobId: `${executionId}:resume:${resumeKey}`,
-        attempts: 5,
-        backoff: { type: 'fixed', delay: 400 },
-        removeOnComplete: 200,
-        removeOnFail: 200,
-      });
+      // Reanudación: instancia NUEVA con id distinto del original (que ya terminó) → sin colisión. El
+      // runner deriva `resumeCompleted` de NodeRun y carga el contexto del Durable Object.
+      await this.queue.dispatch(`${executionId}:resume:${resumeKey}`, input);
       return;
     }
     this.runInline(input);

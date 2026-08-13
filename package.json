@@ -2,7 +2,7 @@
   "name": "agentflow",
   "private": true,
   "version": "0.0.0",
-  "description": "Plataforma SaaS de orquestacion de agentes de IA con editor visual de workflows",
+  "description": "Plataforma SaaS de orquestacion de agentes de IA con editor visual de workflows (Cloudflare Workers)",
   "packageManager": "pnpm@10.8.0",
   "engines": {
     "node": ">=22"
@@ -18,7 +18,8 @@
     "db:migrate": "pnpm --filter @core/infra run prisma:migrate",
     "db:seed": "pnpm --filter @core/infra run prisma:seed",
     "changeset": "changeset",
-    "verify": "pnpm build && pnpm typecheck && pnpm lint && pnpm depcruise && pnpm test"
+    "verify": "pnpm build && pnpm typecheck && pnpm lint && pnpm depcruise && pnpm test",
+    "deploy": "pnpm --filter @app/api deploy && pnpm --filter @app/web deploy"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.10",

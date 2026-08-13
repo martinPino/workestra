@@ -1,19 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import { JwtService } from '@nestjs/jwt';
-import { InMemoryAuthRepository } from '@core/infra';
+import { InMemoryAuthRepository } from '@core/infra/postgres';
+import { WebCryptoTokenSigner } from './token-signer';
 import { AuthService, EmailTakenError } from './auth.service';
-import type { PersistenceBundle } from '../persistence/persistence.module';
+import type { PersistenceBundle } from '../persistence/bundle';
 
-/** Construye un AuthService con un JwtService real y un bundle mínimo (solo `auth` importa aquí). */
+/** Construye un AuthService con un firmante real y un bundle mínimo (solo `auth` importa aquí). */
 function makeService(seedEmails: string[] = []) {
   const auth = new InMemoryAuthRepository(seedEmails.map((email) => ({ email, name: 'X', passwordHash: 'x', role: 'OWNER' as const })));
-  const jwt = new JwtService({ secret: 'test-secret', signOptions: { expiresIn: '1h' } });
+  const jwt = new WebCryptoTokenSigner('test-secret');
   const svc = new AuthService(jwt, { auth } as unknown as PersistenceBundle);
   return { svc, jwt };
 }
 
-function decode(jwt: JwtService, token: string) {
-  return jwt.verify<{ sub: string; email: string; role: string; workspaceId: string }>(token);
+function decode(jwt: WebCryptoTokenSigner, token: string) {
+  return jwt.verify(token);
 }
 
 describe('AuthService — registro/login (M73)', () => {
@@ -23,7 +23,7 @@ describe('AuthService — registro/login (M73)', () => {
     expect(s.user.email).toBe('ana@empresa.com');
     expect(s.user.role).toBe('OWNER');
     expect(s.user.workspaceId).toBeTruthy();
-    const payload = decode(jwt, s.accessToken);
+    const payload = await decode(jwt, s.accessToken);
     expect(payload.sub).toBe(s.user.id); // el JWT lleva el id REAL, no un sub arbitrario
     expect(payload.workspaceId).toBe(s.user.workspaceId);
     expect(payload.role).toBe('OWNER');

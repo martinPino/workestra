@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { UnauthorizedException } from '../http/common';
 import type { TriggerBindingRecord } from '@core/engine';
 import { TriggersService } from './triggers.service';
-import type { PersistenceBundle } from '../persistence/persistence.module';
+import type { PersistenceBundle } from '../persistence/bundle';
 import type { ExecutionsService } from '../execution/executions.service';
 
 type Started = { workflowId: string; ctx: Record<string, unknown> };

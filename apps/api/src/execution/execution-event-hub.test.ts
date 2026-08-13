@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { InMemoryEventStore } from '@core/infra';
 import type { INodeRunRepository } from '@core/engine';
 import { ExecutionEventHub } from './execution-event-hub';
-import type { PersistenceBundle } from '../persistence/persistence.module';
+import type { PersistenceBundle } from '../persistence/bundle';
 
 const noopNodeRuns: INodeRunRepository = {
   async upsert() {},

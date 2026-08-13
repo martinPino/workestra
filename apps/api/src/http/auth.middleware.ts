@@ -57,6 +57,23 @@ async function statusOf(persistence: PersistenceBundle, email: string): Promise<
   return status;
 }
 
+/**
+ * Extrae la credencial. Normalmente del `Authorization: Bearer`, pero un WebSocket de navegador NO
+ * puede fijar cabeceras: la API `WebSocket` del navegador solo deja pasar subprotocolos. Por eso se
+ * acepta también `Sec-WebSocket-Protocol: bearer, <token>`, que es el patrón habitual.
+ *
+ * NO se acepta por query string, que era la otra opción: la URL acaba en logs de acceso, historiales y
+ * cabeceras `Referer`, y ahí un token de sesión de 7 días es una credencial filtrada.
+ */
+function bearerToken(authorization?: string, wsProtocol?: string): string | null {
+  if (authorization?.startsWith('Bearer ')) return authorization.slice('Bearer '.length);
+  if (wsProtocol) {
+    const parts = wsProtocol.split(',').map((p) => p.trim());
+    if (parts[0] === 'bearer' && parts[1]) return parts[1];
+  }
+  return null;
+}
+
 /** Variables que este middleware deja en el contexto para los handlers. */
 export interface AuthVariables {
   user: JwtPayload;
@@ -71,9 +88,8 @@ export function authMiddleware(jwtSecret: string): MiddlewareHandler<{ Variables
   return async (c, next) => {
     if (isPublicRoute(c.req.method, new URL(c.req.url).pathname)) return next();
 
-    const header = c.req.header('authorization');
-    if (!header?.startsWith('Bearer ')) throw new UnauthorizedException('Falta el Bearer token.');
-    const token = header.slice('Bearer '.length);
+    const token = bearerToken(c.req.header('authorization'), c.req.header('sec-websocket-protocol'));
+    if (!token) throw new UnauthorizedException('Falta el Bearer token.');
 
     const persistence = c.get('persistence');
     if (!persistence) throw new InternalServerErrorException('El bundle de persistencia no está en el contexto.');
