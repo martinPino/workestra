@@ -1,21 +1,17 @@
 # Migración a Cloudflare
 
-Plan de re-plataforma de Workestra desde Railway (contenedores Node) a Cloudflare (Workers,
-Workflows, Durable Objects, Hyperdrive, R2, Containers). Es un documento de trabajo: cada fase se
-despliega y se valida por separado, y **hasta la fase 4 el sistema sigue corriendo en Railway**.
+Re-plataforma de Workestra desde Railway (contenedores Node) a Cloudflare (Workers, Workflows,
+Durable Objects, Hyperdrive, R2, Containers). **La migración está hecha**; este documento conserva el
+razonamiento —qué se cambió por qué, y qué se decidió NO hacer— y lo que queda para servir producción.
 
-> Estado del despliegue actual y variables de Railway: [`DEPLOY.md`](../DEPLOY.md).
 > Arquitectura y flujo de ejecución: [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Por qué es viable
 
-La arquitectura hexagonal ya hizo el 60 % del trabajo. `@core/engine` depende **solo** de los
-puertos de `packages/engine/src/ports.ts`; los adaptadores concretos (Prisma/Redis/BullMQ) están
-aislados en `@core/infra` y se inyectan desde una única *composition root*
-(`buildPersistence()` en la API, `main()` en el worker).
-
-**Migrar = escribir adaptadores nuevos y una cáscara HTTP nueva.** El motor, el dominio, los
-contratos y el router de LLM no se tocan:
+La arquitectura hexagonal hizo la mayor parte del trabajo. `@core/engine` depende **solo** de los
+puertos de `packages/engine/src/ports.ts`, y los adaptadores concretos están aislados en
+`@core/infra`. Migrar salió siendo **escribir adaptadores nuevos y una cáscara HTTP nueva**: el motor,
+el dominio, los contratos y el router de LLM no se tocaron ni una línea.
 
 | Paquete | Líneas | Cambios |
 |---|---|---|
@@ -25,9 +21,11 @@ contratos y el router de LLM no se tocan:
 | `@core/llm` | 683 | **Ninguno** — ya usa `fetch` |
 | `@core/infra` | 3.754 | Adaptadores nuevos (los de Prisma/Redis se conservan para dev local) |
 | `@core/sdk-plugins` | 8.691 | 3 nodos (`code`, `browser`, `extract`); el resto ya es `fetch` |
-| `apps/api` | 7.457 | Capa HTTP reescrita; los servicios se conservan |
-| `apps/worker` | 1.126 | Se retira, sustituido por Workflows |
+| `apps/api` | 7.457 | Capa HTTP reescrita (Hono); los servicios se conservan |
+| `apps/worker` | 1.126 | **Retirado**, sustituido por Workflows |
 | `apps/web` | 17.953 | Solo el cliente WebSocket |
+
+(Cifras de antes de empezar; el reparto de cambios se mantuvo.)
 
 ## Mapa de la plataforma destino
 
@@ -44,13 +42,13 @@ Navegador ──────────────▶│ Worker `web` (Assets)
               Hyperdrive ───┘         │          │             └─── R2 (ficheros, 48 h)
                  │                    │          │
             Postgres            Durable Object   Workflow `execution`
-          (event log,          `ExecutionRoom`   (1 nodo = 1 step)
+          (event log,          `ExecutionRoom`   (durable · resume-safe)
            versiones,          WS + pub/sub          │
-           NodeRun)            + checkpoint          └──▶ Container `runtime`
+           NodeRun)            + checkpoint          └──▶ Container `runtime` (fase 5)
                                                           code · browser · OCR
 ```
 
-| Hoy | Cloudflare | Puerto que implementa |
+| Antes | Ahora | Puerto que implementa |
 |---|---|---|
 | SPA en contenedor | Worker + Assets | — |
 | NestJS + Express | Worker + Hono | — |
@@ -58,13 +56,13 @@ Navegador ──────────────▶│ Worker `web` (Assets)
 | Redis pub/sub `exec:*` | El mismo Durable Object | `IEventPublisher` |
 | `RedisContextStore` | DO storage | `IContextStore` |
 | `RedisFileStore` (TTL 48 h) | R2 + lifecycle rule | `IFileStore` |
-| `RedisWorkspaceUsageRepository` | DO storage con alarm diaria | `IWorkspaceUsageRepository` |
+| `RedisWorkspaceUsageRepository` | DO storage, poda al escribir | `IWorkspaceUsageRepository` |
 | BullMQ cola `execution` | Cloudflare Workflows | — |
-| BullMQ cola `schedule` | Cron Trigger + DO alarms | `IScheduleRepository` |
+| BullMQ cola `schedule` | Cron Trigger (tick minutal) | `IScheduleRepository` |
 | Prisma + Postgres directo | Prisma + `@prisma/adapter-pg` + Hyperdrive | todos los `Prisma*Repository` |
 | `nodemailer` (SMTP) | API HTTP (Resend/SES) | `IEmailService` |
-| `worker_threads` + `vm` | Cloudflare Sandboxes | nodo `code` |
-| `playwright-core` local | Browser Rendering | `BrowserEngine` |
+| `worker_threads` + `vm` | Container `runtime` | nodo `code` |
+| `playwright-core` local | Container `runtime` (o engine `browserbase`) | `BrowserEngine` |
 | `tesseract.js` + `pdf-parse` | Container `runtime` | nodo `extract` |
 
 ## Límites de plataforma que condicionan el diseño
@@ -81,10 +79,9 @@ subrequests por invocación. Cron Triggers, consumidores de cola y alarms de DO:
 
 Dos consecuencias de diseño, no negociables:
 
-1. **El resultado de cada step va a 1 MiB.** El `ExecutionContext` de Workestra crece con las salidas
-   de los nodos y ya hoy se checkpointea entero. En Workflows **no** se pasa el contexto entre steps:
-   cada step devuelve un puntero (`execId`) y lee/escribe el contexto en el DO. Es el mismo patrón
-   que ya usa `FileRef` para no meter bytes en el contexto.
+1. **El resultado de cada step va a 1 MiB.** El `ExecutionContext` crece con las salidas de los nodos,
+   así que **no** viaja entre steps: vive en el Durable Object de la ejecución y los steps solo mueven
+   el `executionId`. Es el mismo patrón que ya usaba `FileRef` para no meter bytes en el contexto.
 2. **5 min de CPU es el techo real de un nodo.** Un nodo agente que espera al LLM no consume CPU
    (es IO), así que cabe de sobra. Lo que no cabe es OCR de un PDF grande ni un Playwright local:
    por eso van a Container.
@@ -93,36 +90,33 @@ Dos consecuencias de diseño, no negociables:
 
 | Fase | Estado |
 |---|---|
-| 1 — `web` a Workers Assets | **Hecha.** Falta crear el proyecto en Cloudflare y fijar `VITE_API_URL` |
-| 2 — Adaptadores en `@core/infra` | **Hecha.** Con tests contra bindings falsos |
-| 3 — `api` a Hono sobre Workers | **A medias.** Worker empaqueta; 4 de 14 routers portados |
-| 4 — Ejecución a Workflows | Sin empezar |
-| 5 — `code`/`browser`/OCR a Containers | Sin empezar |
+| 1 — `web` a Workers Assets | **Hecha** |
+| 2 — Adaptadores en `@core/infra` | **Hecha**, con tests contra bindings falsos |
+| 3 — `api` a Hono sobre Workers | **Hecha** salvo `/mcp` y `/analytics` (501) |
+| 4 — Ejecución a Workflows + Cron | **Hecha.** BullMQ y `apps/worker` retirados |
+| 5 — `code`/`browser`/OCR a Containers | **Imagen escrita, sin desplegar.** El binding va comentado en `wrangler.jsonc` |
 
-Lo que falta de la fase 3:
+Railway queda retirado: se borran `Dockerfile`, `railway.json`, `DEPLOY.md`, `scripts/start.sh`,
+`apps/web/serve.mjs` y `apps/worker`.
 
-1. **Rutas** — faltan 10: `auth`, `webhooks`, `schedules`, `connectors`, `triggers`, `api-keys`,
-   `mcp`, `team`, `analytics` y `shares`. Portados: `agents`, `workflows`, `executions` (que absorbe
-   el de escalado humano) y `llm-keys`. Son delegación fina: el riesgo no es la lógica, es perder un
-   `@RequireScopes` por el camino (no rompe ningún test y abre una escritura a VIEWER) o invertir el
-   orden entre una ruta literal y una paramétrica.
-2. **`AuthService`** — cambiar `@nestjs/jwt` por `signJwt`/`verifyJwt`. `verify` pasa a ser `async`.
-3. **`apps/web`** — `socket.io-client` por `WebSocket` nativo contra `/executions/:id/stream`.
-4. **Tests** — mover los de `apps/api` y `@core/infra` a `@cloudflare/vitest-pool-workers`.
+### Lo que falta para servir producción
 
-Sobre el punto 4, la lección ya llegó: `pnpm verify` daba verde mientras el Worker **no empaquetaba**,
-porque los servicios importaban `PERSISTENCE` desde `persistence.module.ts` y eso arrastraba NestJS
-entero al bundle. Lo cazó `wrangler deploy --dry-run`, no el typecheck ni los tests. Es el mismo
-patrón que `CLAUDE.md` documenta para el contenedor DI, y hasta que los tests corran en `workerd` el
-dry-run es la única red: **conviene tenerlo en CI antes de portar más rutas**.
+1. **Provisionar** en Cloudflare: `wrangler hyperdrive create` (y pegar el id), el bucket
+   `workestra-files` **con su lifecycle rule**, y los secretos (`JWT_SECRET`, `KMS_MASTER_KEY`,
+   `BREVO_API_KEY`/`RESEND_API_KEY`, los `*_CLIENT_SECRET`).
+2. **`/mcp`** — el SDK usa el transporte Streamable HTTP sobre `IncomingMessage`/`ServerResponse` de
+   Node. Portarlo pide un transporte nuevo sobre `Request`/`Response`; no es un cambio de import.
+3. **`/analytics`** — sin portar, sin más motivo que no haber llegado.
+4. **Fase 5** — construir y publicar la imagen de `containers/runtime`, y descomentar el binding.
+5. **Rate limiting de verdad** — el middleware cuenta por isolate, no globalmente, así que en
+   Cloudflare es más débil que en Railway. La barrera real son WAF o Rate Limiting Rules;
+   **configúralas antes de abrir el dominio**.
+6. **Tests en `workerd`** — mover `apps/api` y `@core/infra` a `@cloudflare/vitest-pool-workers`.
 
-Estado del bundle: **1,31 MB gzip** de los 10 MB de techo, con el query engine WASM de Prisma dentro y
-sin rastro de `@nestjs`, `nodemailer`, `ioredis` ni `bullmq`. Las librerías de OCR/PDF/navegador se
-sustituyen por un stub vía `alias` (valían 1,7 MB de código inejecutable ahí); vuelven en la fase 5.
-
-**El despacho es INLINE mientras tanto** (`queue = null` en `http/services.ts`): la ejecución corre
-dentro de la propia invocación del Worker, con el techo de 5 min de CPU. Sirve para el editor y runs
-cortos; no para producción. Es justo lo que resuelve la fase 4.
+Sobre el punto 6, la lección llegó dos veces en esta migración: `pnpm verify` daba verde mientras el
+Worker **no empaquetaba** (NestJS entero colado en el bundle por un import de `PERSISTENCE`), y el
+contenedor DI de Nest se rompió sin que ningún test lo notara. Hasta que los tests corran en `workerd`,
+`wrangler deploy --dry-run` —ya en CI— es la única red.
 
 ## Fases
 

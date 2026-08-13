@@ -55,7 +55,17 @@
   // Disparo de los triggers programados. Cada minuto porque los patrones cron son POR SCHEDULE y viven
   // en la base de datos; Cloudflare solo admite crons fijos aquí, así que el tick es minutal y `dueNow`
   // decide a quién le toca. Sustituye a los repeatable jobs de BullMQ.
-  "triggers": { "crons": ["* * * * *"] }
+  "triggers": { "crons": ["* * * * *"] },
+
+  // Fase 5: los tres nodos que no caben en un isolate (code, browser, extract). Se declara comentado
+  // porque exige construir y publicar la imagen primero (`containers/runtime/Dockerfile`) y el plan
+  // Workers Paid; descomentar cuando la imagen exista o el despliegue falla al resolverla.
+  //
+  // "containers": [
+  //   { "class_name": "RuntimeContainer", "image": "./containers/runtime/Dockerfile", "instance_type": "standard-1" }
+  // ],
+
+  "vars": {}
 
   // Secretos (`wrangler secret put`, NUNCA aquí): JWT_SECRET, KMS_MASTER_KEY, BREVO_API_KEY o
   // RESEND_API_KEY, y los *_CLIENT_SECRET de Slack/Jira/GitHub.
