@@ -92,7 +92,7 @@ Dos consecuencias de diseño, no negociables:
 |---|---|
 | 1 — `web` a Workers Assets | **Hecha** |
 | 2 — Adaptadores en `@core/infra` | **Hecha**, con tests contra bindings falsos |
-| 3 — `api` a Hono sobre Workers | **Hecha** salvo `/mcp` y `/analytics` (501) |
+| 3 — `api` a Hono sobre Workers | **Hecha**, `/mcp` y `/analytics` incluidos |
 | 4 — Ejecución a Workflows + Cron | **Hecha.** BullMQ y `apps/worker` retirados |
 | 5 — `code`/`browser`/OCR a Containers | **Imagen escrita, sin desplegar.** El binding va comentado en `wrangler.jsonc` |
 
@@ -101,22 +101,56 @@ Railway queda retirado: se borran `Dockerfile`, `railway.json`, `DEPLOY.md`, `sc
 
 ### Lo que falta para servir producción
 
-1. **Provisionar** en Cloudflare: `wrangler hyperdrive create` (y pegar el id), el bucket
-   `workestra-files` **con su lifecycle rule**, y los secretos (`JWT_SECRET`, `KMS_MASTER_KEY`,
-   `BREVO_API_KEY`/`RESEND_API_KEY`, los `*_CLIENT_SECRET`).
-2. **`/mcp`** — el SDK usa el transporte Streamable HTTP sobre `IncomingMessage`/`ServerResponse` de
-   Node. Portarlo pide un transporte nuevo sobre `Request`/`Response`; no es un cambio de import.
-3. **`/analytics`** — sin portar, sin más motivo que no haber llegado.
-4. **Fase 5** — construir y publicar la imagen de `containers/runtime`, y descomentar el binding.
-5. **Rate limiting de verdad** — el middleware cuenta por isolate, no globalmente, así que en
+Todo lo que queda exige una CUENTA de Cloudflare y decisiones de coste. El código está completo.
+
+1. **Provisionar** en Cloudflare: `wrangler hyperdrive create` (y pegar el id en `wrangler.jsonc`), el
+   bucket `workestra-files` **con su lifecycle rule**, y los secretos (`JWT_SECRET`, `KMS_MASTER_KEY`,
+   `BREVO_API_KEY`/`RESEND_API_KEY`, los `*_CLIENT_SECRET`). Hyperdrive necesita además un Postgres
+   gestionado al que apuntar (Neon/Supabase): el de Railway ya no existe.
+2. **Fase 5** — construir y publicar la imagen de `containers/runtime`, y descomentar el binding.
+   Exige plan Workers Paid.
+3. **Rate limiting de verdad** — el middleware cuenta por isolate, no globalmente, así que en
    Cloudflare es más débil que en Railway. La barrera real son WAF o Rate Limiting Rules;
    **configúralas antes de abrir el dominio**.
-6. **Tests en `workerd`** — mover `apps/api` y `@core/infra` a `@cloudflare/vitest-pool-workers`.
 
-Sobre el punto 6, la lección llegó dos veces en esta migración: `pnpm verify` daba verde mientras el
-Worker **no empaquetaba** (NestJS entero colado en el bundle por un import de `PERSISTENCE`), y el
-contenedor DI de Nest se rompió sin que ningún test lo notara. Hasta que los tests corran en `workerd`,
-`wrangler deploy --dry-run` —ya en CI— es la única red.
+### Lo que ya no falta
+
+- **`/analytics`** — portado. La diferencia de fondo está en `PlatformAdminService`: en Nest resolvía
+  los correos de la allowlist a ids de usuario en `onModuleInit`, una vez al arrancar el proceso. En
+  Workers no hay arranque, así que resuelve PEREZOSAMENTE en la primera consulta del isolate y cachea
+  ahí. Un fallo de base de datos NO se cachea: la petición falla cerrada, pero la siguiente reintenta
+  en vez de dejar al administrador fuera hasta que el isolate se recicle.
+- **`/mcp`** — portado con un transporte propio (`WebTransport`) que implementa la interfaz `Transport`
+  del SDK en vez de falsificar `IncomingMessage`/`ServerResponse`. La interfaz es diminuta
+  (`start`/`send`/`close` + callbacks) y `Protocol.connect()` acepta cualquier cosa que la cumpla, así
+  que las tools, resources y prompts no se tocaron.
+
+  Y va **SIN SESIÓN** a propósito. La versión de Railway guardaba un `Map` por `mcp-session-id` en la
+  instancia del servicio, que vivía tanto como el proceso; en Workers los servicios se construyen POR
+  PETICIÓN y cada petición puede caer en otro isolate, así que ese `Map` estaría casi siempre vacío. No
+  habría fallado ruidosamente —el `initialize` va bien y la siguiente llamada diría «sesión caducada»—
+  sino de forma intermitente, que es peor. Es el modo que el propio SDK recomienda para serverless.
+- **Tests en `workerd`** — `apps/api` tiene dos suites: los unitarios siguen en Node (lógica pura: RBAC,
+  cron, sanitizador, el protocolo MCP contra un servidor real del SDK) y `src/**/*.workers.test.ts`
+  ARRANCAN el Worker dentro de `workerd` con el `wrangler.jsonc` de producción y le hacen peticiones
+  reales. Ambas corren en CI.
+
+  La lección llegó dos veces en esta migración: `pnpm verify` daba verde mientras el Worker **no
+  empaquetaba** (NestJS entero colado en el bundle por un import de `PERSISTENCE`), y el contenedor DI
+  de Nest se rompió sin que ningún test lo notara. `wrangler deploy --dry-run` prueba que el bundle SE
+  CONSTRUYE; los tests de `workerd` prueban que además CORRE. Nada más montarlos encontraron que el
+  Worker es fail-closed con `JWT_SECRET` (las 9 aserciones fallaban hasta dárselo), que una ruta
+  desconocida sale 401 y no 404 —el middleware es deny-by-default y no revela qué rutas existen— y que
+  `/mcp` con cabecera lo rechaza el middleware global antes de llegar al handler, igual que hacía el
+  guard de Nest.
+
+  **Ojo con las versiones**: el pool exige vitest 4 y el resto del monorepo sigue en vitest 2 (subirlo
+  a todos arrastraría vite 5 → 6 en la web). Por eso `apps/api` lleva su propio `vitest` y `vite` en
+  devDependencies; pnpm aísla por paquete y nadie más se entera.
+
+  Lo que estas suites NO cubren: nada que toque la base de datos. Hyperdrive apunta a una Postgres
+  inexistente en el test, así que las rutas con BD salen 500. Cuando haga falta, se levanta una
+  Postgres y se apunta `WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` a ella.
 
 ## Fases
 

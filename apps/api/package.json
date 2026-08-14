@@ -8,7 +8,8 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --exclude \"**/*.workers.test.ts\" --exclude \"**/node_modules/**\"",
+    "test:workers": "WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE=postgresql://u:p@localhost:5432/db vitest run --config vitest.workers.config.mts"
   },
   "dependencies": {
     "@core/contracts": "workspace:*",
@@ -22,7 +23,10 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.21.3",
     "@types/node": "^22.10.2",
+    "vite": "^6",
+    "vitest": "^4",
     "wrangler": "^4.122.0"
   }
 }

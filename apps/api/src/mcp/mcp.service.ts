@@ -1,8 +1,5 @@
-import { randomUUID } from 'node:crypto';
-import type { IncomingMessage, ServerResponse } from 'node:http';
-import { Injectable } from '../http/common';
-import { McpServer, StreamableHTTPServerTransport, isInitializeRequest } from './mcp-sdk';
-import type { McpServerLike, StreamableTransportLike } from './mcp-sdk';
+import { McpServer, WebTransport, type JsonRpcMessage } from './mcp-sdk';
+import type { McpServerLike } from './mcp-sdk';
 import { registerTools, type McpContext } from './tools';
 import { registerArchitectTools } from './architect';
 import { registerResources } from './resources';
@@ -15,14 +12,23 @@ import { RbacService } from '../rbac/rbac.service';
 import type { ApiKeyPrincipal } from '../api-keys/api-key.util';
 
 /**
- * Servidor MCP montado en la API (M32), transporte Streamable HTTP. Mantiene una sesión por conexión
- * (Map por `mcp-session-id`); en cada `initialize` crea un McpServer con las tools/resources ligados al
- * principal autenticado (workspace + rol), de modo que TODO queda acotado a su tenant.
+ * Servidor MCP montado en la API (M32). En cada petición se crea un `McpServer` con las tools,
+ * resources y prompts ligados al principal autenticado (workspace + rol), de modo que TODO queda
+ * acotado a su tenant.
+ *
+ * ── Sin sesión, y por qué ─────────────────────────────────────────────────────────────────────────
+ * La versión de Railway guardaba un `Map` de sesiones por `mcp-session-id` en la instancia del
+ * servicio, que vivía tanto como el proceso. En Workers no hay proceso: los servicios se construyen
+ * POR PETICIÓN y cada petición puede caer en un isolate distinto, así que ese `Map` estaría casi
+ * siempre vacío. No sería un fallo ruidoso —el `initialize` funcionaría y la siguiente llamada diría
+ * «sesión caducada»— sino intermitente, que es peor.
+ *
+ * Así que cada petición se basta a sí misma: se construye el servidor, se le da la vuelta al mensaje y
+ * se responde. Es el modo que el propio SDK recomienda para serverless. El coste es rearmar el
+ * registro de tools por petición (objetos en memoria, sin IO); lo que se gana es que no hay estado
+ * pegado a un isolate que pueda desaparecer entre dos llamadas del mismo cliente.
  */
-@Injectable()
 export class McpService {
-  private readonly sessions = new Map<string, StreamableTransportLike>();
-
   constructor(
     private readonly workflows: WorkflowsService,
     private readonly agents: AgentsService,
@@ -49,45 +55,17 @@ export class McpService {
   }
 
   /**
-   * Maneja una petición MCP (POST mensajes / GET stream SSE / DELETE cierre). `principal` lo resuelve el
-   * controller (cabecera Bearer o key en la URL). Reutiliza la sesión si existe; si es un `initialize`
-   * sin sesión, crea transporte + servidor. El transporte ESCRIBE la respuesta (no devolvemos nada).
+   * Procesa un mensaje JSON-RPC y devuelve la respuesta, o `null` si era una notificación (a las que
+   * el protocolo no contesta). Quien llama traduce eso a 200 con cuerpo o 202 sin él.
    */
-  async handle(req: IncomingMessage, res: ServerResponse, body: unknown, principal: ApiKeyPrincipal): Promise<void> {
-    const sessionId = req.headers['mcp-session-id'] as string | undefined;
-
-    const existing = sessionId ? this.sessions.get(sessionId) : undefined;
-    if (existing) {
-      await existing.handleRequest(req, res, body);
-      return;
+  async handle(message: JsonRpcMessage, principal: ApiKeyPrincipal): Promise<JsonRpcMessage | null> {
+    const transport = new WebTransport();
+    const server = this.createServer(principal);
+    await server.connect(transport);
+    try {
+      return await transport.dispatch(message);
+    } finally {
+      await transport.close();
     }
-
-    if (req.method === 'POST' && isInitializeRequest(body)) {
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => randomUUID(),
-        onsessioninitialized: (sid: string) => this.sessions.set(sid, transport),
-        // Respuesta JSON directa (no SSE): es un servidor de tools request/response; compatible con los
-        // clientes y más simple. No usamos mensajes iniciados por el servidor (progreso/streaming).
-        enableJsonResponse: true,
-      });
-      transport.onclose = () => {
-        const sid = transport.sessionId;
-        if (sid) this.sessions.delete(sid);
-      };
-      const server = this.createServer(principal);
-      await server.connect(transport);
-      await transport.handleRequest(req, res, body);
-      return;
-    }
-
-    res.statusCode = 400;
-    res.setHeader('content-type', 'application/json');
-    res.end(
-      JSON.stringify({
-        jsonrpc: '2.0',
-        error: { code: -32000, message: 'Falta o caducó mcp-session-id. Inicia con una petición initialize.' },
-        id: null,
-      }),
-    );
   }
 }

@@ -8,6 +8,8 @@ import { buildCloudflarePersistence, closeBundle } from './http/composition';
 import { buildServices, type Services } from './http/services';
 import { WorkflowsDispatcher } from './execution/dispatcher';
 import { agentsRouter } from './http/routers/agents';
+import { ingestRouter, insightsRouter } from './http/routers/analytics';
+import { mcpRouter } from './http/routers/mcp';
 import { workflowsRouter } from './http/routers/workflows';
 import { executionsRouter } from './http/routers/executions';
 import { llmKeysRouter } from './http/routers/llm-keys';
@@ -78,15 +80,8 @@ function matchField(field: string, value: number): boolean {
 /**
  * Entry del API en Cloudflare Workers. Sustituye a `main.ts` (NestFactory + Express).
  *
- * ⚠️ PORT INCOMPLETO. Faltan los routers de `PENDIENTES`, que responden 501
- * con la lista de lo que falta (ver `PENDIENTES`), en vez de 404: un 404 se confundiría con una ruta que
- * no existe y haría pensar que el port está terminado. NO desplegar esto como el API de producción
- * todavía — por eso tampoco hay workflow de deploy.
+ * Port COMPLETO: todas las rutas del API de Nest están servidas aquí.
  */
-
-// `mcp` usa el transporte Streamable HTTP del SDK, que exige los objetos IncomingMessage/ServerResponse
-// de Node; portarlo pide un transporte nuevo sobre Request/Response. `analytics` simplemente falta.
-const PENDIENTES = ['mcp', 'analytics'];
 
 type AppEnv = { Bindings: Env; Variables: AuthVariables & { services: Services } };
 
@@ -175,6 +170,15 @@ function createApp(jwtSecret: string) {
   app.route('/webhooks', webhooksAdminRouter());
   app.route('/triggers', triggersAdminRouter());
 
+  // Analítica (M84): la ingesta y el panel van por prefijos distintos porque sus permisos son
+  // distintos (ver el router). `/ingest` no se llama `/analytics` para no caer en las listas de
+  // bloqueo de anuncios.
+  app.route('/ingest', ingestRouter());
+  app.route('/insights', insightsRouter());
+
+  // MCP (M32): sin sesión, cada petición se basta a sí misma. `/mcp/:key` es pública y autentica dentro.
+  app.route('/mcp', mcpRouter());
+
   // Ingreso público de terceros. `/hooks/jira` y `/hooks/sentry` van antes que `/hooks/:token`.
   app.route('/hooks', providerHooksRouter());
   app.route('/hooks', hooksRouter());
@@ -185,16 +189,8 @@ function createApp(jwtSecret: string) {
   // Proveedor OAuth de juguete: auto-aprueba y emite tokens sin verificar identidad. Nunca en producción.
   if (process.env.NODE_ENV !== 'production') app.route('/oauth/dev', devOAuthRouter());
 
-  app.all('*', (c) =>
-    c.json(
-      {
-        statusCode: 501,
-        message: 'Ruta no portada todavía al Worker. Ver docs/CLOUDFLARE.md.',
-        pendientes: PENDIENTES,
-      },
-      501,
-    ),
-  );
+  // Ya no hay rutas pendientes de portar: lo que no casa es un 404 de verdad.
+  app.notFound((c) => c.json({ statusCode: 404, message: 'Not Found' }, 404));
 
   return app;
 }

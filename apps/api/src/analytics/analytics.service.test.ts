@@ -126,12 +126,15 @@ describe('Administrador de plataforma — un correo no es una identidad', () => 
   const withAccounts = (emails: Record<string, string>) =>
     ({ auth: { async findByEmail(e: string) { return emails[e] ? { id: emails[e], email: e } : null; } } }) as never;
 
-  const boot = async (envValue: string | undefined, accounts: Record<string, string>) => {
+  /**
+   * Ya no hay `onModuleInit`: en Workers no existe arranque de módulo, así que la resolución es
+   * perezosa en la primera consulta del isolate. Los tests solo construyen el servicio; quien resuelve
+   * es el propio `isAdmin`, que por eso es `async`.
+   */
+  const boot = (envValue: string | undefined, accounts: Record<string, string>) => {
     if (envValue === undefined) delete process.env.ANALYTICS_ADMIN_EMAILS;
     else process.env.ANALYTICS_ADMIN_EMAILS = envValue;
-    const svc = new PlatformAdminService(withAccounts(accounts));
-    await svc.onModuleInit();
-    return svc;
+    return new PlatformAdminService(withAccounts(accounts));
   };
 
   beforeEach(() => {
@@ -139,36 +142,70 @@ describe('Administrador de plataforma — un correo no es una identidad', () => 
   });
 
   it('sin la variable configurada NO hay administradores (ni siquiera el dueño)', async () => {
-    const svc = await boot(undefined, { 'yo@empresa.com': 'u1' });
-    expect(svc.isAdmin('u1')).toBe(false);
+    const svc = boot(undefined, { 'yo@empresa.com': 'u1' });
+    expect(await svc.isAdmin('u1')).toBe(false);
   });
 
   it('una lista vacía no concede acceso a nadie', async () => {
-    const svc = await boot('   ', { 'yo@empresa.com': 'u1' });
-    expect(svc.isAdmin('u1')).toBe(false);
+    const svc = boot('   ', { 'yo@empresa.com': 'u1' });
+    expect(await svc.isAdmin('u1')).toBe(false);
   });
 
   it('concede por ID de la cuenta que YA existía, no por el correo', async () => {
-    const svc = await boot(' Yo@Empresa.com , otro@empresa.com ', { 'yo@empresa.com': 'u1', 'otro@empresa.com': 'u2' });
-    expect(svc.isAdmin('u1')).toBe(true);
-    expect(svc.isAdmin('u2')).toBe(true);
-    expect(svc.isAdmin('u3')).toBe(false);
-    expect(svc.isAdmin(undefined)).toBe(false);
+    const svc = boot(' Yo@Empresa.com , otro@empresa.com ', { 'yo@empresa.com': 'u1', 'otro@empresa.com': 'u2' });
+    expect(await svc.isAdmin('u1')).toBe(true);
+    expect(await svc.isAdmin('u2')).toBe(true);
+    expect(await svc.isAdmin('u3')).toBe(false);
+    expect(await svc.isAdmin(undefined)).toBe(false);
   });
 
   it('un correo de la lista SIN cuenta no concede nada: registrarse con él después no sirve', async () => {
     // Era la vía real: si `admin@…` está en la lista y nadie la ha registrado, quien se registre con esa
     // dirección se llevaría los datos de todos los clientes. Al resolver a ids al arrancar, no.
-    const svc = await boot('admin@empresa.com', {});
-    expect(svc.isAdmin('el-que-se-registro-luego')).toBe(false);
+    const svc = boot('admin@empresa.com', {});
+    expect(await svc.isAdmin('el-que-se-registro-luego')).toBe(false);
   });
 
   it('si la resolución falla, el permiso NO se concede', async () => {
     process.env.ANALYTICS_ADMIN_EMAILS = 'yo@empresa.com';
     const roto = { auth: { async findByEmail() { throw new Error('BD caída'); } } } as never;
     const svc = new PlatformAdminService(roto);
-    await svc.onModuleInit();
-    expect(svc.isAdmin('u1')).toBe(false);
+    expect(await svc.isAdmin('u1')).toBe(false);
+  });
+
+  it('resuelve UNA vez por isolate: la segunda consulta no vuelve a la base de datos', async () => {
+    process.env.ANALYTICS_ADMIN_EMAILS = 'yo@empresa.com';
+    let consultas = 0;
+    const contando = {
+      auth: {
+        async findByEmail(e: string) {
+          consultas++;
+          return { id: 'u1', email: e };
+        },
+      },
+    } as never;
+    const svc = new PlatformAdminService(contando);
+    expect(await svc.isAdmin('u1')).toBe(true);
+    expect(await svc.isAdmin('u1')).toBe(true);
+    expect(consultas).toBe(1);
+  });
+
+  it('un fallo de BD NO se cachea: la siguiente petición reintenta', async () => {
+    // Congelar el resultado dejaría al administrador fuera hasta reciclar el isolate por un error que
+    // puede durar un segundo. Falla cerrado en la petición que falla, y se recupera en la siguiente.
+    process.env.ANALYTICS_ADMIN_EMAILS = 'yo@empresa.com';
+    let intento = 0;
+    const intermitente = {
+      auth: {
+        async findByEmail(e: string) {
+          if (++intento === 1) throw new Error('BD caída');
+          return { id: 'u1', email: e };
+        },
+      },
+    } as never;
+    const svc = new PlatformAdminService(intermitente);
+    expect(await svc.isAdmin('u1')).toBe(false); // el fallo no concede
+    expect(await svc.isAdmin('u1')).toBe(true); // y no queda congelado
   });
 
   it('parseAllowlist normaliza espacios y mayúsculas', () => {
