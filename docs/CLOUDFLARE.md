@@ -103,15 +103,26 @@ Railway queda retirado: se borran `Dockerfile`, `railway.json`, `DEPLOY.md`, `sc
 
 Todo lo que queda exige una CUENTA de Cloudflare y decisiones de coste. El código está completo.
 
-1. **Provisionar** en Cloudflare: `wrangler hyperdrive create` (y pegar el id en `wrangler.jsonc`), el
-   bucket `workestra-files` **con su lifecycle rule**, y los secretos (`JWT_SECRET`, `KMS_MASTER_KEY`,
-   `BREVO_API_KEY`/`RESEND_API_KEY`, los `*_CLIENT_SECRET`). Hyperdrive necesita además un Postgres
-   gestionado al que apuntar (Neon/Supabase): el de Railway ya no existe.
-2. **Fase 5** — construir y publicar la imagen de `containers/runtime`, y descomentar el binding.
-   Exige plan Workers Paid.
-3. **Rate limiting de verdad** — el middleware cuenta por isolate, no globalmente, así que en
+Lo automatizable está en **`scripts/cloudflare-provision.sh`** (Hyperdrive + bucket con su lifecycle
+rule + secretos + comprobación previa). Lo que ese script NO puede hacer, comprobado contra la cuenta
+`40ac93b049bb3d8c6b5ee28d2b18725b` el 14/08/2026:
+
+1. **Una base de datos.** Hyperdrive es un POOL: no guarda nada, acelera el acceso a un Postgres que
+   ya existe. Hoy no hay ninguno — el servicio Postgres de Railway conserva sus variables de conexión
+   pero su deployment está **REMOVED**, igual que `api`, `web` y `worker`. Hay que revivirlo o crear
+   uno gestionado (Neon/Supabase) y restaurar. **Es la decisión que bloquea todo lo demás**: sin base
+   de datos, un despliegue arranca pero no sirve nada.
+2. **R2 habilitado.** `wrangler r2 bucket list` responde `code 10042: Please enable R2 through the
+   Cloudflare Dashboard`. Se habilita en el panel; no hay forma de hacerlo por API.
+3. **Plan Workers Paid** ($5/mes) para Workflows (la ejecución durable) y Containers (fase 5).
+4. **`KMS_MASTER_KEY` el mismo que en Railway.** Cifra los tokens de conectores con AES-GCM; con otro
+   valor quedan indescifrables y todos los usuarios tienen que reconectar sus integraciones. Es el
+   único dato de la migración que no se puede regenerar — y si se perdió al retirar Railway, conviene
+   saberlo antes de desplegar, no después.
+5. **Fase 5** — construir y publicar la imagen de `containers/runtime`, y descomentar el binding.
+6. **Rate limiting de verdad** — el middleware cuenta por isolate, no globalmente, así que en
    Cloudflare es más débil que en Railway. La barrera real son WAF o Rate Limiting Rules;
-   **configúralas antes de abrir el dominio**.
+   **configúralas antes de abrir el dominio** o `/auth/login` queda expuesta a fuerza bruta.
 
 ### Lo que ya no falta
 
