@@ -25,9 +25,9 @@
     "playwright-core": "./src/stubs/node-only.ts"
   },
 
-  // Pool de Postgres del lado de Cloudflare. El id sale de `wrangler hyperdrive create`; apunta al
-  // MISMO Postgres que usa Railway, que es lo que hace posible la convivencia.
-  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "<pendiente: wrangler hyperdrive create>" }],
+  // Pool de Postgres del lado de Cloudflare, apuntando al proyecto de Supabase. Hyperdrive NO es una
+  // base de datos: agrupa conexiones a una que ya existe. El Postgres que daba Railway está retirado.
+  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "88e3973177144db798d1509831407d72" }],
 
   // Ficheros efímeros de ejecución (M48). OJO: la caducidad de 48 h es una lifecycle rule del bucket,
   // no código — sin ella el bucket crece para siempre:

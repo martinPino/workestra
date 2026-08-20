@@ -1,3 +1,4 @@
+import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from 'cloudflare:workers';
 import type { RunInput } from '@core/engine';
 import { buildCloudflarePersistence, closeBundle } from '../http/composition';
 import { buildServices } from '../http/services';
@@ -20,22 +21,13 @@ import type { Env } from '../http/env';
  * (`DurableObjectContextStore`) y los steps solo mueven el `executionId`.
  */
 
-/** Lo que Workflows pasa al entrypoint. Se tipa a mano por lo mismo que el resto: globals en conflicto. */
-export interface WorkflowEvent<T> {
-  payload: T;
-}
-
-export interface WorkflowStep {
-  do<T>(name: string, callback: () => Promise<T>): Promise<T>;
-}
-
-export class ExecutionWorkflow {
-  constructor(
-    protected ctx: unknown,
-    protected env: Env,
-  ) {}
-
-  async run(event: WorkflowEvent<RunInput>, step: WorkflowStep): Promise<{ executionId: string; status: string }> {
+/**
+ * Extiende `WorkflowEntrypoint` — no basta con exportar la clase. El despliegue valida que lo sea y
+ * falla con `code 10021` («Workflow must be exported») ante una clase plana, que es engañoso: el
+ * problema no es la exportación sino la herencia. `ctx` y `env` los aporta la clase base.
+ */
+export class ExecutionWorkflow extends WorkflowEntrypoint<Env, RunInput> {
+  async run(event: Readonly<WorkflowEvent<RunInput>>, step: WorkflowStep): Promise<{ executionId: string; status: string }> {
     const input = event.payload;
     const { bundle, pool } = buildCloudflarePersistence(this.env);
 

@@ -24,3 +24,6 @@ coverage/
 
 # credenciales de conectores OAuth (local)
 .env.connectors
+
+# SQL de arranque generado para Supabase (se regenera desde prisma/migrations)
+supabase-bootstrap.sql
