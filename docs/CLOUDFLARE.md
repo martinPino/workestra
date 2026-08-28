@@ -86,82 +86,56 @@ Dos consecuencias de diseño, no negociables:
    (es IO), así que cabe de sobra. Lo que no cabe es OCR de un PDF grande ni un Playwright local:
    por eso van a Container.
 
-## Estado
+## Estado — EN PRODUCCIÓN
+
+Desplegado y verificado el 26/08/2026 contra la cuenta `40ac93b049bb3d8c6b5ee28d2b18725b`:
+
+| | |
+|---|---|
+| API | https://workestra-api.martin-schwarzbock.workers.dev |
+| Web | https://workestra-web.martin-schwarzbock.workers.dev |
+| Postgres | Supabase `cvhdzzcfptyhdvzuswrt` (35 tablas, 15 migraciones) vía Hyperdrive `88e39731…0d72` |
+| Ficheros | R2 `workestra-files`, lifecycle `expire-execution-files` (prefijo `file/`, 2 días) |
+| Ejecución | Workflow `execution` → `ExecutionWorkflow` |
+| Schedules | Cron `* * * * *`, disparando |
 
 | Fase | Estado |
 |---|---|
-| 1 — `web` a Workers Assets | **Hecha** |
+| 1 — `web` a Workers Assets | **Desplegada** |
 | 2 — Adaptadores en `@core/infra` | **Hecha**, con tests contra bindings falsos |
-| 3 — `api` a Hono sobre Workers | **Hecha**, `/mcp` y `/analytics` incluidos |
-| 4 — Ejecución a Workflows + Cron | **Hecha.** BullMQ y `apps/worker` retirados |
+| 3 — `api` a Hono sobre Workers | **Desplegada**, los 14 routers portados |
+| 4 — Ejecución a Workflows + Cron | **Desplegada.** BullMQ y `apps/worker` retirados |
 | 5 — `code`/`browser`/OCR a Containers | **Imagen escrita, sin desplegar.** El binding va comentado en `wrangler.jsonc` |
 
-Railway queda retirado: se borran `Dockerfile`, `railway.json`, `DEPLOY.md`, `scripts/start.sh`,
+Railway queda retirado: se borraron `Dockerfile`, `railway.json`, `DEPLOY.md`, `scripts/start.sh`,
 `apps/web/serve.mjs` y `apps/worker`.
 
-### Lo que falta para servir producción
+**Verificado de punta a punta en producción**, no solo en tests: registro (crea usuario + organización +
+workspace + membership de forma atómica), `/auth/me` con la sesión, listado acotado por tenant y
+creación de un workflow —escritura real en Postgres a través de Hyperdrive—. Y el deny-by-default:
+`/workflows`, `/agents` y `/mcp` devuelven 401 sin credencial.
 
-Todo lo que queda exige una CUENTA de Cloudflare y decisiones de coste. El código está completo.
+### Lo que queda
 
-Lo automatizable está en **`scripts/cloudflare-provision.sh`** (Hyperdrive + bucket con su lifecycle
-rule + secretos + comprobación previa). Lo que ese script NO puede hacer, comprobado contra la cuenta
-`40ac93b049bb3d8c6b5ee28d2b18725b` el 14/08/2026:
+1. **Rate limiting de verdad.** El middleware cuenta por isolate, no globalmente, así que en Cloudflare
+   es más débil que en Railway. La barrera real son WAF o Rate Limiting Rules; **configúralas antes de
+   poner un dominio propio** o `/auth/login` queda expuesta a fuerza bruta.
+2. **Fase 5** — construir y publicar la imagen de `containers/runtime` y descomentar el binding. Hasta
+   entonces los nodos de código, navegador y OCR fallan con un mensaje explícito en vez de un error
+   críptico.
+3. **Tests en `workerd`** para `@core/infra` (los de `apps/api` ya corren ahí).
+4. **Dominio propio** en vez de `*.workers.dev`, y rehacer el build de la web con el `VITE_API_URL`
+   nuevo — se hornea en build.
 
-1. **Una base de datos.** Hyperdrive es un POOL: no guarda nada, acelera el acceso a un Postgres que
-   ya existe. Hoy no hay ninguno — el servicio Postgres de Railway conserva sus variables de conexión
-   pero su deployment está **REMOVED**, igual que `api`, `web` y `worker`. Hay que revivirlo o crear
-   uno gestionado (Neon/Supabase) y restaurar. **Es la decisión que bloquea todo lo demás**: sin base
-   de datos, un despliegue arranca pero no sirve nada.
-2. **R2 habilitado.** `wrangler r2 bucket list` responde `code 10042: Please enable R2 through the
-   Cloudflare Dashboard`. Se habilita en el panel; no hay forma de hacerlo por API.
-3. **Plan Workers Paid** ($5/mes) para Workflows (la ejecución durable) y Containers (fase 5).
-4. **`KMS_MASTER_KEY` el mismo que en Railway.** Cifra los tokens de conectores con AES-GCM; con otro
-   valor quedan indescifrables y todos los usuarios tienen que reconectar sus integraciones. Es el
-   único dato de la migración que no se puede regenerar — y si se perdió al retirar Railway, conviene
-   saberlo antes de desplegar, no después.
-5. **Fase 5** — construir y publicar la imagen de `containers/runtime`, y descomentar el binding.
-6. **Rate limiting de verdad** — el middleware cuenta por isolate, no globalmente, así que en
-   Cloudflare es más débil que en Railway. La barrera real son WAF o Rate Limiting Rules;
-   **configúralas antes de abrir el dominio** o `/auth/login` queda expuesta a fuerza bruta.
+### Notas de operación
 
-### Lo que ya no falta
-
-- **`/analytics`** — portado. La diferencia de fondo está en `PlatformAdminService`: en Nest resolvía
-  los correos de la allowlist a ids de usuario en `onModuleInit`, una vez al arrancar el proceso. En
-  Workers no hay arranque, así que resuelve PEREZOSAMENTE en la primera consulta del isolate y cachea
-  ahí. Un fallo de base de datos NO se cachea: la petición falla cerrada, pero la siguiente reintenta
-  en vez de dejar al administrador fuera hasta que el isolate se recicle.
-- **`/mcp`** — portado con un transporte propio (`WebTransport`) que implementa la interfaz `Transport`
-  del SDK en vez de falsificar `IncomingMessage`/`ServerResponse`. La interfaz es diminuta
-  (`start`/`send`/`close` + callbacks) y `Protocol.connect()` acepta cualquier cosa que la cumpla, así
-  que las tools, resources y prompts no se tocaron.
-
-  Y va **SIN SESIÓN** a propósito. La versión de Railway guardaba un `Map` por `mcp-session-id` en la
-  instancia del servicio, que vivía tanto como el proceso; en Workers los servicios se construyen POR
-  PETICIÓN y cada petición puede caer en otro isolate, así que ese `Map` estaría casi siempre vacío. No
-  habría fallado ruidosamente —el `initialize` va bien y la siguiente llamada diría «sesión caducada»—
-  sino de forma intermitente, que es peor. Es el modo que el propio SDK recomienda para serverless.
-- **Tests en `workerd`** — `apps/api` tiene dos suites: los unitarios siguen en Node (lógica pura: RBAC,
-  cron, sanitizador, el protocolo MCP contra un servidor real del SDK) y `src/**/*.workers.test.ts`
-  ARRANCAN el Worker dentro de `workerd` con el `wrangler.jsonc` de producción y le hacen peticiones
-  reales. Ambas corren en CI.
-
-  La lección llegó dos veces en esta migración: `pnpm verify` daba verde mientras el Worker **no
-  empaquetaba** (NestJS entero colado en el bundle por un import de `PERSISTENCE`), y el contenedor DI
-  de Nest se rompió sin que ningún test lo notara. `wrangler deploy --dry-run` prueba que el bundle SE
-  CONSTRUYE; los tests de `workerd` prueban que además CORRE. Nada más montarlos encontraron que el
-  Worker es fail-closed con `JWT_SECRET` (las 9 aserciones fallaban hasta dárselo), que una ruta
-  desconocida sale 401 y no 404 —el middleware es deny-by-default y no revela qué rutas existen— y que
-  `/mcp` con cabecera lo rechaza el middleware global antes de llegar al handler, igual que hacía el
-  guard de Nest.
-
-  **Ojo con las versiones**: el pool exige vitest 4 y el resto del monorepo sigue en vitest 2 (subirlo
-  a todos arrastraría vite 5 → 6 en la web). Por eso `apps/api` lleva su propio `vitest` y `vite` en
-  devDependencies; pnpm aísla por paquete y nadie más se entera.
-
-  Lo que estas suites NO cubren: nada que toque la base de datos. Hyperdrive apunta a una Postgres
-  inexistente en el test, así que las rutas con BD salen 500. Cuando haga falta, se levanta una
-  Postgres y se apunta `WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` a ella.
+- **`KMS_MASTER_KEY` y `JWT_SECRET` son NUEVOS.** La base arrancó vacía, así que no había tokens de
+  conectores cifrados que preservar. Si algún día se restauran datos de Railway, esos tokens serán
+  ilegibles y cada usuario tendrá que reconectar sus integraciones.
+- **El esquema se aplicó por la Management API de Supabase**, no con `prisma migrate deploy`: el
+  contenedor de la sesión bloquea el TCP saliente al 5432. El SQL se genera desde
+  `prisma/migrations` incluyendo los checksums de `_prisma_migrations`, de modo que un `migrate deploy`
+  posterior las ve ya aplicadas y no intenta repetirlas.
 
 ## Fases
 
