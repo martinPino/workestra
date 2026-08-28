@@ -21,6 +21,8 @@ export interface Env {
   WORKSPACE_USAGE: DurableObjectNamespaceLike;
   /** Ejecución durable: una instancia de Workflow por ejecución. */
   EXECUTION: WorkflowBindingLike;
+  /** Un objeto por (ruta + IP): ventana deslizante del rate-limit de credenciales. */
+  RATE_LIMITER: DurableObjectNamespaceLike;
 
   /** Firma de las sesiones. Sin valor propio el Worker se niega a arrancar (igual que en Railway). */
   JWT_SECRET?: string;

@@ -2,12 +2,13 @@ import type { Context } from 'hono';
 import { BadRequestException } from '../common';
 import { workspaceOf, type AuthVariables } from '../auth.middleware';
 import type { Services } from '../services';
+import type { Env } from '../env';
 
 /**
  * El contexto que comparten todos los routers: el principal autenticado, el bundle de la petición y los
  * servicios construidos para ella.
  */
-export type RouterEnv = { Variables: AuthVariables & { services: Services } };
+export type RouterEnv = { Bindings: Env; Variables: AuthVariables & { services: Services } };
 
 /**
  * El `workspaceId` autenticado de la petición: el equivalente del decorador `@Workspace()`. Sale del

@@ -117,15 +117,38 @@ creación de un workflow —escritura real en Postgres a través de Hyperdrive�
 
 ### Lo que queda
 
-1. **Rate limiting de verdad.** El middleware cuenta por isolate, no globalmente, así que en Cloudflare
-   es más débil que en Railway. La barrera real son WAF o Rate Limiting Rules; **configúralas antes de
-   poner un dominio propio** o `/auth/login` queda expuesta a fuerza bruta.
+1. **WAF / Rate Limiting Rules.** NO se pueden configurar hoy: son funciones de ZONA y la cuenta no
+   tiene ninguna (`workers.dev` es la zona de Cloudflare, no del cliente). Quedan pendientes del
+   dominio propio. Mientras tanto la barrera vive en el Worker, ver abajo.
 2. **Fase 5** — construir y publicar la imagen de `containers/runtime` y descomentar el binding. Hasta
    entonces los nodos de código, navegador y OCR fallan con un mensaje explícito en vez de un error
    críptico.
 3. **Tests en `workerd`** para `@core/infra` (los de `apps/api` ya corren ahí).
 4. **Dominio propio** en vez de `*.workers.dev`, y rehacer el build de la web con el `VITE_API_URL`
    nuevo — se hornea en build.
+
+### Rate limiting
+
+Sin zona no hay WAF, así que la barrera es de aplicación: un Durable Object por clave con ventana
+deslizante de un minuto. Dos cosas salieron de PROBARLO contra producción, no de la teoría:
+
+- **La primera versión contaba en un `Map` de módulo**, cuyo alcance es el isolate. Como Cloudflare
+  atiende al mismo atacante desde muchos isolates, el límite real era «10 por minuto y por isolate»:
+  ninguno.
+- **Agrupar por IP exacta tampoco servía.** Al probarlo, 13 intentos seguidos salieron con 13 IPs
+  distintas del mismo /24 (el proxy de salida rota sobre un pool) y no saltó ni una vez. El test
+  ejecutó por accidente el ataque que debía parar. Cualquiera con un rango de nube tiene eso gratis.
+
+La versión desplegada cuenta dos claves con umbrales distintos a propósito:
+
+| Clave | Límite | Por qué |
+|---|---|---|
+| `ruta \| net:<IP /24 o /64>` | 60/min | Una subred puede tener decenas de usuarios legítimos (NAT corporativa, CGNAT móvil); castigarlos a todos por un atacante sería peor que el ataque |
+| `ruta \| email:<cuenta>` | 10/min | Es donde de verdad se para la fuerza bruta, y aguanta aunque el ataque venga repartido por muchas IPs |
+
+Verificado en producción: el intento 11 contra una cuenta devuelve 429 con `retryAfter`, y otra cuenta
+desde la misma subred sigue entrando. Es **fail-open** si el DO no responde: una incidencia de
+plataforma no debe tumbar todos los logins.
 
 ### Notas de operación
 

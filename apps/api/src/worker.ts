@@ -33,6 +33,7 @@ import type { Env } from './http/env';
 
 export { ExecutionRoom } from './durable/execution-room';
 export { WorkspaceUsage } from './durable/workspace-usage';
+export { RateLimiter } from './durable/rate-limiter';
 export { ExecutionWorkflow } from './workflows/execution.workflow';
 
 /**

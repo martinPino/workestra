@@ -37,7 +37,8 @@
   "durable_objects": {
     "bindings": [
       { "name": "EXECUTION_ROOM", "class_name": "ExecutionRoom" },
-      { "name": "WORKSPACE_USAGE", "class_name": "WorkspaceUsage" }
+      { "name": "WORKSPACE_USAGE", "class_name": "WorkspaceUsage" },
+      { "name": "RATE_LIMITER", "class_name": "RateLimiter" }
     ]
   },
 
@@ -45,6 +46,10 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["ExecutionRoom", "WorkspaceUsage"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["RateLimiter"]
     }
   ],
 

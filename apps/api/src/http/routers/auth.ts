@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { RegisterSchema, LoginSchema } from '@core/contracts';
 import type { Role } from '@core/contracts';
 import { BadRequestException, ConflictException, ForbiddenException, UnauthorizedException } from '../common';
-import { rateLimit } from '../rate-limit.middleware';
+import { rateLimit, emailSubject } from '../rate-limit.middleware';
 import { EmailTakenError, AccountDisabledError } from '../../auth/auth.service';
 import type { RouterEnv } from './types';
 
@@ -20,7 +20,7 @@ function devMinterEnabled(): boolean {
 export function authRouter(): Hono<RouterEnv> {
   const r = new Hono<RouterEnv>();
 
-  r.post('/register', rateLimit(), async (c) => {
+  r.post('/register', rateLimit({ subject: emailSubject }), async (c) => {
     const parsed = RegisterSchema.safeParse(await c.req.json().catch(() => ({})));
     if (!parsed.success) throw new BadRequestException(parsed.error.issues.map((i) => i.message).join('; '));
     try {
@@ -31,7 +31,7 @@ export function authRouter(): Hono<RouterEnv> {
     }
   });
 
-  r.post('/login', rateLimit(), async (c) => {
+  r.post('/login', rateLimit({ subject: emailSubject }), async (c) => {
     const parsed = LoginSchema.safeParse(await c.req.json().catch(() => ({})));
     if (!parsed.success) throw new BadRequestException(parsed.error.issues.map((i) => i.message).join('; '));
     let session;
